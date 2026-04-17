@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-gatsby"
+version = "0.1.0"
+description = "Local, citation-verified literary analysis and translation pipeline for The Great Gatsby"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Aaron Horvitz" }
+]
+dependencies = [
+  "PyYAML>=6.0",
+  "pydantic>=2.0",
+  "openai>=1.0.0",
+  "requests>=2.31.0",
+  "fpdf2>=2.7.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0"
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["agent_gatsby*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.setuptools.package-data]
+agent_gatsby = ["py.typed"]
