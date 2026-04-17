@@ -13,735 +13,735 @@ Build, test, debug, and package a working local AI pipeline that:
 ---
 
 # 0. Ground Rules for the Weekend
-- [ ] Do **not** start by chasing perfection.
-- [ ] Do **not** start by polishing the README again.
-- [ ] Do **not** start by designing advanced future features.
-- [ ] Build the **smallest working pipeline first**, then harden it.
-- [ ] At every stage, make sure there is a file on disk that proves the stage worked.
-- [ ] At every stage, add at least one test or one validation check.
-- [ ] If a stage fails, fix the stage before moving on.
-- [ ] Always keep the pipeline runnable from the command line.
-- [ ] Commit after each major milestone.
+- [ ] 0.1 Do **not** start by chasing perfection.
+- [ ] 0.2 Do **not** start by polishing the README again.
+- [ ] 0.3 Do **not** start by designing advanced future features.
+- [ ] 0.4 Build the **smallest working pipeline first**, then harden it.
+- [ ] 0.5 At every stage, make sure there is a file on disk that proves the stage worked.
+- [ ] 0.6 At every stage, add at least one test or one validation check.
+- [ ] 0.7 If a stage fails, fix the stage before moving on.
+- [ ] 0.8 Always keep the pipeline runnable from the command line.
+- [ ] 0.9 Commit after each major milestone.
 
 ---
 
 # 1. Definition of Done
 The project is considered done only if all of the following are true:
 
-- [ ] Repo has a clean structure.
-- [ ] README reflects the final architecture.
-- [ ] Config file exists and is used by code.
-- [ ] Source text is locked and hashed.
-- [ ] Passage indexing works.
-- [ ] Candidate metaphor extraction works.
-- [ ] Evidence ledger file is produced.
-- [ ] English outline is produced.
-- [ ] English draft is produced.
-- [ ] English quote/citation verification runs.
-- [ ] English final master is produced.
-- [ ] Spanish translation file is produced.
-- [ ] Mandarin translation file is produced.
-- [ ] QA checks for translations run.
-- [ ] Three PDFs are successfully rendered.
-- [ ] Unit tests run cleanly.
-- [ ] At least one lightweight end-to-end test runs.
-- [ ] Logs are written to disk.
-- [ ] Final manifest is written.
-- [ ] The repo can be demonstrated by running a clear command sequence.
+- [ ] 1.1 Repo has a clean structure.
+- [ ] 1.2 README reflects the final architecture.
+- [ ] 1.3 Config file exists and is used by code.
+- [ ] 1.4 Source text is locked and hashed.
+- [ ] 1.5 Passage indexing works.
+- [ ] 1.6 Candidate metaphor extraction works.
+- [ ] 1.7 Evidence ledger file is produced.
+- [ ] 1.8 English outline is produced.
+- [ ] 1.9 English draft is produced.
+- [ ] 1.10 English quote/citation verification runs.
+- [ ] 1.11 English final master is produced.
+- [ ] 1.12 Spanish translation file is produced.
+- [ ] 1.13 Mandarin translation file is produced.
+- [ ] 1.14 QA checks for translations run.
+- [ ] 1.15 Three PDFs are successfully rendered.
+- [ ] 1.16 Unit tests run cleanly.
+- [ ] 1.17 At least one lightweight end-to-end test runs.
+- [ ] 1.18 Logs are written to disk.
+- [ ] 1.19 Final manifest is written.
+- [ ] 1.20 The repo can be demonstrated by running a clear command sequence.
 
 ---
 
 # 2. Minimum Viable Scope
 This is the version you must finish first before adding anything fancy.
 
-## Required MVP components
-- [ ] `config/config.yaml`
-- [ ] `src/agent_gatsby/orchestrator.py`
-- [ ] `src/agent_gatsby/data_ingest.py`
-- [ ] `src/agent_gatsby/normalize.py`
-- [ ] `src/agent_gatsby/index_text.py`
-- [ ] `src/agent_gatsby/extract_metaphors.py`
-- [ ] `src/agent_gatsby/build_evidence_ledger.py`
-- [ ] `src/agent_gatsby/plan_outline.py`
-- [ ] `src/agent_gatsby/draft_english.py`
-- [ ] `src/agent_gatsby/verify_citations.py`
-- [ ] `src/agent_gatsby/critique_and_edit.py`
-- [ ] `src/agent_gatsby/translate_spanish.py`
-- [ ] `src/agent_gatsby/translate_mandarin.py`
-- [ ] `src/agent_gatsby/bilingual_qa.py`
-- [ ] `src/agent_gatsby/pdf_compiler.py`
-- [ ] `src/agent_gatsby/manifest_writer.py`
-- [ ] `tests/`
-- [ ] `requirements.txt`
-- [ ] `README.md`
+## 2.1 Required MVP components
+- [ ] 2.1.1 `config/config.yaml`
+- [ ] 2.1.2 `src/agent_gatsby/orchestrator.py`
+- [ ] 2.1.3 `src/agent_gatsby/data_ingest.py`
+- [ ] 2.1.4 `src/agent_gatsby/normalize.py`
+- [ ] 2.1.5 `src/agent_gatsby/index_text.py`
+- [ ] 2.1.6 `src/agent_gatsby/extract_metaphors.py`
+- [ ] 2.1.7 `src/agent_gatsby/build_evidence_ledger.py`
+- [ ] 2.1.8 `src/agent_gatsby/plan_outline.py`
+- [ ] 2.1.9 `src/agent_gatsby/draft_english.py`
+- [ ] 2.1.10 `src/agent_gatsby/verify_citations.py`
+- [ ] 2.1.11 `src/agent_gatsby/critique_and_edit.py`
+- [ ] 2.1.12 `src/agent_gatsby/translate_spanish.py`
+- [ ] 2.1.13 `src/agent_gatsby/translate_mandarin.py`
+- [ ] 2.1.14 `src/agent_gatsby/bilingual_qa.py`
+- [ ] 2.1.15 `src/agent_gatsby/pdf_compiler.py`
+- [ ] 2.1.16 `src/agent_gatsby/manifest_writer.py`
+- [ ] 2.1.17 `tests/`
+- [ ] 2.1.18 `requirements.txt`
+- [ ] 2.1.19 `README.md`
 
-## Explicitly postpone until MVP works
-- [ ] Embeddings
-- [ ] Semantic retrieval
-- [ ] Multi-model routing
-- [ ] Docker
-- [ ] CI/CD
-- [ ] Web UI
-- [ ] Fancy observability dashboards
-- [ ] Parallel execution
-- [ ] Advanced retry schedulers
+## 2.2 Explicitly postpone until MVP works
+- [ ] 2.2.1 Embeddings
+- [ ] 2.2.2 Semantic retrieval
+- [ ] 2.2.3 Multi-model routing
+- [ ] 2.2.4 Docker
+- [ ] 2.2.5 CI/CD
+- [ ] 2.2.6 Web UI
+- [ ] 2.2.7 Fancy observability dashboards
+- [ ] 2.2.8 Parallel execution
+- [ ] 2.2.9 Advanced retry schedulers
 
 ---
 
 # 3. Weekend Schedule Overview
-## Thursday Night
+## 3.1 Thursday Night
 Focus: repo scaffold + config + source lock + ingestion + normalization
 
-## Friday
+## 3.2 Friday
 Focus: indexing + candidate extraction + evidence ledger + outline
 
-## Saturday
+## 3.3 Saturday
 Focus: English drafting + verification + editorial pass + tests
 
-## Sunday
+## 3.4 Sunday
 Focus: translations + translation QA + PDFs + manifest + full dry run + final cleanup
 
 ---
 
 # 4. Thursday Night — Setup and Foundation
 ## 4.1 Create the repo structure
-- [ ] Open the repository root.
-- [ ] Create `config/`
-- [ ] Create `data/source/`
-- [ ] Create `data/normalized/`
-- [ ] Create `artifacts/manifests/`
-- [ ] Create `artifacts/evidence/`
-- [ ] Create `artifacts/drafts/`
-- [ ] Create `artifacts/translations/`
-- [ ] Create `artifacts/qa/`
-- [ ] Create `artifacts/logs/`
-- [ ] Create `outputs/`
-- [ ] Create `fonts/`
-- [ ] Create `src/agent_gatsby/`
-- [ ] Create `src/agent_gatsby/utils/`
-- [ ] Create `tests/`
+- [ ] 4.1.1 Open the repository root.
+- [ ] 4.1.2 Create `config/`
+- [ ] 4.1.3 Create `data/source/`
+- [ ] 4.1.4 Create `data/normalized/`
+- [ ] 4.1.5 Create `artifacts/manifests/`
+- [ ] 4.1.6 Create `artifacts/evidence/`
+- [ ] 4.1.7 Create `artifacts/drafts/`
+- [ ] 4.1.8 Create `artifacts/translations/`
+- [ ] 4.1.9 Create `artifacts/qa/`
+- [ ] 4.1.10 Create `artifacts/logs/`
+- [ ] 4.1.11 Create `outputs/`
+- [ ] 4.1.12 Create `fonts/`
+- [ ] 4.1.13 Create `src/agent_gatsby/`
+- [ ] 4.1.14 Create `src/agent_gatsby/utils/`
+- [ ] 4.1.15 Create `tests/`
 
 ## 4.2 Create base files
-- [ ] Create `README.md`
-- [ ] Create `requirements.txt`
-- [ ] Create `pyproject.toml` if you want packaging consistency
-- [ ] Create `config/config.yaml`
-- [ ] Create `src/agent_gatsby/__init__.py`
-- [ ] Create `src/agent_gatsby/schemas.py`
-- [ ] Create `src/agent_gatsby/config.py`
-- [ ] Create `src/agent_gatsby/orchestrator.py`
+- [ ] 4.2.1 Create `README.md`
+- [ ] 4.2.2 Create `requirements.txt`
+- [ ] 4.2.3 Create `pyproject.toml` if you want packaging consistency
+- [ ] 4.2.4 Create `config/config.yaml`
+- [ ] 4.2.5 Create `src/agent_gatsby/__init__.py`
+- [ ] 4.2.6 Create `src/agent_gatsby/schemas.py`
+- [ ] 4.2.7 Create `src/agent_gatsby/config.py`
+- [ ] 4.2.8 Create `src/agent_gatsby/orchestrator.py`
 
 ## 4.3 Install and verify local environment
-- [ ] Activate your environment.
-- [ ] Install base dependencies.
-- [ ] Verify Python version.
-- [ ] Verify `ollama` is installed.
-- [ ] Verify `ollama serve` starts.
-- [ ] Pull the model you plan to use.
-- [ ] Run a trivial test prompt against the local endpoint.
-- [ ] Save the exact working command you used.
+- [ ] 4.3.1 Activate your environment.
+- [ ] 4.3.2 Install base dependencies.
+- [ ] 4.3.3 Verify Python version.
+- [ ] 4.3.4 Verify `ollama` is installed.
+- [ ] 4.3.5 Verify `ollama serve` starts.
+- [ ] 4.3.6 Pull the model you plan to use.
+- [ ] 4.3.7 Run a trivial test prompt against the local endpoint.
+- [ ] 4.3.8 Save the exact working command you used.
 
 ## 4.4 Build `requirements.txt`
 Include only what you actually need.
-- [ ] Add `pyyaml`
-- [ ] Add `requests`
-- [ ] Add `fpdf2`
-- [ ] Add `pytest`
-- [ ] Add `pydantic` if you want schema validation
-- [ ] Add `openai` only if using Ollama’s OpenAI-compatible endpoint
-- [ ] Add anything else only if truly necessary
+- [ ] 4.4.1 Add `pyyaml`
+- [ ] 4.4.2 Add `requests`
+- [ ] 4.4.3 Add `fpdf2`
+- [ ] 4.4.4 Add `pytest`
+- [ ] 4.4.5 Add `pydantic` if you want schema validation
+- [ ] 4.4.6 Add `openai` only if using Ollama’s OpenAI-compatible endpoint
+- [ ] 4.4.7 Add anything else only if truly necessary
 
 ## 4.5 Build `config/config.yaml`
-- [ ] Add output directory paths
-- [ ] Add artifact directory paths
-- [ ] Add model endpoint
-- [ ] Add model name
-- [ ] Add drafting temperature
-- [ ] Add translation settings
-- [ ] Add PDF settings
-- [ ] Add log level
-- [ ] Add source file path
-- [ ] Add final output file names
+- [ ] 4.5.1 Add output directory paths
+- [ ] 4.5.2 Add artifact directory paths
+- [ ] 4.5.3 Add model endpoint
+- [ ] 4.5.4 Add model name
+- [ ] 4.5.5 Add drafting temperature
+- [ ] 4.5.6 Add translation settings
+- [ ] 4.5.7 Add PDF settings
+- [ ] 4.5.8 Add log level
+- [ ] 4.5.9 Add source file path
+- [ ] 4.5.10 Add final output file names
 
 ## 4.6 Build `config.py`
-- [ ] Write code to load YAML config
-- [ ] Validate required keys exist
-- [ ] Return config object
-- [ ] Add clean error if config file missing
-- [ ] Add clean error if required key missing
+- [ ] 4.6.1 Write code to load YAML config
+- [ ] 4.6.2 Validate required keys exist
+- [ ] 4.6.3 Return config object
+- [ ] 4.6.4 Add clean error if config file missing
+- [ ] 4.6.5 Add clean error if required key missing
 
 ## 4.7 Build logging utility
-- [ ] Create `logging_utils.py`
-- [ ] Add file logger
-- [ ] Add console logger
-- [ ] Make logs go to `artifacts/logs/pipeline.log`
-- [ ] Confirm a log message writes successfully
+- [ ] 4.7.1 Create `logging_utils.py`
+- [ ] 4.7.2 Add file logger
+- [ ] 4.7.3 Add console logger
+- [ ] 4.7.4 Make logs go to `artifacts/logs/pipeline.log`
+- [ ] 4.7.5 Confirm a log message writes successfully
 
 ## 4.8 Lock the source text
 Decide now: use a local source file as canonical.
-- [ ] Place source text in `data/source/gatsby_source.txt`
-- [ ] Open file and visually inspect beginning and end
-- [ ] Confirm encoding is UTF-8
-- [ ] Create `hashing.py`
-- [ ] Write a SHA-256 hash function
-- [ ] Hash the raw source file
-- [ ] Save the hash to `artifacts/manifests/source_manifest.json`
+- [ ] 4.8.1 Place source text in `data/source/gatsby_source.txt`
+- [ ] 4.8.2 Open file and visually inspect beginning and end
+- [ ] 4.8.3 Confirm encoding is UTF-8
+- [ ] 4.8.4 Create `hashing.py`
+- [ ] 4.8.5 Write a SHA-256 hash function
+- [ ] 4.8.6 Hash the raw source file
+- [ ] 4.8.7 Save the hash to `artifacts/manifests/source_manifest.json`
 
 ## 4.9 Build `data_ingest.py`
-- [ ] Load source text from local file
-- [ ] Validate file exists
-- [ ] Validate text is non-empty
-- [ ] Log file size
-- [ ] Log source hash
-- [ ] Return raw text string
+- [ ] 4.9.1 Load source text from local file
+- [ ] 4.9.2 Validate file exists
+- [ ] 4.9.3 Validate text is non-empty
+- [ ] 4.9.4 Log file size
+- [ ] 4.9.5 Log source hash
+- [ ] 4.9.6 Return raw text string
 
 ## 4.10 Build `normalize.py`
-- [ ] Write function to normalize line endings
-- [ ] Write function to collapse excessive blank lines
-- [ ] Preserve chapter markers
-- [ ] Preserve paragraph boundaries
-- [ ] Save normalized text to `data/normalized/gatsby_locked.txt`
-- [ ] Confirm output file exists
-- [ ] Confirm output file is readable
-- [ ] Confirm chapter headings remain intact
+- [ ] 4.10.1 Write function to normalize line endings
+- [ ] 4.10.2 Write function to collapse excessive blank lines
+- [ ] 4.10.3 Preserve chapter markers
+- [ ] 4.10.4 Preserve paragraph boundaries
+- [ ] 4.10.5 Save normalized text to `data/normalized/gatsby_locked.txt`
+- [ ] 4.10.6 Confirm output file exists
+- [ ] 4.10.7 Confirm output file is readable
+- [ ] 4.10.8 Confirm chapter headings remain intact
 
 ## 4.11 Create first unit tests
-- [ ] `test_hashing.py`
-  - [ ] verify same file always gives same hash
-  - [ ] verify non-empty hash string
-- [ ] `test_normalize.py`
-  - [ ] verify normalized text is non-empty
-  - [ ] verify output still contains chapter markers
-  - [ ] verify output does not contain absurd blank-line sequences
+- [ ] 4.11.1 `test_hashing.py`
+  - [ ] 4.11.1.1 verify same file always gives same hash
+  - [ ] 4.11.1.2 verify non-empty hash string
+- [ ] 4.11.2 `test_normalize.py`
+  - [ ] 4.11.2.1 verify normalized text is non-empty
+  - [ ] 4.11.2.2 verify output still contains chapter markers
+  - [ ] 4.11.2.3 verify output does not contain absurd blank-line sequences
 
 ## 4.12 End of Thursday checkpoint
 Do not move on until all are true:
-- [ ] config loads
-- [ ] logger works
-- [ ] source file is locked
-- [ ] source hash manifest exists
-- [ ] normalized text file exists
-- [ ] first tests pass
+- [ ] 4.12.1 config loads
+- [ ] 4.12.2 logger works
+- [ ] 4.12.3 source file is locked
+- [ ] 4.12.4 source hash manifest exists
+- [ ] 4.12.5 normalized text file exists
+- [ ] 4.12.6 first tests pass
 
 ---
 
 # 5. Friday — Passage Index, Extraction, Evidence Ledger, Outline
 ## 5.1 Build `schemas.py`
 Create clear structures.
-- [ ] Define `SourceManifest`
-- [ ] Define `PassageRecord`
-- [ ] Define `MetaphorCandidate`
-- [ ] Define `EvidenceRecord`
-- [ ] Define `OutlineSection`
-- [ ] Define `VerificationReport`
-- [ ] Define `FinalManifest`
-- [ ] Decide whether to use dataclasses or Pydantic
-- [ ] Keep schemas simple and serializable
+- [ ] 5.1.1 Define `SourceManifest`
+- [ ] 5.1.2 Define `PassageRecord`
+- [ ] 5.1.3 Define `MetaphorCandidate`
+- [ ] 5.1.4 Define `EvidenceRecord`
+- [ ] 5.1.5 Define `OutlineSection`
+- [ ] 5.1.6 Define `VerificationReport`
+- [ ] 5.1.7 Define `FinalManifest`
+- [ ] 5.1.8 Decide whether to use dataclasses or Pydantic
+- [ ] 5.1.9 Keep schemas simple and serializable
 
 ## 5.2 Build `index_text.py`
-- [ ] Load `gatsby_locked.txt`
-- [ ] Split text into chapters
-- [ ] Split chapters into paragraphs
-- [ ] Strip useless whitespace from each paragraph
-- [ ] Skip empty paragraphs
-- [ ] Assign stable `passage_id` values such as `1.1`, `1.2`, etc.
-- [ ] Store chapter number
-- [ ] Store paragraph number
-- [ ] Store raw text
-- [ ] Write output to `artifacts/manifests/passage_index.json`
-- [ ] Confirm file exists
-- [ ] Inspect first 10 passages manually
-- [ ] Inspect a middle passage manually
-- [ ] Inspect a late passage manually
+- [ ] 5.2.1 Load `gatsby_locked.txt`
+- [ ] 5.2.2 Split text into chapters
+- [ ] 5.2.3 Split chapters into paragraphs
+- [ ] 5.2.4 Strip useless whitespace from each paragraph
+- [ ] 5.2.5 Skip empty paragraphs
+- [ ] 5.2.6 Assign stable `passage_id` values such as `1.1`, `1.2`, etc.
+- [ ] 5.2.7 Store chapter number
+- [ ] 5.2.8 Store paragraph number
+- [ ] 5.2.9 Store raw text
+- [ ] 5.2.10 Write output to `artifacts/manifests/passage_index.json`
+- [ ] 5.2.11 Confirm file exists
+- [ ] 5.2.12 Inspect first 10 passages manually
+- [ ] 5.2.13 Inspect a middle passage manually
+- [ ] 5.2.14 Inspect a late passage manually
 
 ## 5.3 Create tests for passage indexing
-- [ ] `test_passage_index.py`
-  - [ ] verify index file is created
-  - [ ] verify passage IDs are unique
-  - [ ] verify passage IDs are deterministic across reruns
-  - [ ] verify every passage has non-empty text
-  - [ ] verify chapter numbers are valid integers
+- [ ] 5.3.1 `test_passage_index.py`
+  - [ ] 5.3.1.1 verify index file is created
+  - [ ] 5.3.1.2 verify passage IDs are unique
+  - [ ] 5.3.1.3 verify passage IDs are deterministic across reruns
+  - [ ] 5.3.1.4 verify every passage has non-empty text
+  - [ ] 5.3.1.5 verify chapter numbers are valid integers
 
 ## 5.4 Build local LLM client helper
-- [ ] Create a helper function for chat completion calls
-- [ ] Put it in `utils/` or dedicated `llm_client.py`
-- [ ] Read model name from config
-- [ ] Read endpoint from config
-- [ ] Add timeout handling
-- [ ] Add retry handling for malformed output
-- [ ] Log each call with stage name
-- [ ] Log output path for each call
-- [ ] Confirm one successful round-trip call
+- [ ] 5.4.1 Create a helper function for chat completion calls
+- [ ] 5.4.2 Put it in `utils/` or dedicated `llm_client.py`
+- [ ] 5.4.3 Read model name from config
+- [ ] 5.4.4 Read endpoint from config
+- [ ] 5.4.5 Add timeout handling
+- [ ] 5.4.6 Add retry handling for malformed output
+- [ ] 5.4.7 Log each call with stage name
+- [ ] 5.4.8 Log output path for each call
+- [ ] 5.4.9 Confirm one successful round-trip call
 
 ## 5.5 Write extraction prompt
-- [ ] Create prompt file or prompt string for metaphor extraction
-- [ ] Force JSON output only
-- [ ] Ask for candidate metaphor/image/symbol entries
-- [ ] Require `candidate_id`
-- [ ] Require `label`
-- [ ] Require `passage_id`
-- [ ] Require exact quote substring
-- [ ] Require short rationale
-- [ ] Require confidence score
-- [ ] Require no essay prose
+- [ ] 5.5.1 Create prompt file or prompt string for metaphor extraction
+- [ ] 5.5.2 Force JSON output only
+- [ ] 5.5.3 Ask for candidate metaphor/image/symbol entries
+- [ ] 5.5.4 Require `candidate_id`
+- [ ] 5.5.5 Require `label`
+- [ ] 5.5.6 Require `passage_id`
+- [ ] 5.5.7 Require exact quote substring
+- [ ] 5.5.8 Require short rationale
+- [ ] 5.5.9 Require confidence score
+- [ ] 5.5.10 Require no essay prose
 
 ## 5.6 Build `extract_metaphors.py`
-- [ ] Load passage index
-- [ ] Decide how many passages to send per call
-- [ ] If using full context, still keep outputs structured
-- [ ] Call LLM
-- [ ] Parse JSON response
-- [ ] Validate each candidate has required fields
-- [ ] Save to `artifacts/evidence/metaphor_candidates.json`
-- [ ] Log candidate count
-- [ ] Manually inspect output for obvious garbage
+- [ ] 5.6.1 Load passage index
+- [ ] 5.6.2 Decide how many passages to send per call
+- [ ] 5.6.3 If using full context, still keep outputs structured
+- [ ] 5.6.4 Call LLM
+- [ ] 5.6.5 Parse JSON response
+- [ ] 5.6.6 Validate each candidate has required fields
+- [ ] 5.6.7 Save to `artifacts/evidence/metaphor_candidates.json`
+- [ ] 5.6.8 Log candidate count
+- [ ] 5.6.9 Manually inspect output for obvious garbage
 
 ## 5.7 Add extraction fallback logic
-- [ ] If JSON parse fails, save raw response to a debug file
-- [ ] Retry once with stricter JSON instruction
-- [ ] If still failing, stop and inspect
-- [ ] Do not silently continue with bad data
+- [ ] 5.7.1 If JSON parse fails, save raw response to a debug file
+- [ ] 5.7.2 Retry once with stricter JSON instruction
+- [ ] 5.7.3 If still failing, stop and inspect
+- [ ] 5.7.4 Do not silently continue with bad data
 
 ## 5.8 Create tests for extraction output shape
-- [ ] `test_metaphor_candidates.py`
-  - [ ] verify output file exists
-  - [ ] verify candidates are a list
-  - [ ] verify each candidate has passage_id
-  - [ ] verify each candidate has quote
-  - [ ] verify confidence is numeric or convertible
+- [ ] 5.8.1 `test_metaphor_candidates.py`
+  - [ ] 5.8.1.1 verify output file exists
+  - [ ] 5.8.1.2 verify candidates are a list
+  - [ ] 5.8.1.3 verify each candidate has passage_id
+  - [ ] 5.8.1.4 verify each candidate has quote
+  - [ ] 5.8.1.5 verify confidence is numeric or convertible
 
 ## 5.9 Build `build_evidence_ledger.py`
 This is critical.
-- [ ] Load candidate file
-- [ ] Load passage index
-- [ ] For each candidate:
-  - [ ] confirm passage_id exists
-  - [ ] confirm quote string exists exactly inside passage text
-  - [ ] reject candidate if quote does not match
-  - [ ] reject candidate if rationale is too vague
-  - [ ] normalize label text
-- [ ] Promote good candidates into evidence entries
-- [ ] Add `status = verified`
-- [ ] Save to `artifacts/evidence/evidence_ledger.json`
-- [ ] Save rejected candidates to `artifacts/evidence/rejected_candidates.json`
-- [ ] Log promoted count
-- [ ] Log rejected count
+- [ ] 5.9.1 Load candidate file
+- [ ] 5.9.2 Load passage index
+- [ ] 5.9.3 For each candidate:
+  - [ ] 5.9.3.1 confirm passage_id exists
+  - [ ] 5.9.3.2 confirm quote string exists exactly inside passage text
+  - [ ] 5.9.3.3 reject candidate if quote does not match
+  - [ ] 5.9.3.4 reject candidate if rationale is too vague
+  - [ ] 5.9.3.5 normalize label text
+- [ ] 5.9.4 Promote good candidates into evidence entries
+- [ ] 5.9.5 Add `status = verified`
+- [ ] 5.9.6 Save to `artifacts/evidence/evidence_ledger.json`
+- [ ] 5.9.7 Save rejected candidates to `artifacts/evidence/rejected_candidates.json`
+- [ ] 5.9.8 Log promoted count
+- [ ] 5.9.9 Log rejected count
 
 ## 5.10 Create tests for the evidence ledger
-- [ ] `test_evidence_ledger.py`
-  - [ ] verify each evidence record points to valid passage_id
-  - [ ] verify quote exists exactly in passage text
-  - [ ] verify status is `verified`
-  - [ ] verify rejected file is created if rejections exist
+- [ ] 5.10.1 `test_evidence_ledger.py`
+  - [ ] 5.10.1.1 verify each evidence record points to valid passage_id
+  - [ ] 5.10.1.2 verify quote exists exactly in passage text
+  - [ ] 5.10.1.3 verify status is `verified`
+  - [ ] 5.10.1.4 verify rejected file is created if rejections exist
 
 ## 5.11 Build `plan_outline.py`
-- [ ] Load evidence ledger
-- [ ] Feed evidence records to LLM
-- [ ] Ask for thesis + section plan
-- [ ] Force structured JSON output
-- [ ] Require section headings
-- [ ] Require assigned evidence IDs per section
-- [ ] Require intro and conclusion concept
-- [ ] Save to `artifacts/drafts/outline.json`
-- [ ] Inspect outline manually
-- [ ] Confirm section ordering makes sense
-- [ ] Confirm no section uses nonexistent evidence IDs
+- [ ] 5.11.1 Load evidence ledger
+- [ ] 5.11.2 Feed evidence records to LLM
+- [ ] 5.11.3 Ask for thesis + section plan
+- [ ] 5.11.4 Force structured JSON output
+- [ ] 5.11.5 Require section headings
+- [ ] 5.11.6 Require assigned evidence IDs per section
+- [ ] 5.11.7 Require intro and conclusion concept
+- [ ] 5.11.8 Save to `artifacts/drafts/outline.json`
+- [ ] 5.11.9 Inspect outline manually
+- [ ] 5.11.10 Confirm section ordering makes sense
+- [ ] 5.11.11 Confirm no section uses nonexistent evidence IDs
 
 ## 5.12 Create tests for outline integrity
-- [ ] `test_outline.py`
-  - [ ] verify outline file exists
-  - [ ] verify thesis is non-empty
-  - [ ] verify sections exist
-  - [ ] verify all referenced evidence IDs exist in ledger
+- [ ] 5.12.1 `test_outline.py`
+  - [ ] 5.12.1.1 verify outline file exists
+  - [ ] 5.12.1.2 verify thesis is non-empty
+  - [ ] 5.12.1.3 verify sections exist
+  - [ ] 5.12.1.4 verify all referenced evidence IDs exist in ledger
 
 ## 5.13 End of Friday checkpoint
 Do not move on until all are true:
-- [ ] passage index exists
-- [ ] LLM client works
-- [ ] metaphor candidate file exists
-- [ ] evidence ledger exists
-- [ ] rejected candidates file exists if needed
-- [ ] outline exists
-- [ ] all Friday tests pass
+- [ ] 5.13.1 passage index exists
+- [ ] 5.13.2 LLM client works
+- [ ] 5.13.3 metaphor candidate file exists
+- [ ] 5.13.4 evidence ledger exists
+- [ ] 5.13.5 rejected candidates file exists if needed
+- [ ] 5.13.6 outline exists
+- [ ] 5.13.7 all Friday tests pass
 
 ---
 
 # 6. Saturday — English Essay, Verification, Editorial Pass
 ## 6.1 Write drafting prompt
-- [ ] Create a section drafting prompt
-- [ ] Tell model to write one section at a time
-- [ ] Require use of provided evidence only
-- [ ] Forbid invented quotes
-- [ ] Forbid invented citations
-- [ ] Forbid conversational filler
-- [ ] Require academic tone
-- [ ] Require citation markers to remain intact
+- [ ] 6.1.1 Create a section drafting prompt
+- [ ] 6.1.2 Tell model to write one section at a time
+- [ ] 6.1.3 Require use of provided evidence only
+- [ ] 6.1.4 Forbid invented quotes
+- [ ] 6.1.5 Forbid invented citations
+- [ ] 6.1.6 Forbid conversational filler
+- [ ] 6.1.7 Require academic tone
+- [ ] 6.1.8 Require citation markers to remain intact
 
 ## 6.2 Build `draft_english.py`
-- [ ] Load outline
-- [ ] Load evidence ledger
-- [ ] Loop over outline sections one at a time
-- [ ] For each section:
-  - [ ] gather only the section’s evidence IDs
-  - [ ] build prompt with heading + evidence
-  - [ ] call LLM
-  - [ ] save raw section draft to disk
-- [ ] Combine all section drafts into one markdown file
-- [ ] Save combined file to `artifacts/drafts/analysis_english_draft.md`
-- [ ] Confirm headings exist
-- [ ] Confirm text is non-empty
-- [ ] Confirm citations appear in a consistent format
+- [ ] 6.2.1 Load outline
+- [ ] 6.2.2 Load evidence ledger
+- [ ] 6.2.3 Loop over outline sections one at a time
+- [ ] 6.2.4 For each section:
+  - [ ] 6.2.4.1 gather only the section’s evidence IDs
+  - [ ] 6.2.4.2 build prompt with heading + evidence
+  - [ ] 6.2.4.3 call LLM
+  - [ ] 6.2.4.4 save raw section draft to disk
+- [ ] 6.2.5 Combine all section drafts into one markdown file
+- [ ] 6.2.6 Save combined file to `artifacts/drafts/analysis_english_draft.md`
+- [ ] 6.2.7 Confirm headings exist
+- [ ] 6.2.8 Confirm text is non-empty
+- [ ] 6.2.9 Confirm citations appear in a consistent format
 
 ## 6.3 Decide citation format now
 Pick one and use it consistently.
-- [ ] Choose passage ID format such as `(Passage 5.18)`
-- [ ] Or choose chapter/paragraph format
-- [ ] Or choose a simple in-house textual locator
-- [ ] Use the same format everywhere
-- [ ] Update drafting and verification logic accordingly
+- [ ] 6.3.1 Choose passage ID format such as `(Passage 5.18)`
+- [ ] 6.3.2 Or choose chapter/paragraph format
+- [ ] 6.3.3 Or choose a simple in-house textual locator
+- [ ] 6.3.4 Use the same format everywhere
+- [ ] 6.3.5 Update drafting and verification logic accordingly
 
 ## 6.4 Build `verify_citations.py`
 This file is non-negotiable.
-- [ ] Load English draft
-- [ ] Load evidence ledger
-- [ ] Load passage index
-- [ ] Extract all quoted strings from the draft
-- [ ] Extract all citation markers from the draft
-- [ ] For each quote:
-  - [ ] confirm exact match in source passage or ledger quote
-- [ ] For each citation:
-  - [ ] confirm locator resolves
-- [ ] Create a verification report
-- [ ] Save report to `artifacts/qa/english_verification_report.json`
-- [ ] If verification fails, exit with failure
+- [ ] 6.4.1 Load English draft
+- [ ] 6.4.2 Load evidence ledger
+- [ ] 6.4.3 Load passage index
+- [ ] 6.4.4 Extract all quoted strings from the draft
+- [ ] 6.4.5 Extract all citation markers from the draft
+- [ ] 6.4.6 For each quote:
+  - [ ] 6.4.6.1 confirm exact match in source passage or ledger quote
+- [ ] 6.4.7 For each citation:
+  - [ ] 6.4.7.1 confirm locator resolves
+- [ ] 6.4.8 Create a verification report
+- [ ] 6.4.9 Save report to `artifacts/qa/english_verification_report.json`
+- [ ] 6.4.10 If verification fails, exit with failure
 
 ## 6.5 Create tests for quote verification
-- [ ] `test_quote_verification.py`
-  - [ ] verify real quote passes
-  - [ ] verify fake quote fails
-  - [ ] verify valid passage ID resolves
-  - [ ] verify invalid passage ID fails
+- [ ] 6.5.1 `test_quote_verification.py`
+  - [ ] 6.5.1.1 verify real quote passes
+  - [ ] 6.5.1.2 verify fake quote fails
+  - [ ] 6.5.1.3 verify valid passage ID resolves
+  - [ ] 6.5.1.4 verify invalid passage ID fails
 
 ## 6.6 Build `critique_and_edit.py`
-- [ ] Load verified English draft
-- [ ] Ask LLM to improve transitions, cohesion, and style
-- [ ] Explicitly forbid changing quoted text
-- [ ] Explicitly forbid adding new citations
-- [ ] Explicitly forbid changing citation markers
-- [ ] Save output to `artifacts/drafts/analysis_english_final.md`
-- [ ] Compare old and new versions manually
-- [ ] Confirm quotes stayed identical
-- [ ] Confirm no citations disappeared
+- [ ] 6.6.1 Load verified English draft
+- [ ] 6.6.2 Ask LLM to improve transitions, cohesion, and style
+- [ ] 6.6.3 Explicitly forbid changing quoted text
+- [ ] 6.6.4 Explicitly forbid adding new citations
+- [ ] 6.6.5 Explicitly forbid changing citation markers
+- [ ] 6.6.6 Save output to `artifacts/drafts/analysis_english_final.md`
+- [ ] 6.6.7 Compare old and new versions manually
+- [ ] 6.6.8 Confirm quotes stayed identical
+- [ ] 6.6.9 Confirm no citations disappeared
 
 ## 6.7 Add test or validation for editorial integrity
-- [ ] `test_editorial_integrity.py`
-  - [ ] verify all original citation markers remain in final draft
-  - [ ] verify all direct quotes remain present
-  - [ ] verify final file exists and is non-empty
+- [ ] 6.7.1 `test_editorial_integrity.py`
+  - [ ] 6.7.1.1 verify all original citation markers remain in final draft
+  - [ ] 6.7.1.2 verify all direct quotes remain present
+  - [ ] 6.7.1.3 verify final file exists and is non-empty
 
 ## 6.8 Manual English review pass
 Read it like a hiring reviewer, not like a coder.
-- [ ] Read thesis
-- [ ] Read introduction
-- [ ] Check whether it sounds generic
-- [ ] Check whether claims feel grounded
-- [ ] Check whether transitions are smooth
-- [ ] Check whether conclusion actually concludes
-- [ ] Check whether metaphor analysis feels serious and not canned
-- [ ] Mark any obvious weak sections
-- [ ] Fix weak sections now, not later
+- [ ] 6.8.1 Read thesis
+- [ ] 6.8.2 Read introduction
+- [ ] 6.8.3 Check whether it sounds generic
+- [ ] 6.8.4 Check whether claims feel grounded
+- [ ] 6.8.5 Check whether transitions are smooth
+- [ ] 6.8.6 Check whether conclusion actually concludes
+- [ ] 6.8.7 Check whether metaphor analysis feels serious and not canned
+- [ ] 6.8.8 Mark any obvious weak sections
+- [ ] 6.8.9 Fix weak sections now, not later
 
 ## 6.9 Create a lightweight integration test
-- [ ] `test_pipeline_smoke.py`
-  - [ ] run ingestion on a small sample
-  - [ ] run normalization
-  - [ ] run indexing
-  - [ ] run verification functions
-  - [ ] assert artifacts are produced
+- [ ] 6.9.1 `test_pipeline_smoke.py`
+  - [ ] 6.9.1.1 run ingestion on a small sample
+  - [ ] 6.9.1.2 run normalization
+  - [ ] 6.9.1.3 run indexing
+  - [ ] 6.9.1.4 run verification functions
+  - [ ] 6.9.1.5 assert artifacts are produced
 
 ## 6.10 End of Saturday checkpoint
 Do not move on until all are true:
-- [ ] English draft exists
-- [ ] English verification report exists
-- [ ] English final file exists
-- [ ] quote verification tests pass
-- [ ] editorial integrity checks pass
-- [ ] smoke test passes
-- [ ] English essay is human-reviewed once
+- [ ] 6.10.1 English draft exists
+- [ ] 6.10.2 English verification report exists
+- [ ] 6.10.3 English final file exists
+- [ ] 6.10.4 quote verification tests pass
+- [ ] 6.10.5 editorial integrity checks pass
+- [ ] 6.10.6 smoke test passes
+- [ ] 6.10.7 English essay is human-reviewed once
 
 ---
 
 # 7. Sunday — Translation, QA, PDFs, Manifest, Final Dry Run
 ## 7.1 Freeze English master
-- [ ] Copy or rename final English file as `artifacts/final/analysis_english_master.md`
-- [ ] Treat this file as immutable
-- [ ] Do not translate from a draft that is still moving
+- [ ] 7.1.1 Copy or rename final English file as `artifacts/final/analysis_english_master.md`
+- [ ] 7.1.2 Treat this file as immutable
+- [ ] 7.1.3 Do not translate from a draft that is still moving
 
 ## 7.2 Build translation chunker utility
-- [ ] Create helper to split English master by headings
-- [ ] If sections are too long, split by paragraph groups
-- [ ] Preserve order
-- [ ] Preserve heading text
-- [ ] Preserve citation markers
-- [ ] Preserve quotes
-- [ ] Save chunk metadata if helpful
+- [ ] 7.2.1 Create helper to split English master by headings
+- [ ] 7.2.2 If sections are too long, split by paragraph groups
+- [ ] 7.2.3 Preserve order
+- [ ] 7.2.4 Preserve heading text
+- [ ] 7.2.5 Preserve citation markers
+- [ ] 7.2.6 Preserve quotes
+- [ ] 7.2.7 Save chunk metadata if helpful
 
 ## 7.3 Build `translate_spanish.py`
-- [ ] Load English master
-- [ ] Split into chunks
-- [ ] For each chunk:
-  - [ ] call LLM
-  - [ ] preserve heading structure
-  - [ ] preserve citation markers
-  - [ ] preserve quote formatting
-  - [ ] save raw chunk output if needed
-- [ ] Reassemble final Spanish markdown
-- [ ] Save to `artifacts/translations/analysis_spanish_draft.md`
+- [ ] 7.3.1 Load English master
+- [ ] 7.3.2 Split into chunks
+- [ ] 7.3.3 For each chunk:
+  - [ ] 7.3.3.1 call LLM
+  - [ ] 7.3.3.2 preserve heading structure
+  - [ ] 7.3.3.3 preserve citation markers
+  - [ ] 7.3.3.4 preserve quote formatting
+  - [ ] 7.3.3.5 save raw chunk output if needed
+- [ ] 7.3.4 Reassemble final Spanish markdown
+- [ ] 7.3.5 Save to `artifacts/translations/analysis_spanish_draft.md`
 
 ## 7.4 Build `translate_mandarin.py`
-- [ ] Load English master
-- [ ] Split into chunks
-- [ ] For each chunk:
-  - [ ] call LLM
-  - [ ] require Simplified Chinese
-  - [ ] preserve heading structure
-  - [ ] preserve citation markers
-  - [ ] preserve quote formatting
-- [ ] Reassemble final Mandarin markdown
-- [ ] Save to `artifacts/translations/analysis_mandarin_draft.md`
+- [ ] 7.4.1 Load English master
+- [ ] 7.4.2 Split into chunks
+- [ ] 7.4.3 For each chunk:
+  - [ ] 7.4.3.1 call LLM
+  - [ ] 7.4.3.2 require Simplified Chinese
+  - [ ] 7.4.3.3 preserve heading structure
+  - [ ] 7.4.3.4 preserve citation markers
+  - [ ] 7.4.3.5 preserve quote formatting
+- [ ] 7.4.4 Reassemble final Mandarin markdown
+- [ ] 7.4.5 Save to `artifacts/translations/analysis_mandarin_draft.md`
 
 ## 7.5 Build `bilingual_qa.py`
 This can be basic but must exist.
-- [ ] Load English master
-- [ ] Load Spanish draft
-- [ ] Load Mandarin draft
-- [ ] Count headings in English vs Spanish
-- [ ] Count headings in English vs Mandarin
-- [ ] Count citation markers in each file
-- [ ] Count quote markers in each file
-- [ ] Flag mismatches
-- [ ] Save `artifacts/qa/spanish_qa_report.json`
-- [ ] Save `artifacts/qa/mandarin_qa_report.json`
+- [ ] 7.5.1 Load English master
+- [ ] 7.5.2 Load Spanish draft
+- [ ] 7.5.3 Load Mandarin draft
+- [ ] 7.5.4 Count headings in English vs Spanish
+- [ ] 7.5.5 Count headings in English vs Mandarin
+- [ ] 7.5.6 Count citation markers in each file
+- [ ] 7.5.7 Count quote markers in each file
+- [ ] 7.5.8 Flag mismatches
+- [ ] 7.5.9 Save `artifacts/qa/spanish_qa_report.json`
+- [ ] 7.5.10 Save `artifacts/qa/mandarin_qa_report.json`
 
 ## 7.6 Create tests for translation integrity
-- [ ] `test_translation_integrity.py`
-  - [ ] verify heading counts match
-  - [ ] verify citation markers survive
-  - [ ] verify translation files exist
-  - [ ] verify translation files are non-empty
+- [ ] 7.6.1 `test_translation_integrity.py`
+  - [ ] 7.6.1.1 verify heading counts match
+  - [ ] 7.6.1.2 verify citation markers survive
+  - [ ] 7.6.1.3 verify translation files exist
+  - [ ] 7.6.1.4 verify translation files are non-empty
 
 ## 7.7 Manual translation spot checks
 You do not need to be perfect in both languages, but you must do spot checks.
-- [ ] Check title in Spanish for professionalism
-- [ ] Check title in Mandarin for correct rendering
-- [ ] Check one middle paragraph in Spanish
-- [ ] Check one conclusion paragraph in Spanish
-- [ ] Check one middle paragraph in Mandarin
-- [ ] Check one conclusion paragraph in Mandarin
-- [ ] Confirm citations stayed intact
-- [ ] Confirm weird garbage characters are absent
+- [ ] 7.7.1 Check title in Spanish for professionalism
+- [ ] 7.7.2 Check title in Mandarin for correct rendering
+- [ ] 7.7.3 Check one middle paragraph in Spanish
+- [ ] 7.7.4 Check one conclusion paragraph in Spanish
+- [ ] 7.7.5 Check one middle paragraph in Mandarin
+- [ ] 7.7.6 Check one conclusion paragraph in Mandarin
+- [ ] 7.7.7 Confirm citations stayed intact
+- [ ] 7.7.8 Confirm weird garbage characters are absent
 
 ## 7.8 Build `pdf_compiler.py`
-- [ ] Load English markdown/text
-- [ ] Load Spanish markdown/text
-- [ ] Load Mandarin markdown/text
-- [ ] Configure page size
-- [ ] Configure margins
-- [ ] Configure default font for English/Spanish
-- [ ] Configure CJK-capable font for Mandarin
-- [ ] Render English PDF
-- [ ] Render Spanish PDF
-- [ ] Render Mandarin PDF
-- [ ] Save all three files in `outputs/`
+- [ ] 7.8.1 Load English markdown/text
+- [ ] 7.8.2 Load Spanish markdown/text
+- [ ] 7.8.3 Load Mandarin markdown/text
+- [ ] 7.8.4 Configure page size
+- [ ] 7.8.5 Configure margins
+- [ ] 7.8.6 Configure default font for English/Spanish
+- [ ] 7.8.7 Configure CJK-capable font for Mandarin
+- [ ] 7.8.8 Render English PDF
+- [ ] 7.8.9 Render Spanish PDF
+- [ ] 7.8.10 Render Mandarin PDF
+- [ ] 7.8.11 Save all three files in `outputs/`
 
 ## 7.9 Add PDF tests
-- [ ] `test_pdf_unicode.py`
-  - [ ] verify PDF files are created
-  - [ ] verify file size > 0
-  - [ ] verify Mandarin PDF renders without Unicode exception
+- [ ] 7.9.1 `test_pdf_unicode.py`
+  - [ ] 7.9.1.1 verify PDF files are created
+  - [ ] 7.9.1.2 verify file size > 0
+  - [ ] 7.9.1.3 verify Mandarin PDF renders without Unicode exception
 
 ## 7.10 Build `manifest_writer.py`
-- [ ] Collect source hash
-- [ ] Collect model name
-- [ ] Collect config path
-- [ ] Collect generated artifact paths
-- [ ] Collect QA report paths
-- [ ] Collect timestamp
-- [ ] Save to `outputs/final_manifest.json`
+- [ ] 7.10.1 Collect source hash
+- [ ] 7.10.2 Collect model name
+- [ ] 7.10.3 Collect config path
+- [ ] 7.10.4 Collect generated artifact paths
+- [ ] 7.10.5 Collect QA report paths
+- [ ] 7.10.6 Collect timestamp
+- [ ] 7.10.7 Save to `outputs/final_manifest.json`
 
 ## 7.11 Wire everything into `orchestrator.py`
-- [ ] Add stage registry
-- [ ] Add command-line argument parsing
-- [ ] Add `--run all`
-- [ ] Add `--run <stage>`
-- [ ] Add stage-level logging
-- [ ] Add clean failure messages
-- [ ] Add exit code non-zero on stage failure
+- [ ] 7.11.1 Add stage registry
+- [ ] 7.11.2 Add command-line argument parsing
+- [ ] 7.11.3 Add `--run all`
+- [ ] 7.11.4 Add `--run <stage>`
+- [ ] 7.11.5 Add stage-level logging
+- [ ] 7.11.6 Add clean failure messages
+- [ ] 7.11.7 Add exit code non-zero on stage failure
 
 ## 7.12 Do a full dry run
-- [ ] Delete stale intermediate files if necessary
-- [ ] Run pipeline end-to-end
-- [ ] Watch console logs
-- [ ] Note first point of failure if any
-- [ ] Fix failure
-- [ ] Rerun
-- [ ] Do not stop until full run completes once cleanly
+- [ ] 7.12.1 Delete stale intermediate files if necessary
+- [ ] 7.12.2 Run pipeline end-to-end
+- [ ] 7.12.3 Watch console logs
+- [ ] 7.12.4 Note first point of failure if any
+- [ ] 7.12.5 Fix failure
+- [ ] 7.12.6 Rerun
+- [ ] 7.12.7 Do not stop until full run completes once cleanly
 
 ## 7.13 Run full test suite
-- [ ] Run `pytest`
-- [ ] Read failures carefully
-- [ ] Fix failing tests
-- [ ] Re-run `pytest`
-- [ ] Repeat until tests pass cleanly
+- [ ] 7.13.1 Run `pytest`
+- [ ] 7.13.2 Read failures carefully
+- [ ] 7.13.3 Fix failing tests
+- [ ] 7.13.4 Re-run `pytest`
+- [ ] 7.13.5 Repeat until tests pass cleanly
 
 ## 7.14 Do final human QA on outputs
-- [ ] Open English PDF
-- [ ] Open Spanish PDF
-- [ ] Open Mandarin PDF
-- [ ] Confirm each file opens
-- [ ] Confirm title page or opening section looks clean
-- [ ] Confirm no broken characters
-- [ ] Confirm page breaks are reasonable
-- [ ] Confirm file names are professional
+- [ ] 7.14.1 Open English PDF
+- [ ] 7.14.2 Open Spanish PDF
+- [ ] 7.14.3 Open Mandarin PDF
+- [ ] 7.14.4 Confirm each file opens
+- [ ] 7.14.5 Confirm title page or opening section looks clean
+- [ ] 7.14.6 Confirm no broken characters
+- [ ] 7.14.7 Confirm page breaks are reasonable
+- [ ] 7.14.8 Confirm file names are professional
 
 ## 7.15 Final repo cleanup
-- [ ] Remove junk scratch files
-- [ ] Remove debug outputs you do not want visible
-- [ ] Keep useful logs and artifacts
-- [ ] Confirm README matches actual implementation
-- [ ] Confirm commands in README really work
-- [ ] Confirm file tree in README matches repo
-- [ ] Confirm no hard-coded machine-specific paths remain
+- [ ] 7.15.1 Remove junk scratch files
+- [ ] 7.15.2 Remove debug outputs you do not want visible
+- [ ] 7.15.3 Keep useful logs and artifacts
+- [ ] 7.15.4 Confirm README matches actual implementation
+- [ ] 7.15.5 Confirm commands in README really work
+- [ ] 7.15.6 Confirm file tree in README matches repo
+- [ ] 7.15.7 Confirm no hard-coded machine-specific paths remain
 
 ## 7.16 Final Git tasks
-- [ ] `git status`
-- [ ] Inspect all changed files
-- [ ] Make final commit with a clean message
-- [ ] Push repo
-- [ ] Open repo in browser
-- [ ] Confirm important files are present
-- [ ] Confirm README renders correctly
+- [ ] 7.16.1 `git status`
+- [ ] 7.16.2 Inspect all changed files
+- [ ] 7.16.3 Make final commit with a clean message
+- [ ] 7.16.4 Push repo
+- [ ] 7.16.5 Open repo in browser
+- [ ] 7.16.6 Confirm important files are present
+- [ ] 7.16.7 Confirm README renders correctly
 
 ## 7.17 End of Sunday checkpoint
 Do not stop until all are true:
-- [ ] Spanish draft exists
-- [ ] Mandarin draft exists
-- [ ] Spanish QA report exists
-- [ ] Mandarin QA report exists
-- [ ] three PDFs exist
-- [ ] final manifest exists
-- [ ] end-to-end run completed once
-- [ ] tests pass
-- [ ] repo is pushed and presentable
+- [ ] 7.17.1 Spanish draft exists
+- [ ] 7.17.2 Mandarin draft exists
+- [ ] 7.17.3 Spanish QA report exists
+- [ ] 7.17.4 Mandarin QA report exists
+- [ ] 7.17.5 three PDFs exist
+- [ ] 7.17.6 final manifest exists
+- [ ] 7.17.7 end-to-end run completed once
+- [ ] 7.17.8 tests pass
+- [ ] 7.17.9 repo is pushed and presentable
 
 ---
 
 # 8. Detailed File-by-File Build Checklist
 ## 8.1 `src/agent_gatsby/orchestrator.py`
-- [ ] load config
-- [ ] initialize logger
-- [ ] parse CLI args
-- [ ] map stage names to functions
-- [ ] support `all`
-- [ ] support single-stage runs
-- [ ] handle exceptions cleanly
-- [ ] log start and finish for each stage
+- [ ] 8.1.1 load config
+- [ ] 8.1.2 initialize logger
+- [ ] 8.1.3 parse CLI args
+- [ ] 8.1.4 map stage names to functions
+- [ ] 8.1.5 support `all`
+- [ ] 8.1.6 support single-stage runs
+- [ ] 8.1.7 handle exceptions cleanly
+- [ ] 8.1.8 log start and finish for each stage
 
 ## 8.2 `src/agent_gatsby/data_ingest.py`
-- [ ] read local source file
-- [ ] validate existence
-- [ ] validate encoding
-- [ ] validate non-empty contents
-- [ ] compute file hash
-- [ ] return raw text
+- [ ] 8.2.1 read local source file
+- [ ] 8.2.2 validate existence
+- [ ] 8.2.3 validate encoding
+- [ ] 8.2.4 validate non-empty contents
+- [ ] 8.2.5 compute file hash
+- [ ] 8.2.6 return raw text
 
 ## 8.3 `src/agent_gatsby/normalize.py`
-- [ ] normalize whitespace
-- [ ] normalize line endings
-- [ ] preserve structure
-- [ ] write locked normalized file
+- [ ] 8.3.1 normalize whitespace
+- [ ] 8.3.2 normalize line endings
+- [ ] 8.3.3 preserve structure
+- [ ] 8.3.4 write locked normalized file
 
 ## 8.4 `src/agent_gatsby/index_text.py`
-- [ ] split chapters
-- [ ] split paragraphs
-- [ ] assign IDs
-- [ ] serialize JSON
-- [ ] write passage index
+- [ ] 8.4.1 split chapters
+- [ ] 8.4.2 split paragraphs
+- [ ] 8.4.3 assign IDs
+- [ ] 8.4.4 serialize JSON
+- [ ] 8.4.5 write passage index
 
 ## 8.5 `src/agent_gatsby/extract_metaphors.py`
-- [ ] load index
-- [ ] build prompt
-- [ ] call model
-- [ ] parse JSON
-- [ ] validate fields
-- [ ] save candidate file
-- [ ] save raw response on failure
+- [ ] 8.5.1 load index
+- [ ] 8.5.2 build prompt
+- [ ] 8.5.3 call model
+- [ ] 8.5.4 parse JSON
+- [ ] 8.5.5 validate fields
+- [ ] 8.5.6 save candidate file
+- [ ] 8.5.7 save raw response on failure
 
 ## 8.6 `src/agent_gatsby/build_evidence_ledger.py`
-- [ ] load candidates
-- [ ] exact-match quotes
-- [ ] validate locators
-- [ ] promote valid entries
-- [ ] save verified ledger
-- [ ] save rejected list
+- [ ] 8.6.1 load candidates
+- [ ] 8.6.2 exact-match quotes
+- [ ] 8.6.3 validate locators
+- [ ] 8.6.4 promote valid entries
+- [ ] 8.6.5 save verified ledger
+- [ ] 8.6.6 save rejected list
 
 ## 8.7 `src/agent_gatsby/plan_outline.py`
-- [ ] load ledger
-- [ ] build thesis prompt
-- [ ] parse structured output
-- [ ] save outline JSON
+- [ ] 8.7.1 load ledger
+- [ ] 8.7.2 build thesis prompt
+- [ ] 8.7.3 parse structured output
+- [ ] 8.7.4 save outline JSON
 
 ## 8.8 `src/agent_gatsby/draft_english.py`
-- [ ] load outline
-- [ ] load ledger
-- [ ] draft section by section
-- [ ] combine sections
-- [ ] save markdown file
+- [ ] 8.8.1 load outline
+- [ ] 8.8.2 load ledger
+- [ ] 8.8.3 draft section by section
+- [ ] 8.8.4 combine sections
+- [ ] 8.8.5 save markdown file
 
 ## 8.9 `src/agent_gatsby/verify_citations.py`
-- [ ] extract quotes
-- [ ] extract citation markers
-- [ ] validate quotes
-- [ ] validate locators
-- [ ] write QA report
+- [ ] 8.9.1 extract quotes
+- [ ] 8.9.2 extract citation markers
+- [ ] 8.9.3 validate quotes
+- [ ] 8.9.4 validate locators
+- [ ] 8.9.5 write QA report
 
 ## 8.10 `src/agent_gatsby/critique_and_edit.py`
-- [ ] improve prose only
-- [ ] preserve quotes
-- [ ] preserve citations
-- [ ] write final English file
+- [ ] 8.10.1 improve prose only
+- [ ] 8.10.2 preserve quotes
+- [ ] 8.10.3 preserve citations
+- [ ] 8.10.4 write final English file
 
 ## 8.11 `src/agent_gatsby/translate_spanish.py`
-- [ ] chunk English master
-- [ ] translate each chunk
-- [ ] reassemble file
-- [ ] save markdown
+- [ ] 8.11.1 chunk English master
+- [ ] 8.11.2 translate each chunk
+- [ ] 8.11.3 reassemble file
+- [ ] 8.11.4 save markdown
 
 ## 8.12 `src/agent_gatsby/translate_mandarin.py`
-- [ ] chunk English master
-- [ ] translate each chunk
-- [ ] force Simplified Chinese
-- [ ] reassemble file
-- [ ] save markdown
+- [ ] 8.12.1 chunk English master
+- [ ] 8.12.2 translate each chunk
+- [ ] 8.12.3 force Simplified Chinese
+- [ ] 8.12.4 reassemble file
+- [ ] 8.12.5 save markdown
 
 ## 8.13 `src/agent_gatsby/bilingual_qa.py`
-- [ ] compare heading counts
-- [ ] compare citation counts
-- [ ] compare quote markers
-- [ ] write reports
+- [ ] 8.13.1 compare heading counts
+- [ ] 8.13.2 compare citation counts
+- [ ] 8.13.3 compare quote markers
+- [ ] 8.13.4 write reports
 
 ## 8.14 `src/agent_gatsby/pdf_compiler.py`
-- [ ] load text files
-- [ ] set fonts
-- [ ] render pages
-- [ ] save PDFs
-- [ ] catch Unicode errors
+- [ ] 8.14.1 load text files
+- [ ] 8.14.2 set fonts
+- [ ] 8.14.3 render pages
+- [ ] 8.14.4 save PDFs
+- [ ] 8.14.5 catch Unicode errors
 
 ## 8.15 `src/agent_gatsby/manifest_writer.py`
-- [ ] gather hashes
-- [ ] gather outputs
-- [ ] gather model info
-- [ ] write manifest JSON
+- [ ] 8.15.1 gather hashes
+- [ ] 8.15.2 gather outputs
+- [ ] 8.15.3 gather model info
+- [ ] 8.15.4 write manifest JSON
 
 ---
 
@@ -749,108 +749,109 @@ Do not stop until all are true:
 Use this when something breaks.
 
 ## 9.1 If the local model call fails
-- [ ] confirm `ollama serve` is running
-- [ ] confirm model is pulled
-- [ ] confirm endpoint URL matches config
-- [ ] run a tiny manual test prompt
-- [ ] inspect logs
-- [ ] reduce prompt size if necessary
-- [ ] save raw failure output
+- [ ] 9.1.1 confirm `ollama serve` is running
+- [ ] 9.1.2 confirm model is pulled
+- [ ] 9.1.3 confirm endpoint URL matches config
+- [ ] 9.1.4 run a tiny manual test prompt
+- [ ] 9.1.5 inspect logs
+- [ ] 9.1.6 reduce prompt size if necessary
+- [ ] 9.1.7 save raw failure output
 
 ## 9.2 If JSON parsing fails
-- [ ] inspect raw model response
-- [ ] add stricter JSON-only instructions
-- [ ] ask model for array/object only
-- [ ] strip code fences before parsing if necessary
-- [ ] retry once
-- [ ] if still failing, simplify the schema
+- [ ] 9.2.1 inspect raw model response
+- [ ] 9.2.2 add stricter JSON-only instructions
+- [ ] 9.2.3 ask model for array/object only
+- [ ] 9.2.4 strip code fences before parsing if necessary
+- [ ] 9.2.5 retry once
+- [ ] 9.2.6 if still failing, simplify the schema
 
 ## 9.3 If quote verification fails
-- [ ] print failing quote
-- [ ] print referenced passage text
-- [ ] check punctuation mismatch
-- [ ] check whitespace normalization mismatch
-- [ ] check curly quotes vs straight quotes
-- [ ] decide whether verifier should normalize quotes before matching
+- [ ] 9.3.1 print failing quote
+- [ ] 9.3.2 print referenced passage text
+- [ ] 9.3.3 check punctuation mismatch
+- [ ] 9.3.4 check whitespace normalization mismatch
+- [ ] 9.3.5 check curly quotes vs straight quotes
+- [ ] 9.3.6 decide whether verifier should normalize quotes before matching
 
 ## 9.4 If translations lose citations
-- [ ] verify chunk boundaries
-- [ ] explicitly instruct model not to alter citation markers
-- [ ] compare citation counts before and after
-- [ ] rerun only broken chunks
+- [ ] 9.4.1 verify chunk boundaries
+- [ ] 9.4.2 explicitly instruct model not to alter citation markers
+- [ ] 9.4.3 compare citation counts before and after
+- [ ] 9.4.4 rerun only broken chunks
 
 ## 9.5 If Mandarin PDF breaks
-- [ ] confirm font file exists
-- [ ] confirm font supports CJK
-- [ ] confirm font registration code is correct
-- [ ] test a one-line Mandarin string first
-- [ ] then test full document
+- [ ] 9.5.1 confirm font file exists
+- [ ] 9.5.2 confirm font supports CJK
+- [ ] 9.5.3 confirm font registration code is correct
+- [ ] 9.5.4 test a one-line Mandarin string first
+- [ ] 9.5.5 then test full document
 
 ## 9.6 If end-to-end run is messy
-- [ ] delete stale intermediate files
-- [ ] rerun from earliest failing stage
-- [ ] confirm config values
-- [ ] confirm directory paths
-- [ ] confirm all expected artifacts are being written
+- [ ] 9.6.1 delete stale intermediate files
+- [ ] 9.6.2 rerun from earliest failing stage
+- [ ] 9.6.3 confirm config values
+- [ ] 9.6.4 confirm directory paths
+- [ ] 9.6.5 confirm all expected artifacts are being written
 
 ---
 
 # 10. Anti-Procrastination Execution Rules
 These are here because the project is large and ADHD can make it easy to drift.
 
-- [ ] Work only from this checklist.
-- [ ] Do not redesign the system midstream unless something is clearly broken.
-- [ ] Do not start polishing the repo visuals before the pipeline works.
-- [ ] Do not chase optional features before tests pass.
-- [ ] After finishing each section, physically check the box.
-- [ ] After each major milestone, run the relevant test.
-- [ ] After each major milestone, commit the code.
+## 10.1 Core rules
+- [ ] 10.1.1 Work only from this checklist.
+- [ ] 10.1.2 Do not redesign the system midstream unless something is clearly broken.
+- [ ] 10.1.3 Do not start polishing the repo visuals before the pipeline works.
+- [ ] 10.1.4 Do not chase optional features before tests pass.
+- [ ] 10.1.5 After finishing each section, physically check the box.
+- [ ] 10.1.6 After each major milestone, run the relevant test.
+- [ ] 10.1.7 After each major milestone, commit the code.
 
-## Mandatory commit points
-- [ ] after Thursday foundation
-- [ ] after Friday evidence ledger + outline
-- [ ] after Saturday English pipeline
-- [ ] after Sunday translations + PDFs + tests
-- [ ] after final cleanup
+## 10.2 Mandatory commit points
+- [ ] 10.2.1 after Thursday foundation
+- [ ] 10.2.2 after Friday evidence ledger + outline
+- [ ] 10.2.3 after Saturday English pipeline
+- [ ] 10.2.4 after Sunday translations + PDFs + tests
+- [ ] 10.2.5 after final cleanup
 
 ---
 
 # 11. Final Submission Prep Checklist
 Before you submit your application materials:
 
-- [ ] confirm repo link works
-- [ ] confirm README is current
-- [ ] confirm repo shows actual code, not just architecture
-- [ ] confirm final PDFs open correctly
-- [ ] confirm file names are clean and professional
-- [ ] confirm there are no embarrassing debug prints in visible files
-- [ ] confirm tests exist in repo
-- [ ] confirm logs do not expose anything unnecessary
-- [ ] confirm the project clearly demonstrates implementation discipline
-- [ ] confirm the output package is ready for upload
+- [ ] 11.1 confirm repo link works
+- [ ] 11.2 confirm README is current
+- [ ] 11.3 confirm repo shows actual code, not just architecture
+- [ ] 11.4 confirm final PDFs open correctly
+- [ ] 11.5 confirm file names are clean and professional
+- [ ] 11.6 confirm there are no embarrassing debug prints in visible files
+- [ ] 11.7 confirm tests exist in repo
+- [ ] 11.8 confirm logs do not expose anything unnecessary
+- [ ] 11.9 confirm the project clearly demonstrates implementation discipline
+- [ ] 11.10 confirm the output package is ready for upload
 
 ---
 
 # 12. Absolute Final Checklist
 You are done only when every box below is checked:
 
-- [ ] source locked
-- [ ] normalized text saved
-- [ ] passage index saved
-- [ ] candidate metaphors saved
-- [ ] evidence ledger saved
-- [ ] outline saved
-- [ ] English draft saved
-- [ ] English verification passed
-- [ ] English final saved
-- [ ] Spanish draft saved
-- [ ] Mandarin draft saved
-- [ ] translation QA reports saved
-- [ ] English PDF saved
-- [ ] Spanish PDF saved
-- [ ] Mandarin PDF saved
-- [ ] final manifest saved
-- [ ] tests pass
-- [ ] end-to-end pipeline works
-- [ ] repo pushed
-- [ ] submission artifacts ready
+- [ ] 12.1 source locked
+- [ ] 12.2 normalized text saved
+- [ ] 12.3 passage index saved
+- [ ] 12.4 candidate metaphors saved
+- [ ] 12.5 evidence ledger saved
+- [ ] 12.6 outline saved
+- [ ] 12.7 English draft saved
+- [ ] 12.8 English verification passed
+- [ ] 12.9 English final saved
+- [ ] 12.10 Spanish draft saved
+- [ ] 12.11 Mandarin draft saved
+- [ ] 12.12 translation QA reports saved
+- [ ] 12.13 English PDF saved
+- [ ] 12.14 Spanish PDF saved
+- [ ] 12.15 Mandarin PDF saved
+- [ ] 12.16 final manifest saved
+- [ ] 12.17 tests pass
+- [ ] 12.18 end-to-end pipeline works
+- [ ] 12.19 repo pushed
+- [ ] 12.20 submission artifacts ready
