@@ -48,7 +48,7 @@ The central design decision in this repository is simple:
 
 The objective of Agent Gatsby is to take a locked source text of *The Great Gatsby* and produce a submission package that satisfies the following output requirements:
 
-- a polished **English literary analysis** focused on metaphor
+- a polished **English literary analysis of the novel’s major recurring metaphor systems, including citations**, targeting approximately 10 pages
 - a **Spanish translation** of that analysis
 - a **Mandarin translation** of that analysis, rendered in Simplified Chinese
 - three separate, professional **PDF artifacts** suitable for upload
@@ -142,12 +142,12 @@ flowchart TD
     G --> H[Verify Quotes and Citations]
     H --> I[Critic and Edit Pass]
     I --> J[Freeze Canonical English Draft]
+    J --> O[Render English PDF]
     J --> K[Translate to Spanish in Chunks]
     J --> L[Translate to Mandarin in Chunks]
     K --> M[Spanish QA Pass]
     L --> N[Mandarin QA Pass]
-    M --> O[Render English PDF]
-    N --> P[Render Spanish PDF]
+    M --> P[Render Spanish PDF]
     N --> Q[Render Mandarin PDF]
     O --> R[Write Final Manifest]
     P --> R
@@ -552,79 +552,50 @@ The system writes a manifest summarizing the run.
 
 ## 7. Repository Structure
 
+The repository is organized around a small number of stable top-level areas:
+
+- **`config/`**  
+  Runtime configuration and prompt assets used by the pipeline.
+
+- **`src/agent_gatsby/`**  
+  Core Python implementation for ingestion, normalization, indexing, evidence extraction, drafting, verification, translation, PDF generation, and orchestration.
+
+- **`data/`**  
+  Source text inputs and normalized working text used during execution.
+
+- **`artifacts/`**  
+  Intermediate pipeline outputs such as manifests, evidence ledgers, drafts, translations, QA reports, and logs.
+
+- **`outputs/`**  
+  Final submission artifacts, including the English, Spanish, and Mandarin PDFs, along with the final run manifest.
+
+- **`fonts/`**  
+  Local font assets required for reliable PDF rendering, especially for Simplified Chinese output.
+
+- **`tests/`**  
+  Unit tests and lightweight integration/smoke tests for critical pipeline behavior.
+
+### High-Level Layout
+
 ```text
-agent_gatsby/
+Agent-Gatsby/
 ├── README.md
 ├── requirements.txt
 ├── pyproject.toml
+├── AGENTS.md
 ├── config/
-│   ├── config.yaml
-│   └── prompts.yaml
 ├── data/
-│   ├── source/
-│   │   └── gatsby_source.txt
-│   └── normalized/
-│       └── gatsby_locked.txt
-├── fonts/
-│   ├── NotoSerif-Regular.ttf
-│   ├── NotoSerif-Bold.ttf
-│   └── NotoSansSC-Regular.ttf
-├── outputs/
-│   ├── Gatsby_Analysis_English.pdf
-│   ├── Gatsby_Analysis_Spanish.pdf
-│   ├── Gatsby_Analysis_Mandarin.pdf
-│   └── final_manifest.json
 ├── artifacts/
-│   ├── manifests/
-│   │   └── source_manifest.json
-│   ├── evidence/
-│   │   ├── metaphor_candidates.json
-│   │   └── evidence_ledger.json
-│   ├── drafts/
-│   │   ├── outline.json
-│   │   ├── analysis_english_draft.md
-│   │   └── analysis_english_final.md
-│   ├── translations/
-│   │   ├── analysis_spanish_draft.md
-│   │   └── analysis_mandarin_draft.md
-│   ├── qa/
-│   │   ├── english_verification_report.json
-│   │   ├── spanish_qa_report.json
-│   │   └── mandarin_qa_report.json
-│   └── logs/
-│       └── pipeline.log
+├── outputs/
+├── fonts/
 ├── src/
 │   └── agent_gatsby/
-│       ├── __init__.py
-│       ├── orchestrator.py
-│       ├── config.py
-│       ├── schemas.py
-│       ├── data_ingest.py
-│       ├── normalize.py
-│       ├── index_text.py
-│       ├── extract_metaphors.py
-│       ├── build_evidence_ledger.py
-│       ├── plan_outline.py
-│       ├── draft_english.py
-│       ├── verify_citations.py
-│       ├── critique_and_edit.py
-│       ├── translate_spanish.py
-│       ├── translate_mandarin.py
-│       ├── bilingual_qa.py
-│       ├── pdf_compiler.py
-│       ├── manifest_writer.py
-│       └── utils/
-│           ├── hashing.py
-│           ├── text_utils.py
-│           ├── logging_utils.py
-│           └── pdf_utils.py
 └── tests/
-    ├── test_hashing.py
-    ├── test_passage_index.py
-    ├── test_quote_verification.py
-    ├── test_translation_integrity.py
-    └── test_pdf_unicode.py
 ```
+### Note on Structure
+This README intentionally documents the stable architectural layout rather than an exhaustively detailed file tree.
+
+During active development, exact module names, prompt files, intermediate artifacts, and test files may evolve. The GitHub repository tree is the source of truth for the exact current file structure.
 
 ---
 
@@ -755,7 +726,7 @@ The system is model-routable, but the baseline implementation keeps the operatio
 Prompts are treated as versioned assets, not as inline afterthoughts.
 
 ## 11.1 Prompt files
-Prompts should live in `config/prompts.yaml` or a prompt directory.
+Prompts should live in `config/prompts/` as versioned prompt assets rather than as ad hoc inline strings wherever practical.
 
 ## 11.2 Prompt classes
 
@@ -1054,8 +1025,10 @@ Configuration should not be hidden in code. It should be inspectable and editabl
 ## 19. Cold-Start Execution
 
 ## 19.1 Install dependencies
+Assumes the source text and required local font files are already present in the configured repository paths.
 ```bash
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ## 19.2 Start local inference server
