@@ -250,9 +250,11 @@ The model can reason over the full text if needed, but verification should opera
 ```
 
 ### Citation convention
-English citations use bracketed chapter.paragraph locators such as `[5.18]`.
+The internal drafting and verification pipeline uses canonical bracketed chapter.paragraph locators such as `[5.18]`.
 
-These locators reference the locked passage index, not printed page numbers. A brief note near the top of the English essay should explain this convention.
+The final English report renders those deterministically as explicit human-readable citations such as `[#1, Chapter 5, Paragraph 18]`.
+
+The final report also appends a `Citations` section that lists each citation in first-appearance order alongside the exact locked-source paragraph text it references. A machine-readable citation registry is written separately for QA.
 
 ---
 
@@ -395,6 +397,7 @@ The system drafts the essay section by section rather than in one monolithic pas
 - maintain a formal analytical tone
 - preserve citation markers
 - avoid unsupported claims
+- ground each interpretation in surrounding locked-source paragraphs, not just an isolated quote
 
 ### Why this matters
 Section-bounded drafting produces better local coherence and makes debugging easier.
@@ -404,6 +407,8 @@ Section-bounded drafting produces better local coherence and makes debugging eas
 - every direct quote must exist in the ledger
 - every citation must resolve to a passage ID
 - unsupported thematic claims are disallowed
+- metaphor interpretation should explain what is happening in the scene and why the figurative language makes sense in the surrounding text
+- claims about later developments should be tied to supporting evidence rather than vague story memory
 
 ### Length targets
 - target roughly 2800-3200 words for the English essay
@@ -424,6 +429,7 @@ After the English draft is generated, a deterministic verifier checks every quot
 - ensure cited passage IDs exist
 - ensure every citation in the draft maps to a ledger entry
 - ensure no quote has been silently altered
+- generate a machine-readable citation registry for the report
 - report draft word count and estimated page count
 - keep invalid quote rate at zero
 - keep invalid citation rate at zero
@@ -434,6 +440,9 @@ A literary essay with weak citations fails the core deliverable.
 
 ### Example output artifact
 `artifacts/qa/english_verification_report.json`
+
+Additional QA artifact:
+`artifacts/qa/citation_registry.json`
 
 ```json
 {
@@ -457,6 +466,7 @@ Once the draft is verified, the system runs a critic/editor stage.
 - sharpen topic sentences
 - improve academic tone
 - preserve meaning without altering verified quotations
+- render explicit human-readable citations and append the final `Citations` section deterministically
 
 ### Important constraint
 This stage may refine prose, but it may **not** modify direct quotations or invent new citations.
@@ -1098,7 +1108,9 @@ python -m agent_gatsby.orchestrator --config config/config.yaml --run critique_e
 Expected English-stage outputs:
 - `artifacts/drafts/analysis_english_draft.md`
 - `artifacts/qa/english_verification_report.json`
+- `artifacts/qa/citation_registry.json`
 - `artifacts/drafts/analysis_english_final.md`
+- `artifacts/qa/citation_registry.json`
 
 The verification report now includes:
 - word count

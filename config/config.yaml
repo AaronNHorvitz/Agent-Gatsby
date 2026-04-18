@@ -119,6 +119,10 @@ drafting:
   write_section_by_section: true
   max_evidence_per_section: 4
   citation_format: "[{passage_id}]"
+  display_citation_format: "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]"
+  citation_appendix_heading: "Citations"
+  context_window_paragraphs_before: 1
+  context_window_paragraphs_after: 1
   preserve_direct_quotes: true
   forbid_invented_citations: true
   forbid_invented_quotes: true
@@ -126,6 +130,7 @@ drafting:
 
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
+  citation_registry_output_path: "artifacts/qa/citation_registry.json"
   fail_on_quote_mismatch: true
   fail_on_invalid_citation: true
   invalid_quote_rate_threshold: 0.0

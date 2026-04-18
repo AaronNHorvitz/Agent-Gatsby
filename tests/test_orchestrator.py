@@ -105,6 +105,10 @@ drafting:
   section_drafts_dir: "artifacts/drafts/sections"
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
+  display_citation_format: "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]"
+  citation_appendix_heading: "Citations"
+  context_window_paragraphs_before: 1
+  context_window_paragraphs_after: 1
   write_section_by_section: true
   max_evidence_per_section: 4
   citation_format: "[{passage_id}]"
@@ -114,6 +118,7 @@ drafting:
   target_tone: "formal academic literary analysis"
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
+  citation_registry_output_path: "artifacts/qa/citation_registry.json"
   fail_on_quote_mismatch: true
   fail_on_invalid_citation: true
   normalize_curly_quotes_for_matching: true
@@ -169,8 +174,6 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
                 [
                     "# Metaphor and Desire in Gatsby",
                     "",
-                    "_Citation note: bracketed locators reference chapter.paragraph positions in the locked source text._",
-                    "",
                     "## Introduction",
                     "",
                     'Nick\'s opening perspective frames metaphor as the language through which aspiration becomes socially visible through the "green light" [1.1].',
@@ -213,6 +216,10 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     assert (repo_root / "artifacts/drafts/analysis_english_draft.md").exists()
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").exists()
+    final_text = (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8")
+    assert "[#1, Chapter 1, Paragraph 1]" in final_text
+    assert "## Citations" in final_text
+    assert (repo_root / "artifacts/qa/citation_registry.json").exists()
 
     log_text = (repo_root / "artifacts/logs/pipeline.log").read_text(encoding="utf-8")
     assert "Starting stage: ingest" in log_text

@@ -52,6 +52,7 @@ drafting:
   final_output_path: "artifacts/drafts/analysis_english_final.md"
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
+  citation_registry_output_path: "artifacts/qa/citation_registry.json"
 models:
   primary_reasoner: "gemma4:26b"
 """
@@ -69,6 +70,7 @@ def test_load_config_resolves_repo_and_output_paths(tmp_path) -> None:
     assert config.metaphor_candidates_path == repo_root / "artifacts/evidence/metaphor_candidates.json"
     assert config.final_draft_output_path == repo_root / "artifacts/drafts/analysis_english_final.md"
     assert config.english_verification_report_path == repo_root / "artifacts/qa/english_verification_report.json"
+    assert config.citation_registry_output_path == repo_root / "artifacts/qa/citation_registry.json"
     assert config.resolve_prompt_path("draft_prompt_path") == repo_root / "config/prompts/draft.md"
     assert config.model_name_for("primary_reasoner") == "gemma4:26b"
 

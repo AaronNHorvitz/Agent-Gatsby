@@ -178,6 +178,10 @@ class AppConfig(BaseModel):
     def english_verification_report_path(self) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("verification", "output_path"))
 
+    @property
+    def citation_registry_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("verification", "citation_registry_output_path"))
+
     def resolve_prompt_path(self, prompt_key: str) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("prompts", prompt_key))
 

@@ -397,19 +397,20 @@ Do not move on until all are true:
 - [x] 6.2.7 Confirm headings exist
 - [x] 6.2.8 Confirm text is non-empty
 - [x] 6.2.9 Confirm citations appear in `[chapter.paragraph]` format
-- [ ] 6.2.10 Add target word count variable
-- [ ] 6.2.11 Add estimated page target variable
-- [ ] 6.2.12 Add words-per-page estimate variable
-- [ ] 6.2.13 Report actual draft word count
-- [ ] 6.2.14 Report estimated page count
+- [x] 6.2.10 Add target word count variable
+- [x] 6.2.11 Add estimated page target variable
+- [x] 6.2.12 Add words-per-page estimate variable
+- [x] 6.2.13 Report actual draft word count
+- [x] 6.2.14 Report estimated page count
 
 ## 6.3 Lock citation format now
 This decision is already made; implement it consistently.
-- [x] 6.3.1 Use bracketed chapter.paragraph markers such as `[5.18]`
-- [x] 6.3.2 Add a short note near the top of the essay explaining the locator convention
+- [x] 6.3.1 Use canonical bracketed chapter.paragraph markers such as `[5.18]` internally
+- [x] 6.3.2 Render final report citations explicitly as `[#n, Chapter X, Paragraph Y]`
 - [x] 6.3.3 Do not use page numbers
 - [x] 6.3.4 Use the same format everywhere
-- [x] 6.3.5 Update drafting and verification logic accordingly
+- [x] 6.3.5 Add a final `Citations` appendix and machine-readable citation registry
+- [x] 6.3.6 Update drafting and verification logic accordingly
 
 ## 6.4 Build `verify_citations.py`
 This file is non-negotiable.
@@ -425,10 +426,10 @@ This file is non-negotiable.
 - [x] 6.4.8 Create a verification report
 - [x] 6.4.9 Save report to `artifacts/qa/english_verification_report.json`
 - [x] 6.4.10 If verification fails, exit with failure
-- [ ] 6.4.11 Add zero-tolerance invalid quote rate variable
-- [ ] 6.4.12 Add zero-tolerance invalid citation rate variable
-- [ ] 6.4.13 Add advisory unsupported-claim threshold variable
-- [ ] 6.4.14 Report unsupported-claim estimate for human review
+- [x] 6.4.11 Add zero-tolerance invalid quote rate variable
+- [x] 6.4.12 Add zero-tolerance invalid citation rate variable
+- [x] 6.4.13 Add advisory unsupported-claim threshold variable
+- [x] 6.4.14 Report unsupported-claim estimate for human review
 
 ## 6.5 Create tests for quote verification
 - [x] 6.5.1 `test_quote_verification.py`

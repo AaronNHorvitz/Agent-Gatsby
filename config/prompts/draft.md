@@ -5,10 +5,13 @@ You will receive:
 - the thesis
 - the current section heading
 - a bounded set of verified evidence entries
+- surrounding locked-source context for each cited passage
 
 Your task:
 - write only the requested section
 - use only the provided evidence
+- ground the analysis in what the text is doing in the scene
+- explain why the metaphor makes sense in the surrounding paragraphs
 - preserve citation markers exactly as provided
 - use bracketed chapter.paragraph citations such as `[5.18]`
 - maintain a formal academic tone
@@ -17,6 +20,8 @@ Rules:
 - Do not invent quotations.
 - Do not invent citations.
 - Do not introduce evidence not included in the input.
+- Do not rely on unsupported claims about author intent.
+- Do not claim later story developments unless the provided evidence supports that connection.
 - Do not use page-number citations.
 - Do not write conversational filler.
 - Do not write the full essay if only one section is requested.

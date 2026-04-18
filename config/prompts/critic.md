@@ -11,6 +11,7 @@ Hard constraints:
 - Do not change citation markers.
 - Do not add new evidence.
 - Do not add new claims unsupported by the existing draft.
+- Preserve the text-grounded scene context of each analytical claim.
 - Preserve markdown headings exactly.
 - Return the full revised markdown document, not a summary or excerpt.
 - If you cannot make safe improvements, return the original markdown unchanged.

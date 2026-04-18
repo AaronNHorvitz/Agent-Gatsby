@@ -92,11 +92,14 @@ def stage_draft_english(config: AppConfig, context: StageContext) -> None:
         stage_plan_outline(config, context)
     if "evidence_records" not in context:
         stage_build_evidence_ledger(config, context)
+    if "passage_index" not in context:
+        stage_index(config, context)
 
     context["english_draft"] = draft_english(
         config,
         outline=context["outline"],
         evidence_records=context["evidence_records"],
+        passage_index=context["passage_index"],
     )
 
 

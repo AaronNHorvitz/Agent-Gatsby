@@ -8,6 +8,7 @@ import logging
 import re
 from collections import Counter
 
+from agent_gatsby.citation_registry import build_citation_registry, render_report_with_citation_appendix
 from agent_gatsby.config import AppConfig
 from agent_gatsby.index_text import load_passage_index
 from agent_gatsby.llm_client import LLMResponseValidationError, invoke_text_completion
@@ -84,6 +85,7 @@ def critique_and_edit(
     draft_text: str | None = None,
 ) -> str:
     loaded_draft = draft_text or load_english_draft(config)
+    loaded_index = load_passage_index(config)
     try:
         revised_text = invoke_text_completion(
             config,
@@ -104,7 +106,17 @@ def critique_and_edit(
         config,
         draft_text=revised_text,
         evidence_records=load_evidence_records(config),
-        passage_index=load_passage_index(config),
+        passage_index=loaded_index,
     )
-    write_final_english_draft(config, revised_text)
-    return revised_text
+    citation_registry = build_citation_registry(
+        revised_text,
+        loaded_index,
+        display_format=str(config.drafting.get("display_citation_format", "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]")),
+    )
+    final_text = render_report_with_citation_appendix(
+        revised_text,
+        citation_registry,
+        appendix_heading=str(config.drafting.get("citation_appendix_heading", "Citations")),
+    )
+    write_final_english_draft(config, final_text)
+    return final_text

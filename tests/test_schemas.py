@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from agent_gatsby.schemas import EvidenceRecord, PassageRecord, VerificationIssue, VerificationReport
+from agent_gatsby.schemas import CitationRegistryEntry, EvidenceRecord, PassageRecord, VerificationIssue, VerificationReport
 
 
 def test_schema_models_accept_expected_fields_and_defaults() -> None:
@@ -33,12 +33,22 @@ def test_schema_models_accept_expected_fields_and_defaults() -> None:
         unsupported_sentence_ratio=0.03,
         issues=[VerificationIssue(code="warning", message="Advisory only")],
     )
+    citation_entry = CitationRegistryEntry(
+        citation_number=1,
+        display_label="[#1, Chapter 1, Paragraph 4]",
+        canonical_locator="[1.4]",
+        passage_id="1.4",
+        chapter=1,
+        paragraph=4,
+        exact_passage_text="Example cited passage text.",
+    )
 
     assert record.supporting_theme_tags == []
     assert record.source_type == "candidate"
     assert report.issues[0].message == "Advisory only"
     assert report.word_count == 2800
     assert report.unsupported_sentence_ratio == 0.03
+    assert citation_entry.canonical_locator == "[1.4]"
 
 
 def test_schema_models_reject_unexpected_fields() -> None:

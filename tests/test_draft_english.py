@@ -14,14 +14,61 @@ def write_draft_repo(repo_root: Path) -> Path:
     (repo_root / "config/prompts").mkdir(parents=True)
     (repo_root / "artifacts/evidence").mkdir(parents=True)
     (repo_root / "artifacts/drafts").mkdir(parents=True)
+    (repo_root / "artifacts/manifests").mkdir(parents=True)
     (repo_root / "config/prompts/draft.md").write_text("Output markdown only.\n", encoding="utf-8")
+
+    passage_index = {
+        "source_name": "gatsby_locked",
+        "normalized_path": "data/normalized/gatsby_locked.txt",
+        "chapter_count": 2,
+        "passage_count": 4,
+        "generated_at": "2026-04-18T00:00:00Z",
+        "passages": [
+            {
+                "passage_id": "1.1",
+                "chapter": 1,
+                "paragraph": 1,
+                "text": "Nick arrives with a cautious sense of distance from the East.",
+                "char_start": 0,
+                "char_end": 58,
+            },
+            {
+                "passage_id": "1.2",
+                "chapter": 1,
+                "paragraph": 2,
+                "text": "Gatsby reached toward the green light at the end of the dock.",
+                "char_start": 60,
+                "char_end": 118,
+            },
+            {
+                "passage_id": "2.1",
+                "chapter": 2,
+                "paragraph": 1,
+                "text": "Ashes spread outward beneath the billboard and the road.",
+                "char_start": 120,
+                "char_end": 178,
+            },
+            {
+                "passage_id": "2.2",
+                "chapter": 2,
+                "paragraph": 2,
+                "text": "The valley of ashes gives decay a physical landscape.",
+                "char_start": 180,
+                "char_end": 234,
+            },
+        ],
+    }
+    (repo_root / "artifacts/manifests/passage_index.json").write_text(
+        json.dumps(passage_index, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
     evidence_records = [
         {
             "evidence_id": "E001",
             "metaphor": "green light",
             "quote": "green light",
-            "passage_id": "1.1",
+            "passage_id": "1.2",
             "chapter": 1,
             "interpretation": "A recurring image that concentrates Gatsby's longing into a distant object.",
             "supporting_theme_tags": ["desire"],
@@ -33,7 +80,7 @@ def write_draft_repo(repo_root: Path) -> Path:
             "evidence_id": "E002",
             "metaphor": "valley of ashes",
             "quote": "valley of ashes",
-            "passage_id": "2.1",
+            "passage_id": "2.2",
             "chapter": 2,
             "interpretation": "A material landscape that turns moral decay into a visible social metaphor.",
             "supporting_theme_tags": ["class", "decay"],
@@ -135,6 +182,10 @@ drafting:
   target_word_count_max: 3200
   estimated_page_target: 10
   words_per_page_estimate: 280
+  display_citation_format: "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]"
+  citation_appendix_heading: "Citations"
+  context_window_paragraphs_before: 1
+  context_window_paragraphs_after: 1
   write_section_by_section: true
   max_evidence_per_section: 4
   citation_format: "[{passage_id}]"
@@ -155,6 +206,8 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     prompt_checks = {
         "overall_target": False,
         "section_target": False,
+        "context_payload": False,
+        "scene_guidance": False,
     }
 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
@@ -163,12 +216,16 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
             prompt_checks["overall_target"] = True
         if "Target section length:" in user_prompt:
             prompt_checks["section_target"] = True
+        if '"previous_passages": [' in user_prompt and '"cited_passage": {' in user_prompt:
+            prompt_checks["context_payload"] = True
+        if "Ground the analysis in what the text is doing in the current scene" in user_prompt:
+            prompt_checks["scene_guidance"] = True
         if "Section type: introduction" in user_prompt:
             return "The novel's metaphors organize desire and decay into visible social forms."
         if "Section heading: Desire at a Distance" in user_prompt:
-            return 'Gatsby\'s "green light" turns longing into a visible object of desire [1.1].'
+            return 'In this scene, Gatsby\'s "green light" turns longing into a visible object of desire [1.2].'
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return 'The "valley of ashes" gives moral decay a physical landscape [2.1].'
+            return 'In this scene, the "valley of ashes" gives moral decay a physical landscape [2.2].'
         return "The conclusion gathers the essay's claims into a final judgment."
 
     monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
@@ -181,11 +238,12 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert "## Introduction" in draft_text
     assert "## Desire at a Distance" in draft_text
     assert "## Material Decay and Social Vision" in draft_text
-    assert "[1.1]" in draft_text
-    assert "[2.1]" in draft_text
-    assert "Citation note:" in draft_text
+    assert "[1.2]" in draft_text
+    assert "[2.2]" in draft_text
     assert prompt_checks["overall_target"] is True
     assert prompt_checks["section_target"] is True
+    assert prompt_checks["context_payload"] is True
+    assert prompt_checks["scene_guidance"] is True
 
 
 def test_section_response_validator_rejects_paraphrase_quotes_and_bad_locators() -> None:
@@ -194,7 +252,7 @@ def test_section_response_validator_rejects_paraphrase_quotes_and_bad_locators()
             evidence_id="E001",
             metaphor="green light",
             quote="green light",
-            passage_id="1.1",
+            passage_id="1.2",
             chapter=1,
             interpretation="A recurring image that concentrates Gatsby's longing into a distant object.",
             supporting_theme_tags=[],
@@ -206,7 +264,7 @@ def test_section_response_validator_rejects_paraphrase_quotes_and_bad_locators()
     validator = build_section_response_validator(evidence_records, require_citation=True)
 
     with pytest.raises(ValueError, match="quoted text outside the allowed evidence set"):
-        validator('Gatsby\'s "visible beacon" marks desire [1.1].')
+        validator('Gatsby\'s "visible beacon" marks desire [1.2].')
 
     with pytest.raises(ValueError, match="citations outside the allowed evidence set"):
         validator('Gatsby\'s "green light" marks desire [9.9].')

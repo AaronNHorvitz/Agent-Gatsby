@@ -9,6 +9,13 @@ import logging
 import re
 from pathlib import Path
 
+from agent_gatsby.citation_registry import (
+    ANY_BRACKET_RE,
+    build_citation_registry,
+    extract_citation_passage_ids,
+    extract_invalid_bracket_markers,
+    write_citation_registry,
+)
 from agent_gatsby.config import AppConfig
 from agent_gatsby.data_ingest import utc_now_iso
 from agent_gatsby.index_text import load_passage_index
@@ -17,8 +24,6 @@ from agent_gatsby.schemas import EvidenceRecord, PassageIndex, PassageRecord, Ve
 
 LOGGER = logging.getLogger(__name__)
 
-CITATION_RE = re.compile(r"\[(\d+\.\d+)\]")
-ANY_BRACKET_RE = re.compile(r"\[([^\]]+)\]")
 DOUBLE_QUOTE_RE = re.compile(r"[\"“](.+?)[\"”]", re.DOTALL)
 SINGLE_QUOTE_RE = re.compile(r"(?<!\w)['‘]([^'\n]{2,}?)['’](?!\w)")
 QUOTE_ISSUE_CODES = {
@@ -81,15 +86,7 @@ def normalize_match_text(text: str, *, normalize_curly_quotes: bool) -> str:
 
 
 def extract_citation_markers(text: str) -> list[str]:
-    return [match.group(1) for match in CITATION_RE.finditer(text)]
-
-
-def extract_invalid_bracket_markers(text: str) -> list[str]:
-    invalid: list[str] = []
-    for match in ANY_BRACKET_RE.finditer(text):
-        if not CITATION_RE.fullmatch(match.group(0)):
-            invalid.append(match.group(0))
-    return invalid
+    return extract_citation_passage_ids(text)
 
 
 def extract_quoted_strings(text: str) -> list[str]:
@@ -104,6 +101,14 @@ def extract_quoted_strings(text: str) -> list[str]:
 
 def paragraph_blocks(text: str) -> list[str]:
     return [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
+
+
+def split_main_text_and_appendix(text: str, *, appendix_heading: str) -> tuple[str, str | None]:
+    appendix_marker = f"## {appendix_heading}"
+    if appendix_marker not in text:
+        return text, None
+    body_text, appendix_text = text.split(appendix_marker, maxsplit=1)
+    return body_text.strip(), appendix_marker + appendix_text
 
 
 def prose_paragraph_blocks(text: str) -> list[str]:
@@ -198,7 +203,7 @@ def validate_citations(
 
     citation_markers = extract_citation_markers(text)
     if not citation_markers:
-        issues.append(build_issue("missing_citations", "Draft does not contain any valid [chapter.paragraph] citations"))
+        issues.append(build_issue("missing_citations", "Draft does not contain any valid citations"))
         return issues
 
     for marker in citation_markers:
@@ -300,32 +305,41 @@ def verify_english_draft(
     loaded_text = draft_text or load_english_draft(config)
     loaded_records = evidence_records or load_evidence_records(config)
     loaded_index = passage_index or load_passage_index(config)
+    appendix_heading = str(config.drafting.get("citation_appendix_heading", "Citations"))
+    main_text, _ = split_main_text_and_appendix(loaded_text, appendix_heading=appendix_heading)
 
     passage_lookup = build_passage_lookup(loaded_index)
     evidence_lookup = build_evidence_lookup(loaded_records)
     normalize_curly_quotes = bool(config.verification.get("normalize_curly_quotes_for_matching", True))
 
     issues = [
-        *validate_citations(loaded_text, passage_lookup=passage_lookup, evidence_lookup=evidence_lookup),
+        *validate_citations(main_text, passage_lookup=passage_lookup, evidence_lookup=evidence_lookup),
         *validate_quotes(
-            loaded_text,
+            main_text,
             passage_lookup=passage_lookup,
             evidence_lookup=evidence_lookup,
             normalize_curly_quotes=normalize_curly_quotes,
         ),
     ]
 
-    word_count = count_words(loaded_text)
+    citation_registry = build_citation_registry(
+        main_text,
+        loaded_index,
+        display_format=str(config.drafting.get("display_citation_format", "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]")),
+    )
+    write_citation_registry(config, citation_registry)
+
+    word_count = count_words(main_text)
     words_per_page = int(config.drafting.get("words_per_page_estimate", 280))
     estimated_pages = estimate_page_count(word_count, words_per_page)
-    quote_count = len(extract_quoted_strings(loaded_text))
-    citation_count = len(extract_citation_markers(loaded_text))
+    quote_count = len(extract_quoted_strings(main_text))
+    citation_count = len(extract_citation_markers(main_text))
     invalid_quote_issue_count = count_issues_for_codes(issues, QUOTE_ISSUE_CODES)
     invalid_citation_issue_count = count_issues_for_codes(issues, CITATION_ISSUE_CODES)
     quote_checks_total = quote_count
     citation_checks_total = citation_count or (1 if invalid_citation_issue_count else 0)
     prose_sentence_count, unsupported_sentence_count, unsupported_sentence_ratio = compute_unsupported_sentence_metrics(
-        loaded_text,
+        main_text,
         passage_lookup=passage_lookup,
         evidence_lookup=evidence_lookup,
     )

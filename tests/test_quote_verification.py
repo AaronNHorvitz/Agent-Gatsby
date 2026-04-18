@@ -120,8 +120,11 @@ drafting:
   target_word_count_max: 3200
   estimated_page_target: 10
   words_per_page_estimate: 280
+  display_citation_format: "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]"
+  citation_appendix_heading: "Citations"
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
+  citation_registry_output_path: "artifacts/qa/citation_registry.json"
   fail_on_quote_mismatch: true
   fail_on_invalid_citation: true
   invalid_quote_rate_threshold: 0.0
@@ -164,6 +167,27 @@ The "valley of ashes" gives decay a physical landscape [2.1].
     assert report.invalid_citation_rate == 0.0
     assert report.unsupported_sentence_ratio == 0.0
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
+    registry = json.loads((repo_root / "artifacts/qa/citation_registry.json").read_text(encoding="utf-8"))
+    assert registry[0]["display_label"] == "[#1, Chapter 1, Paragraph 1]"
+    assert registry[1]["exact_passage_text"] == "The valley of ashes lay under the gray morning like a ruined field."
+
+
+def test_verify_english_draft_accepts_human_readable_display_citations(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    draft_text = """
+# Metaphor and the Shape of Desire
+
+## Desire at a Distance
+
+Gatsby's "green light" turns longing into a visible object of desire [#1, Chapter 1, Paragraph 1].
+""".strip() + "\n"
+    config = load_config(write_verification_repo(repo_root, draft_text=draft_text))
+
+    report = verify_english_draft(config)
+
+    assert report.status == "passed"
+    registry = json.loads((repo_root / "artifacts/qa/citation_registry.json").read_text(encoding="utf-8"))
+    assert registry[0]["passage_id"] == "1.1"
 
 
 def test_verify_english_draft_fails_for_fake_quotes_and_invalid_locators(tmp_path) -> None:

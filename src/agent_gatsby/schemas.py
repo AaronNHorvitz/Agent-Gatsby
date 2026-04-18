@@ -109,6 +109,18 @@ class VerificationIssue(BaseModel):
     evidence_id: str | None = None
 
 
+class CitationRegistryEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    citation_number: int
+    display_label: str
+    canonical_locator: str
+    passage_id: str
+    chapter: int
+    paragraph: int
+    exact_passage_text: str
+
+
 class VerificationReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

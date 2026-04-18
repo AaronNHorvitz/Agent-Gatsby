@@ -9,18 +9,17 @@ import logging
 import re
 from pathlib import Path
 
+from agent_gatsby.citation_registry import build_context_payload, extract_citation_passage_ids, extract_invalid_bracket_markers
 from agent_gatsby.config import AppConfig
+from agent_gatsby.index_text import PassageIndex, load_passage_index
 from agent_gatsby.llm_client import invoke_text_completion
 from agent_gatsby.plan_outline import load_evidence_records, load_outline
 from agent_gatsby.schemas import EvidenceRecord, OutlinePlan, OutlineSection
 
 LOGGER = logging.getLogger(__name__)
 
-CITATION_RE = re.compile(r"\[\d+\.\d+\]")
-ANY_BRACKET_RE = re.compile(r"\[([^\]]+)\]")
 DOUBLE_QUOTE_RE = re.compile(r"[\"“](.+?)[\"”]", re.DOTALL)
 SINGLE_QUOTE_RE = re.compile(r"(?<!\w)['‘]([^'\n]{2,}?)['’](?!\w)")
-LOCATOR_NOTE = "Citation note: bracketed locators reference chapter.paragraph positions in the locked source text."
 
 
 def load_draft_prompt(config: AppConfig) -> str:
@@ -54,7 +53,13 @@ def gather_outline_evidence(outline: OutlinePlan, evidence_lookup: dict[str, Evi
     return ordered_records
 
 
-def render_evidence_payload(evidence_records: list[EvidenceRecord]) -> str:
+def render_evidence_payload(
+    evidence_records: list[EvidenceRecord],
+    *,
+    passage_index: PassageIndex,
+    context_before: int,
+    context_after: int,
+) -> str:
     payload = [
         {
             "evidence_id": record.evidence_id,
@@ -63,6 +68,12 @@ def render_evidence_payload(evidence_records: list[EvidenceRecord]) -> str:
             "passage_id": record.passage_id,
             "citation": f"[{record.passage_id}]",
             "interpretation": record.interpretation,
+            "context_window": build_context_payload(
+                passage_index,
+                passage_id=record.passage_id,
+                count_before=context_before,
+                count_after=context_after,
+            ),
         }
         for record in evidence_records
     ]
@@ -74,7 +85,7 @@ def collapse_spaces(text: str) -> str:
 
 
 def count_words(text: str) -> int:
-    cleaned = ANY_BRACKET_RE.sub("", text.replace("#", " ").replace("_", " "))
+    cleaned = re.sub(r"\[[^\]]+\]", "", text.replace("#", " ").replace("_", " "))
     return len(re.findall(r"\b[\w'-]+\b", cleaned, flags=re.UNICODE))
 
 
@@ -150,18 +161,6 @@ def normalize_validator_text(text: str) -> str:
     return collapse_spaces(normalized).strip()
 
 
-def extract_citation_markers(text: str) -> list[str]:
-    return [match.group(0) for match in CITATION_RE.finditer(text)]
-
-
-def extract_invalid_bracket_markers(text: str) -> list[str]:
-    invalid: list[str] = []
-    for match in ANY_BRACKET_RE.finditer(text):
-        if not CITATION_RE.fullmatch(match.group(0)):
-            invalid.append(match.group(0))
-    return invalid
-
-
 def extract_quoted_strings(text: str) -> list[str]:
     quotes: list[str] = []
     for pattern in (DOUBLE_QUOTE_RE, SINGLE_QUOTE_RE):
@@ -178,7 +177,7 @@ def build_section_response_validator(
     require_citation: bool,
 ) -> callable:
     allowed_quotes = {normalize_validator_text(record.quote) for record in evidence_records}
-    allowed_citations = {f"[{record.passage_id}]" for record in evidence_records}
+    allowed_passage_ids = {record.passage_id for record in evidence_records}
 
     def validator(response_text: str) -> None:
         stripped = response_text.strip()
@@ -189,11 +188,11 @@ def build_section_response_validator(
         if invalid_markers:
             raise ValueError(f"Drafted section contains invalid bracket markers: {', '.join(invalid_markers)}")
 
-        citations = extract_citation_markers(stripped)
+        citations = extract_citation_passage_ids(stripped)
         if require_citation and not citations:
             raise ValueError("Drafted section must contain at least one valid [chapter.paragraph] citation")
 
-        disallowed_citations = sorted({marker for marker in citations if marker not in allowed_citations})
+        disallowed_citations = sorted({marker for marker in citations if marker not in allowed_passage_ids})
         if disallowed_citations:
             raise ValueError(
                 "Drafted section contains citations outside the allowed evidence set: "
@@ -224,6 +223,7 @@ def build_draft_user_prompt(
     heading: str,
     section_notes: str,
     evidence_records: list[EvidenceRecord],
+    passage_index: PassageIndex,
 ) -> str:
     instructions = [
         f"Section type: {section_type}",
@@ -233,7 +233,10 @@ def build_draft_user_prompt(
         f"Section notes: {section_notes.strip()}",
         "Write markdown prose only for this section body.",
         "Do not repeat the section heading.",
-        "Use only the evidence records provided below.",
+        "Use only the evidence records and surrounding locked-source context provided below.",
+        "Ground the analysis in what the text is doing in the current scene, not in unsupported claims about author intent.",
+        "Explain why the metaphor makes sense in the surrounding paragraphs and how it clarifies character, setting, or theme in that moment.",
+        "Only connect a metaphor to later developments in the novel when that claim is supported by the provided evidence.",
         "If you use a direct quotation, keep it exact and preserve its locator exactly as given.",
         "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
         "Do not shorten, trim, or partially quote any provided quote string.",
@@ -254,14 +257,19 @@ def build_draft_user_prompt(
         "The only allowed locator markers for this section are: "
         + ", ".join(f"[{record.passage_id}]" for record in evidence_records)
     )
-    return "\n".join(instructions) + "\n\nVerified evidence entries:\n" + render_evidence_payload(evidence_records)
+    return "\n".join(instructions) + "\n\nVerified evidence entries:\n" + render_evidence_payload(
+        evidence_records,
+        passage_index=passage_index,
+        context_before=int(config.drafting.get("context_window_paragraphs_before", 1)),
+        context_after=int(config.drafting.get("context_window_paragraphs_after", 1)),
+    )
 
 
 def validate_section_text(text: str, *, heading: str, require_citation: bool) -> str:
     stripped = text.strip()
     if not stripped:
         raise ValueError(f"Drafted section '{heading}' is empty")
-    if require_citation and not CITATION_RE.search(stripped):
+    if require_citation and not extract_citation_passage_ids(stripped):
         raise ValueError(f"Drafted section '{heading}' does not contain a valid [chapter.paragraph] citation")
     return stripped
 
@@ -283,6 +291,7 @@ def draft_section(
     heading: str,
     section_notes: str,
     evidence_records: list[EvidenceRecord],
+    passage_index: PassageIndex,
     output_path: str,
     require_citation: bool,
 ) -> str:
@@ -297,6 +306,7 @@ def draft_section(
             heading=heading,
             section_notes=section_notes,
             evidence_records=evidence_records,
+            passage_index=passage_index,
         ),
         output_path=output_path,
         response_validator=build_section_response_validator(
@@ -316,8 +326,6 @@ def compose_full_draft(
 ) -> str:
     parts = [
         f"# {outline.title}",
-        "",
-        f"_{LOCATOR_NOTE}_",
         "",
         "## Introduction",
         "",
@@ -344,10 +352,6 @@ def validate_combined_draft(draft_text: str, outline: OutlinePlan) -> None:
             raise ValueError(f"Combined draft heading order is invalid around: {heading}")
         last_position = position
 
-    if LOCATOR_NOTE not in draft_text:
-        raise ValueError("Combined draft is missing the locator convention note")
-
-
 def write_english_draft(config: AppConfig, draft_text: str) -> None:
     output_path = config.draft_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -360,9 +364,11 @@ def draft_english(
     *,
     outline: OutlinePlan | None = None,
     evidence_records: list[EvidenceRecord] | None = None,
+    passage_index: PassageIndex | None = None,
 ) -> str:
     loaded_outline = outline or load_outline(config)
     loaded_records = evidence_records or load_evidence_records(config)
+    loaded_index = passage_index or load_passage_index(config)
     evidence_lookup = build_evidence_lookup(loaded_records)
     outline_records = gather_outline_evidence(loaded_outline, evidence_lookup)
 
@@ -373,6 +379,7 @@ def draft_english(
         heading="Introduction",
         section_notes=loaded_outline.intro_notes,
         evidence_records=outline_records,
+        passage_index=loaded_index,
         output_path=str(config.section_drafts_dir_path / "00_introduction.md"),
         require_citation=False,
     )
@@ -393,6 +400,7 @@ def draft_english(
             heading=section.heading,
             section_notes=section.purpose or loaded_outline.thesis,
             evidence_records=section_records,
+            passage_index=loaded_index,
             output_path=str(config.section_drafts_dir_path / f"{section.section_id}.md"),
             require_citation=True,
         )
@@ -411,6 +419,7 @@ def draft_english(
         heading="Conclusion",
         section_notes=loaded_outline.conclusion_notes,
         evidence_records=outline_records,
+        passage_index=loaded_index,
         output_path=str(config.section_drafts_dir_path / "99_conclusion.md"),
         require_citation=False,
     )
