@@ -12,17 +12,28 @@ from typing import Any
 from agent_gatsby.build_evidence_ledger import build_evidence_ledger
 from agent_gatsby.config import AppConfig, load_config
 from agent_gatsby.data_ingest import ingest_source
+from agent_gatsby.draft_english import draft_english
 from agent_gatsby.extract_metaphors import extract_metaphor_candidates
 from agent_gatsby.index_text import index_normalized_text
 from agent_gatsby.logging_utils import configure_logging
 from agent_gatsby.normalize import normalize_source
 from agent_gatsby.plan_outline import plan_outline
+from agent_gatsby.verify_citations import verify_english_draft
 
 LOGGER = logging.getLogger(__name__)
 
 StageContext = dict[str, Any]
 StageHandler = Callable[[AppConfig, StageContext], None]
-IMPLEMENTED_STAGE_ORDER = ("ingest", "normalize", "index", "extract_metaphors", "build_evidence_ledger", "plan_outline")
+IMPLEMENTED_STAGE_ORDER = (
+    "ingest",
+    "normalize",
+    "index",
+    "extract_metaphors",
+    "build_evidence_ledger",
+    "plan_outline",
+    "draft_english",
+    "verify_english",
+)
 
 
 def stage_ingest(config: AppConfig, context: StageContext) -> None:
@@ -74,6 +85,35 @@ def stage_plan_outline(config: AppConfig, context: StageContext) -> None:
     context["outline"] = plan_outline(config, evidence_records=context["evidence_records"])
 
 
+def stage_draft_english(config: AppConfig, context: StageContext) -> None:
+    if "outline" not in context:
+        stage_plan_outline(config, context)
+    if "evidence_records" not in context:
+        stage_build_evidence_ledger(config, context)
+
+    context["english_draft"] = draft_english(
+        config,
+        outline=context["outline"],
+        evidence_records=context["evidence_records"],
+    )
+
+
+def stage_verify_english(config: AppConfig, context: StageContext) -> None:
+    if "english_draft" not in context:
+        stage_draft_english(config, context)
+    if "passage_index" not in context:
+        stage_index(config, context)
+    if "evidence_records" not in context:
+        stage_build_evidence_ledger(config, context)
+
+    context["english_verification_report"] = verify_english_draft(
+        config,
+        draft_text=context["english_draft"],
+        evidence_records=context["evidence_records"],
+        passage_index=context["passage_index"],
+    )
+
+
 def get_stage_registry() -> dict[str, StageHandler]:
     return {
         "ingest": stage_ingest,
@@ -82,6 +122,8 @@ def get_stage_registry() -> dict[str, StageHandler]:
         "extract_metaphors": stage_extract_metaphors,
         "build_evidence_ledger": stage_build_evidence_ledger,
         "plan_outline": stage_plan_outline,
+        "draft_english": stage_draft_english,
+        "verify_english": stage_verify_english,
     }
 
 

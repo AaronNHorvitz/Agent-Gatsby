@@ -65,6 +65,18 @@ def load_evidence_records(source: AppConfig | str | Path) -> list[EvidenceRecord
     return [EvidenceRecord.model_validate(item) for item in data]
 
 
+def load_outline(source: AppConfig | str | Path) -> OutlinePlan:
+    if isinstance(source, AppConfig):
+        path = source.outline_output_path
+    else:
+        path = Path(source)
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected outline at {path} to contain a JSON object")
+    return OutlinePlan.model_validate(data)
+
+
 def build_outline_user_prompt(config: AppConfig, evidence_records: list[EvidenceRecord]) -> str:
     minimum_sections = int(config.outline.get("minimum_section_count", 0))
     maximum_sections = int(config.outline.get("maximum_section_count", 0))

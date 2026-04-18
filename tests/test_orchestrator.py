@@ -11,6 +11,7 @@ def write_test_repo(repo_root: Path) -> Path:
     (repo_root / "data/source").mkdir(parents=True)
     (repo_root / "config/prompts/extractor.md").write_text("Output JSON only.\n", encoding="utf-8")
     (repo_root / "config/prompts/outline.md").write_text("Output JSON only.\n", encoding="utf-8")
+    (repo_root / "config/prompts/draft.md").write_text("Output markdown only.\n", encoding="utf-8")
 
     source_text = (
         "\ufeffThe Project Gutenberg eBook of The Great Gatsby\n\n"
@@ -71,6 +72,7 @@ llm_defaults:
 prompts:
   extractor_prompt_path: "config/prompts/extractor.md"
   outline_prompt_path: "config/prompts/outline.md"
+  draft_prompt_path: "config/prompts/draft.md"
 indexing:
   output_path: "artifacts/manifests/passage_index.json"
   chapter_pattern: "^Chapter\\\\s+[IVXLC0-9]+$"
@@ -96,6 +98,24 @@ outline:
   require_conclusion: true
   require_thesis: true
   require_evidence_ids_per_section: true
+drafting:
+  output_path: "artifacts/drafts/analysis_english_draft.md"
+  section_drafts_dir: "artifacts/drafts/sections"
+  final_output_path: "artifacts/drafts/analysis_english_final.md"
+  master_output_path: "artifacts/final/analysis_english_master.md"
+  write_section_by_section: true
+  max_evidence_per_section: 4
+  citation_format: "[{passage_id}]"
+  preserve_direct_quotes: true
+  forbid_invented_citations: true
+  forbid_invented_quotes: true
+  target_tone: "formal academic literary analysis"
+verification:
+  output_path: "artifacts/qa/english_verification_report.json"
+  fail_on_quote_mismatch: true
+  fail_on_invalid_citation: true
+  normalize_curly_quotes_for_matching: true
+  require_all_citations_to_resolve: true
 orchestration:
   supported_stages:
     - "ingest"
@@ -104,6 +124,8 @@ orchestration:
     - "extract_metaphors"
     - "build_evidence_ledger"
     - "plan_outline"
+    - "draft_english"
+    - "verify_english"
 """
     config_path = repo_root / "config/config.yaml"
     config_path.write_text(config_text.strip() + "\n", encoding="utf-8")
@@ -132,6 +154,13 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
                     "conclusion_notes": "Return to the collapse of idealized longing.",
                 }
             )
+        if stage_name == "draft_english":
+            user_prompt = kwargs.get("user_prompt", "")
+            if "Section type: introduction" in user_prompt:
+                return "Nick's opening perspective frames metaphor as the language through which aspiration becomes socially visible."
+            if "Section type: conclusion" in user_prompt:
+                return 'The novel closes by showing how the "green light" remains a durable sign of desire even as it recedes [1.1].'
+            return 'Gatsby\'s "green light" turns desire into a visible performance of longing [1.1].'
         return json.dumps(
             [
                 {
@@ -147,6 +176,7 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
 
     monkeypatch.setattr("agent_gatsby.extract_metaphors.invoke_text_completion", fake_invoke_text_completion)
     monkeypatch.setattr("agent_gatsby.plan_outline.invoke_text_completion", fake_invoke_text_completion)
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
     exit_code = main(["--config", str(config_path), "--run", "all"])
 
     assert exit_code == 0
@@ -156,10 +186,12 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     assert (repo_root / "artifacts/evidence/metaphor_candidates.json").exists()
     assert (repo_root / "artifacts/evidence/evidence_ledger.json").exists()
     assert (repo_root / "artifacts/drafts/outline.json").exists()
+    assert (repo_root / "artifacts/drafts/analysis_english_draft.md").exists()
+    assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
 
     log_text = (repo_root / "artifacts/logs/pipeline.log").read_text(encoding="utf-8")
     assert "Starting stage: ingest" in log_text
-    assert "Finished stage: plan_outline" in log_text
+    assert "Finished stage: verify_english" in log_text
 
 
 def test_orchestrator_single_stage_run_builds_upstream_artifacts(tmp_path) -> None:

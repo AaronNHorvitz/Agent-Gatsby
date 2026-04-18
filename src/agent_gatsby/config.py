@@ -162,6 +162,18 @@ class AppConfig(BaseModel):
     def outline_output_path(self) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("outline", "output_path"))
 
+    @property
+    def draft_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("drafting", "output_path"))
+
+    @property
+    def section_drafts_dir_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("drafting", "section_drafts_dir"))
+
+    @property
+    def english_verification_report_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("verification", "output_path"))
+
     def resolve_prompt_path(self, prompt_key: str) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("prompts", prompt_key))
 

@@ -36,8 +36,8 @@ The project is considered done only if all of the following are true:
 - [x] 1.6 Candidate metaphor extraction works.
 - [x] 1.7 Evidence ledger file is produced.
 - [x] 1.8 English outline is produced.
-- [ ] 1.9 English draft is produced.
-- [ ] 1.10 English quote/citation verification runs.
+- [x] 1.9 English draft is produced.
+- [x] 1.10 English quote/citation verification runs.
 - [ ] 1.11 English final master is produced.
 - [ ] 1.12 Spanish translation file is produced.
 - [ ] 1.13 Mandarin translation file is produced.
@@ -63,8 +63,8 @@ This is the version you must finish first before adding anything fancy.
 - [x] 2.1.6 `src/agent_gatsby/extract_metaphors.py`
 - [x] 2.1.7 `src/agent_gatsby/build_evidence_ledger.py`
 - [x] 2.1.8 `src/agent_gatsby/plan_outline.py`
-- [ ] 2.1.9 `src/agent_gatsby/draft_english.py`
-- [ ] 2.1.10 `src/agent_gatsby/verify_citations.py`
+- [x] 2.1.9 `src/agent_gatsby/draft_english.py`
+- [x] 2.1.10 `src/agent_gatsby/verify_citations.py`
 - [ ] 2.1.11 `src/agent_gatsby/critique_and_edit.py`
 - [ ] 2.1.12 `src/agent_gatsby/translate_spanish.py`
 - [ ] 2.1.13 `src/agent_gatsby/translate_mandarin.py`
@@ -370,59 +370,59 @@ Do not move on until all are true:
 
 # 6. Saturday — English Essay, Verification, Editorial Pass
 ## 6.1 Write drafting prompt
-- [ ] 6.1.1 Create a section drafting prompt
-- [ ] 6.1.2 Tell model to write one section at a time
-- [ ] 6.1.3 Require use of provided evidence only
-- [ ] 6.1.4 Forbid invented quotes
-- [ ] 6.1.5 Forbid invented citations
-- [ ] 6.1.6 Forbid conversational filler
-- [ ] 6.1.7 Require academic tone
-- [ ] 6.1.8 Require citation markers to remain intact
+- [x] 6.1.1 Create a section drafting prompt
+- [x] 6.1.2 Tell model to write one section at a time
+- [x] 6.1.3 Require use of provided evidence only
+- [x] 6.1.4 Forbid invented quotes
+- [x] 6.1.5 Forbid invented citations
+- [x] 6.1.6 Forbid conversational filler
+- [x] 6.1.7 Require academic tone
+- [x] 6.1.8 Require citation markers to remain intact
 
 ## 6.2 Build `draft_english.py`
-- [ ] 6.2.1 Load outline
-- [ ] 6.2.2 Load evidence ledger
-- [ ] 6.2.3 Loop over outline sections one at a time
-- [ ] 6.2.4 For each section:
-  - [ ] 6.2.4.1 gather only the section’s evidence IDs
-  - [ ] 6.2.4.2 build prompt with heading + evidence
-  - [ ] 6.2.4.3 call LLM
-  - [ ] 6.2.4.4 save raw section draft to disk
-- [ ] 6.2.5 Combine all section drafts into one markdown file
-- [ ] 6.2.6 Save combined file to `artifacts/drafts/analysis_english_draft.md`
-- [ ] 6.2.7 Confirm headings exist
-- [ ] 6.2.8 Confirm text is non-empty
-- [ ] 6.2.9 Confirm citations appear in `[chapter.paragraph]` format
+- [x] 6.2.1 Load outline
+- [x] 6.2.2 Load evidence ledger
+- [x] 6.2.3 Loop over outline sections one at a time
+- [x] 6.2.4 For each section:
+  - [x] 6.2.4.1 gather only the section’s evidence IDs
+  - [x] 6.2.4.2 build prompt with heading + evidence
+  - [x] 6.2.4.3 call LLM
+  - [x] 6.2.4.4 save raw section draft to disk
+- [x] 6.2.5 Combine all section drafts into one markdown file
+- [x] 6.2.6 Save combined file to `artifacts/drafts/analysis_english_draft.md`
+- [x] 6.2.7 Confirm headings exist
+- [x] 6.2.8 Confirm text is non-empty
+- [x] 6.2.9 Confirm citations appear in `[chapter.paragraph]` format
 
 ## 6.3 Lock citation format now
 This decision is already made; implement it consistently.
-- [ ] 6.3.1 Use bracketed chapter.paragraph markers such as `[5.18]`
-- [ ] 6.3.2 Add a short note near the top of the essay explaining the locator convention
-- [ ] 6.3.3 Do not use page numbers
-- [ ] 6.3.4 Use the same format everywhere
-- [ ] 6.3.5 Update drafting and verification logic accordingly
+- [x] 6.3.1 Use bracketed chapter.paragraph markers such as `[5.18]`
+- [x] 6.3.2 Add a short note near the top of the essay explaining the locator convention
+- [x] 6.3.3 Do not use page numbers
+- [x] 6.3.4 Use the same format everywhere
+- [x] 6.3.5 Update drafting and verification logic accordingly
 
 ## 6.4 Build `verify_citations.py`
 This file is non-negotiable.
-- [ ] 6.4.1 Load English draft
-- [ ] 6.4.2 Load evidence ledger
-- [ ] 6.4.3 Load passage index
-- [ ] 6.4.4 Extract all quoted strings from the draft
-- [ ] 6.4.5 Extract all citation markers from the draft
-- [ ] 6.4.6 For each quote:
-  - [ ] 6.4.6.1 confirm exact match in source passage or ledger quote
-- [ ] 6.4.7 For each citation:
-  - [ ] 6.4.7.1 confirm locator resolves
-- [ ] 6.4.8 Create a verification report
-- [ ] 6.4.9 Save report to `artifacts/qa/english_verification_report.json`
-- [ ] 6.4.10 If verification fails, exit with failure
+- [x] 6.4.1 Load English draft
+- [x] 6.4.2 Load evidence ledger
+- [x] 6.4.3 Load passage index
+- [x] 6.4.4 Extract all quoted strings from the draft
+- [x] 6.4.5 Extract all citation markers from the draft
+- [x] 6.4.6 For each quote:
+  - [x] 6.4.6.1 confirm exact match in source passage or ledger quote
+- [x] 6.4.7 For each citation:
+  - [x] 6.4.7.1 confirm locator resolves
+- [x] 6.4.8 Create a verification report
+- [x] 6.4.9 Save report to `artifacts/qa/english_verification_report.json`
+- [x] 6.4.10 If verification fails, exit with failure
 
 ## 6.5 Create tests for quote verification
-- [ ] 6.5.1 `test_quote_verification.py`
-  - [ ] 6.5.1.1 verify real quote passes
-  - [ ] 6.5.1.2 verify fake quote fails
-  - [ ] 6.5.1.3 verify valid passage ID resolves
-  - [ ] 6.5.1.4 verify invalid passage ID fails
+- [x] 6.5.1 `test_quote_verification.py`
+  - [x] 6.5.1.1 verify real quote passes
+  - [x] 6.5.1.2 verify fake quote fails
+  - [x] 6.5.1.3 verify valid passage ID resolves
+  - [x] 6.5.1.4 verify invalid passage ID fails
 
 ## 6.6 Build `critique_and_edit.py`
 - [ ] 6.6.1 Load verified English draft
@@ -463,10 +463,10 @@ Read it like a hiring reviewer, not like a coder.
 
 ## 6.10 End of Saturday checkpoint
 Do not move on until all are true:
-- [ ] 6.10.1 English draft exists
-- [ ] 6.10.2 English verification report exists
+- [x] 6.10.1 English draft exists
+- [x] 6.10.2 English verification report exists
 - [ ] 6.10.3 English final file exists
-- [ ] 6.10.4 quote verification tests pass
+- [x] 6.10.4 quote verification tests pass
 - [ ] 6.10.5 editorial integrity checks pass
 - [ ] 6.10.6 smoke test passes
 - [ ] 6.10.7 English essay is human-reviewed once
@@ -699,18 +699,18 @@ Do not stop until all are true:
 - [x] 8.7.4 save outline JSON
 
 ## 8.8 `src/agent_gatsby/draft_english.py`
-- [ ] 8.8.1 load outline
-- [ ] 8.8.2 load ledger
-- [ ] 8.8.3 draft section by section
-- [ ] 8.8.4 combine sections
-- [ ] 8.8.5 save markdown file
+- [x] 8.8.1 load outline
+- [x] 8.8.2 load ledger
+- [x] 8.8.3 draft section by section
+- [x] 8.8.4 combine sections
+- [x] 8.8.5 save markdown file
 
 ## 8.9 `src/agent_gatsby/verify_citations.py`
-- [ ] 8.9.1 extract quotes
-- [ ] 8.9.2 extract citation markers
-- [ ] 8.9.3 validate quotes
-- [ ] 8.9.4 validate locators
-- [ ] 8.9.5 write QA report
+- [x] 8.9.1 extract quotes
+- [x] 8.9.2 extract citation markers
+- [x] 8.9.3 validate quotes
+- [x] 8.9.4 validate locators
+- [x] 8.9.5 write QA report
 
 ## 8.10 `src/agent_gatsby/critique_and_edit.py`
 - [ ] 8.10.1 improve prose only
@@ -848,8 +848,8 @@ You are done only when every box below is checked:
 - [x] 12.4 candidate metaphors saved
 - [x] 12.5 evidence ledger saved
 - [x] 12.6 outline saved
-- [ ] 12.7 English draft saved
-- [ ] 12.8 English verification passed
+- [x] 12.7 English draft saved
+- [x] 12.8 English verification passed
 - [ ] 12.9 English final saved
 - [ ] 12.10 Spanish draft saved
 - [ ] 12.11 Mandarin draft saved
