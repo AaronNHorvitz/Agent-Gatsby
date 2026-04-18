@@ -1041,12 +1041,15 @@ Configuration should not be hidden in code. It should be inspectable and editabl
 
 ## 19.1 Install dependencies
 Assumes the source text and required local font files are already present in the configured repository paths.
+This step installs only Python package dependencies for the repository.
+`ollama` is not included in `requirements.txt` and must be installed separately as a local runtime before running LLM-backed stages.
 ```bash
 pip install -r requirements.txt
 pip install -e .
 ```
 
 ## 19.2 Start local inference server
+Requires a separate `ollama` installation that is available on your shell `PATH`.
 ```bash
 ollama serve
 ```
