@@ -150,13 +150,17 @@ extraction:
 evidence_ledger:
   output_path: "artifacts/evidence/evidence_ledger.json"
   rejected_output_path: "artifacts/evidence/rejected_candidates.json"
+outline:
+  fixed_title: "An Analysis of Metaphors in The Great Gatsby"
 drafting:
   output_path: "artifacts/drafts/analysis_english_draft.md"
   section_drafts_dir: "artifacts/drafts/sections"
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
-  display_citation_format: "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]"
+  display_citation_format: "[{citation_number}]"
   citation_appendix_heading: "Citations"
+  citation_text_title: "Citation Text"
+  citation_text_output_path: "artifacts/final/citation_text.md"
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
@@ -207,13 +211,19 @@ def test_critique_and_edit_writes_final_file_and_preserves_integrity(monkeypatch
     final_text = critique_and_edit(config)
 
     final_path = repo_root / "artifacts/drafts/analysis_english_final.md"
+    citation_text_path = repo_root / "artifacts/final/citation_text.md"
     assert final_path.exists()
+    assert citation_text_path.exists()
     assert '*"green light"*' in final_text
     assert '*"valley of ashes"*' in final_text
-    assert "<a href='#citation-1'><u>[#1, Chapter 1, Paragraph 1]</u></a>" in final_text
-    assert "<a href='#citation-2'><u>[#2, Chapter 2, Paragraph 1]</u></a>" in final_text
-    assert "## Citations" in final_text
-    assert "Canonical locator:" not in final_text
+    assert "[1]" in final_text
+    assert "[2]" in final_text
+    assert "## Citations" not in final_text
+    assert "# An Analysis of Metaphors in The Great Gatsby" in final_text
+    citation_text = citation_text_path.read_text(encoding="utf-8")
+    assert "# Citation Text" in citation_text
+    assert "## [1]" in citation_text
+    assert "Chapter 1, Paragraph 1" in citation_text
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
     assert (repo_root / "artifacts/qa/citation_registry.json").exists()
 
@@ -270,6 +280,7 @@ def test_critique_and_edit_falls_back_to_verified_draft_when_editor_returns_empt
     monkeypatch.setattr("agent_gatsby.critique_and_edit.invoke_text_completion", fake_invoke_text_completion)
 
     final_text = critique_and_edit(config)
-    assert "Gatsby's *\"green light\"* turns longing into a visible object of desire <a href='#citation-1'><u>[#1, Chapter 1, Paragraph 1]</u></a>." in final_text
-    assert "## Citations" in final_text
+    assert 'Gatsby\'s *"green light"* turns longing into a visible object of desire [1].' in final_text
+    assert "## Citations" not in final_text
+    assert (repo_root / "artifacts/final/citation_text.md").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8").strip() == final_text.strip()

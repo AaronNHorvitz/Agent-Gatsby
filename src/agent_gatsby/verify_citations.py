@@ -325,7 +325,7 @@ def verify_english_draft(
     citation_registry = build_citation_registry(
         main_text,
         loaded_index,
-        display_format=str(config.drafting.get("display_citation_format", "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]")),
+        display_format=str(config.drafting.get("display_citation_format", "[{citation_number}]")),
     )
     write_citation_registry(config, citation_registry)
 

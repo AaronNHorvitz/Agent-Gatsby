@@ -50,6 +50,7 @@ drafting:
   output_path: "artifacts/drafts/analysis_english_draft.md"
   section_drafts_dir: "artifacts/drafts/sections"
   final_output_path: "artifacts/drafts/analysis_english_final.md"
+  citation_text_output_path: "artifacts/final/citation_text.md"
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
@@ -69,6 +70,7 @@ def test_load_config_resolves_repo_and_output_paths(tmp_path) -> None:
     assert config.source_file_path == repo_root / "data/source/gatsby_source.txt"
     assert config.metaphor_candidates_path == repo_root / "artifacts/evidence/metaphor_candidates.json"
     assert config.final_draft_output_path == repo_root / "artifacts/drafts/analysis_english_final.md"
+    assert config.citation_text_output_path == repo_root / "artifacts/final/citation_text.md"
     assert config.english_verification_report_path == repo_root / "artifacts/qa/english_verification_report.json"
     assert config.citation_registry_output_path == repo_root / "artifacts/qa/citation_registry.json"
     assert config.resolve_prompt_path("draft_prompt_path") == repo_root / "config/prompts/draft.md"

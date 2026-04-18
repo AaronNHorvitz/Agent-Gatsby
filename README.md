@@ -252,9 +252,9 @@ The model can reason over the full text if needed, but verification should opera
 ### Citation convention
 The internal drafting and verification pipeline uses canonical bracketed chapter.paragraph locators such as `[5.18]`.
 
-The final English report renders those deterministically as explicit human-readable citations such as `[#1, Chapter 5, Paragraph 18]`.
+The final English report renders those deterministically as simple numbered note citations such as `[1]`.
 
-The final report also appends a `Citations` section that lists each citation in first-appearance order alongside the exact locked-source paragraph text it references. A machine-readable citation registry is written separately for QA.
+The exact locked-source passages for those note numbers are written to a separate `Citation Text` artifact so the essay stays readable while the evidence remains auditable. A machine-readable citation registry is also written separately for QA.
 
 ---
 
@@ -469,7 +469,7 @@ Once the draft is verified, the system runs a critic/editor stage.
 - sharpen topic sentences
 - improve academic tone
 - preserve meaning without altering verified quotations
-- render explicit human-readable citations and append the final `Citations` section deterministically
+- render readable numbered note citations in the final essay and write a separate deterministic `Citation Text` artifact
 
 ### Important constraint
 This stage may refine prose, but it may **not** modify direct quotations or invent new citations.
@@ -1113,7 +1113,7 @@ Expected English-stage outputs:
 - `artifacts/qa/english_verification_report.json`
 - `artifacts/qa/citation_registry.json`
 - `artifacts/drafts/analysis_english_final.md`
-- `artifacts/qa/citation_registry.json`
+- `artifacts/final/citation_text.md`
 
 The verification report now includes:
 - word count

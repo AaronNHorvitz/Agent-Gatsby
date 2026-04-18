@@ -8,7 +8,12 @@ import logging
 import re
 from collections import Counter
 
-from agent_gatsby.citation_registry import build_citation_registry, render_report_with_citation_appendix
+from agent_gatsby.citation_registry import (
+    build_citation_registry,
+    render_citation_text_document,
+    render_final_report,
+    write_citation_text_document,
+)
 from agent_gatsby.config import AppConfig
 from agent_gatsby.index_text import load_passage_index
 from agent_gatsby.llm_client import LLMResponseValidationError, invoke_text_completion
@@ -111,12 +116,18 @@ def critique_and_edit(
     citation_registry = build_citation_registry(
         revised_text,
         loaded_index,
-        display_format=str(config.drafting.get("display_citation_format", "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]")),
+        display_format=str(config.drafting.get("display_citation_format", "[{citation_number}]")),
     )
-    final_text = render_report_with_citation_appendix(
+    final_text = render_final_report(
         revised_text,
         citation_registry,
-        appendix_heading=str(config.drafting.get("citation_appendix_heading", "Citations")),
+        title_override=str(config.outline.get("fixed_title", "")).strip() or None,
+    )
+    citation_text = render_citation_text_document(
+        citation_registry,
+        title=str(config.drafting.get("citation_text_title", "Citation Text")),
     )
     write_final_english_draft(config, final_text)
+    write_citation_text_document(config, citation_text)
+    LOGGER.info("Wrote citation text document to %s", config.citation_text_output_path)
     return final_text

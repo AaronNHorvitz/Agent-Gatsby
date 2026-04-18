@@ -15,6 +15,7 @@ DISPLAY_CITATION_RE = re.compile(r"\[#(\d+),\s*Chapter\s+(\d+),\s*Paragraph\s+(\
 ANY_BRACKET_RE = re.compile(r"\[([^\]]+)\]")
 LEGACY_CITATION_NOTE_RE = re.compile(r"(?m)^_?Citation note:[^\n]*_?\n?")
 BODY_SECTION_HEADING_RE = re.compile(r"(?m)^## (?!Citations$)")
+TITLE_HEADING_RE = re.compile(r"(?m)^# .+$")
 STRAIGHT_DOUBLE_QUOTE_RE = re.compile(r'(?<!\*)"([^"\n]+?)"(?!\*)')
 CURLY_DOUBLE_QUOTE_RE = re.compile(r"(?<!\*)“([^”\n]+?)”(?!\*)")
 
@@ -38,10 +39,6 @@ def format_display_citation(*, display_format: str, citation_number: int, passag
         paragraph=passage.paragraph,
         passage_id=passage.passage_id,
     )
-
-
-def citation_anchor_id(citation_number: int) -> str:
-    return f"citation-{citation_number}"
 
 
 def is_valid_citation_marker(marker: str) -> bool:
@@ -190,18 +187,14 @@ def build_citation_registry(
 
 
 def render_text_with_display_citations(text: str, registry: list[CitationRegistryEntry]) -> str:
-    display_lookup = {
-        entry.passage_id: (entry.display_label, citation_anchor_id(entry.citation_number))
-        for entry in registry
-    }
+    display_lookup = {entry.passage_id: entry.display_label for entry in registry}
 
     def replace(match: re.Match[str]) -> str:
         passage_id = f"{int(match.group(1))}.{int(match.group(2))}"
-        display_entry = display_lookup.get(passage_id)
-        if display_entry is None:
+        display_label = display_lookup.get(passage_id)
+        if display_label is None:
             return match.group(0)
-        display_label, anchor = display_entry
-        return f"<a href='#{anchor}'><u>{display_label}</u></a>"
+        return display_label
 
     return CANONICAL_CITATION_RE.sub(replace, text)
 
@@ -220,39 +213,55 @@ def shrink_body_headings(text: str) -> str:
     return BODY_SECTION_HEADING_RE.sub("### ", text)
 
 
-def render_citations_appendix(
+def normalize_report_title(text: str, *, title_override: str | None) -> str:
+    if not title_override:
+        return text
+    if TITLE_HEADING_RE.search(text):
+        return TITLE_HEADING_RE.sub(f"# {title_override}", text, count=1)
+    return f"# {title_override}\n\n{text.strip()}"
+
+
+def render_final_report(
+    body_text: str,
     registry: list[CitationRegistryEntry],
     *,
-    heading: str,
+    title_override: str | None = None,
+) -> str:
+    rendered_body = strip_legacy_citation_note(body_text.strip())
+    rendered_body = normalize_report_title(rendered_body, title_override=title_override)
+    rendered_body = render_text_with_display_citations(rendered_body, registry).strip()
+    rendered_body = italicize_quoted_text(rendered_body)
+    rendered_body = shrink_body_headings(rendered_body)
+    return rendered_body.strip() + "\n"
+
+
+def render_citation_text_document(
+    registry: list[CitationRegistryEntry],
+    *,
+    title: str,
 ) -> str:
     if not registry:
-        return f"## {heading}\n\nNo citations were recorded.\n"
+        return f"# {title}\n\nNo citation text entries were recorded.\n"
 
-    parts = [f"## {heading}", ""]
+    parts = [
+        f"# {title}",
+        "",
+        "This document lists the exact English source passages referenced by the numbered citations in the essays.",
+        "It is provided separately so the main report can stay readable while the evidence remains auditable.",
+        "",
+    ]
     for entry in registry:
         parts.extend(
             [
-                f"### <a id='{citation_anchor_id(entry.citation_number)}'></a>{entry.display_label}",
+                f"## {entry.display_label}",
                 "",
-                italicize_quoted_text(f"> {entry.exact_passage_text}"),
+                f"Chapter {entry.chapter}, Paragraph {entry.paragraph}",
+                "",
+                entry.exact_passage_text,
                 "",
             ]
         )
     return "\n".join(parts).strip() + "\n"
-
-
-def render_report_with_citation_appendix(
-    body_text: str,
-    registry: list[CitationRegistryEntry],
-    *,
-    appendix_heading: str,
-) -> str:
-    rendered_body = strip_legacy_citation_note(body_text.strip())
-    rendered_body = render_text_with_display_citations(rendered_body, registry).strip()
-    rendered_body = italicize_quoted_text(rendered_body)
-    rendered_body = shrink_body_headings(rendered_body)
-    appendix = render_citations_appendix(registry, heading=appendix_heading).strip()
-    return rendered_body + "\n\n" + appendix + "\n"
 
 
 def write_citation_registry(config: AppConfig, registry: list[CitationRegistryEntry]) -> None:
@@ -262,3 +271,9 @@ def write_citation_registry(config: AppConfig, registry: list[CitationRegistryEn
         json.dumps([entry.model_dump() for entry in registry], indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+
+
+def write_citation_text_document(config: AppConfig, document_text: str) -> None:
+    output_path = config.citation_text_output_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(document_text, encoding="utf-8")

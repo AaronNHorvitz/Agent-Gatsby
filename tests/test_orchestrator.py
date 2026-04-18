@@ -105,8 +105,10 @@ drafting:
   section_drafts_dir: "artifacts/drafts/sections"
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
-  display_citation_format: "[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]"
+  display_citation_format: "[{citation_number}]"
   citation_appendix_heading: "Citations"
+  citation_text_title: "Citation Text"
+  citation_text_output_path: "artifacts/final/citation_text.md"
   context_window_paragraphs_before: 1
   context_window_paragraphs_after: 1
   write_section_by_section: true
@@ -217,8 +219,9 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").exists()
     final_text = (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8")
-    assert "<a href='#citation-1'><u>[#1, Chapter 1, Paragraph 1]</u></a>" in final_text
-    assert "## Citations" in final_text
+    assert "[1]" in final_text
+    assert "## Citations" not in final_text
+    assert (repo_root / "artifacts/final/citation_text.md").exists()
     assert (repo_root / "artifacts/qa/citation_registry.json").exists()
 
     log_text = (repo_root / "artifacts/logs/pipeline.log").read_text(encoding="utf-8")

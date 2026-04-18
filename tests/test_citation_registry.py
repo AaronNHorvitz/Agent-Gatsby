@@ -4,7 +4,8 @@ from agent_gatsby.citation_registry import (
     build_citation_registry,
     build_context_payload,
     extract_citation_passage_ids,
-    render_report_with_citation_appendix,
+    render_citation_text_document,
+    render_final_report,
 )
 from agent_gatsby.schemas import PassageIndex, PassageRecord
 
@@ -72,9 +73,9 @@ def test_build_context_payload_collects_same_chapter_neighbors() -> None:
     assert context_payload["next_passages"] == []
 
 
-def test_render_report_with_citation_appendix_uses_display_labels_and_exact_text() -> None:
+def test_render_final_report_and_citation_text_document_use_note_numbers_and_exact_text() -> None:
     body_text = (
-        "# Sample Essay\n\n"
+        "# Old Title\n\n"
         "_Citation note: bracketed locators reference chapter.paragraph positions in the locked source text._\n\n"
         "## Introduction\n\n"
         'The "green light" matters here [1.2].\n'
@@ -82,16 +83,22 @@ def test_render_report_with_citation_appendix_uses_display_labels_and_exact_text
     registry = build_citation_registry(
         body_text,
         sample_passage_index(),
-        display_format="[#{citation_number}, Chapter {chapter}, Paragraph {paragraph}]",
+        display_format="[{citation_number}]",
     )
 
-    rendered = render_report_with_citation_appendix(body_text, registry, appendix_heading="Citations")
+    rendered_report = render_final_report(
+        body_text,
+        registry,
+        title_override="An Analysis of Metaphors in The Great Gatsby",
+    )
+    citation_text = render_citation_text_document(registry, title="Citation Text")
 
-    assert "<a href='#citation-1'><u>[#1, Chapter 1, Paragraph 2]</u></a>" in rendered
-    assert "## Citations" in rendered
-    assert "Canonical locator:" not in rendered
-    assert "_Citation note:" not in rendered
-    assert "### Introduction" in rendered
-    assert '*"green light"*' in rendered
-    assert "### <a id='citation-1'></a>[#1, Chapter 1, Paragraph 2]" in rendered
-    assert "Gatsby reached toward the green light at the end of the dock." in rendered
+    assert "# An Analysis of Metaphors in The Great Gatsby" in rendered_report
+    assert "_Citation note:" not in rendered_report
+    assert "## Citations" not in rendered_report
+    assert "### Introduction" in rendered_report
+    assert '*"green light"* matters here [1].' in rendered_report
+    assert "# Citation Text" in citation_text
+    assert "## [1]" in citation_text
+    assert "Chapter 1, Paragraph 2" in citation_text
+    assert "Gatsby reached toward the green light at the end of the dock." in citation_text

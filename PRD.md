@@ -984,8 +984,8 @@ Prefer bounded, verifiable stages over a single elegant but fragile prompt chain
 
 ## 25. Locked V1 Decisions
 
-- The internal drafting and verification pipeline uses canonical bracketed chapter.paragraph locators such as `[5.18]`, but the final English report renders those as explicit human-readable citations such as `[#1, Chapter 5, Paragraph 18]`.
-- The final English report appends a `Citations` section listing each citation in first-appearance order together with the exact locked-source paragraph text it references, and the same data is serialized to a machine-readable citation registry JSON artifact.
+- The internal drafting and verification pipeline uses canonical bracketed chapter.paragraph locators such as `[5.18]`, but the final English report renders those as simple numbered note citations such as `[1]`.
+- The exact locked-source paragraph text for each note number is moved out of the essay and into a separate `Citation Text` artifact, and the same data is serialized to a machine-readable citation registry JSON artifact.
 - Metaphor interpretation is grounded in the locked source text by providing the cited paragraph plus surrounding paragraphs to the drafting stage, and the prose should explain why the figurative language makes sense in that immediate scene context.
 - The Spanish and Mandarin outputs fully translate the essay, including quoted content, while preserving citation markers and quotation boundaries.
 - Exact quote verification applies to the English master only. Translated outputs are promoted through structural QA plus human spot checks.
