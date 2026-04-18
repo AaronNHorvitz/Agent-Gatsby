@@ -86,11 +86,15 @@ def build_outline_user_prompt(config: AppConfig, evidence_records: list[Evidence
     instructions = [
         "Create a structured essay outline from the verified evidence ledger.",
         "Return only a JSON object with the required schema.",
+        "Read the full verified evidence ledger before choosing the essay order.",
         "Use only evidence IDs that appear in the ledger.",
         "Do not invent evidence, quotations, or section support.",
         "This outline should support a reader-friendly English report rather than an abstract technical artifact.",
-        "The introduction should briefly explain what happens in the story, how the text uses metaphor as a literary device, and why the selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable later.",
+        "Plan the body arguments first, then make the introduction and conclusion summarize those body arguments.",
+        "The introduction should explain F. Scott Fitzgerald's writing style in The Great Gatsby and how he uses metaphor, based only on the evidence in the sections that follow.",
         "Prefer one main metaphor per body section, with section headings that clearly name the metaphor or image being analyzed.",
+        "Each body section must include a short 'purpose' field that states the argumentative claim the section will prove.",
+        "Order the body sections so the argument builds clearly from one metaphor to the next.",
     ]
     if fixed_title:
         instructions.append(f'Use this exact essay title: "{fixed_title}".')

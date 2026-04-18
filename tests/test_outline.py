@@ -112,8 +112,20 @@ outline:
 def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_outline_repo(repo_root))
+    prompt_checks = {
+        "body_first_guidance": False,
+        "purpose_guidance": False,
+        "style_guidance": False,
+    }
 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        if "Plan the body arguments first" in user_prompt:
+            prompt_checks["body_first_guidance"] = True
+        if "short 'purpose' field" in user_prompt:
+            prompt_checks["purpose_guidance"] = True
+        if "F. Scott Fitzgerald's writing style" in user_prompt:
+            prompt_checks["style_guidance"] = True
         return json.dumps(
             {
                 "title": "Some Other Title",
@@ -123,11 +135,13 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
                     {
                         "section_id": "S1",
                         "heading": "Desire at a Distance",
+                        "purpose": "Argue that the green light turns Gatsby's longing into a visible, distant target.",
                         "evidence_ids": ["E001"],
                     },
                     {
                         "section_id": "S2",
                         "heading": "Material Decay and Social Vision",
+                        "purpose": "Argue that the valley of ashes turns social decay into a concrete landscape.",
                         "evidence_ids": ["E002"],
                     },
                 ],
@@ -147,8 +161,12 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
     saved_outline = json.loads(outline_path.read_text(encoding="utf-8"))
     assert saved_outline["title"] == "An Analysis of Metaphors in The Great Gatsby"
     assert saved_outline["sections"]
+    assert saved_outline["sections"][0]["purpose"]
     assert saved_outline["sections"][0]["evidence_ids"] == ["E001"]
     assert saved_outline["sections"][1]["evidence_ids"] == ["E002"]
+    assert prompt_checks["body_first_guidance"] is True
+    assert prompt_checks["purpose_guidance"] is True
+    assert prompt_checks["style_guidance"] is True
 
 
 def test_plan_outline_rejects_nonexistent_evidence_ids(monkeypatch, tmp_path) -> None:
@@ -165,11 +183,13 @@ def test_plan_outline_rejects_nonexistent_evidence_ids(monkeypatch, tmp_path) ->
                     {
                         "section_id": "S1",
                         "heading": "Missing Support",
+                        "purpose": "This should fail because the evidence is missing.",
                         "evidence_ids": ["E999"],
                     },
                     {
                         "section_id": "S2",
                         "heading": "Still Missing Support",
+                        "purpose": "This second section is valid but should never be written.",
                         "evidence_ids": ["E001"],
                     },
                 ],

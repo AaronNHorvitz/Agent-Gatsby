@@ -137,16 +137,40 @@ def render_metaphor_focus_block(evidence_records: list[EvidenceRecord]) -> str:
     return "\n".join(lines)
 
 
-def render_intro_retry_evidence_summary(evidence_records: list[EvidenceRecord]) -> str:
+def strip_metaphor_focus_block(text: str) -> str:
+    if text.startswith("Metaphor text:\n"):
+        parts = text.split("\n\n", maxsplit=1)
+        if len(parts) == 2:
+            return parts[1].strip()
+    return text.strip()
+
+
+def split_sentences(text: str) -> list[str]:
+    normalized = collapse_spaces(text)
+    if not normalized:
+        return []
+    return [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+", normalized)
+        if sentence.strip()
+    ]
+
+
+def summarize_body_section_text(text: str, *, max_sentences: int = 2) -> str:
+    body_text = strip_metaphor_focus_block(text)
+    sentences = split_sentences(body_text)
+    if not sentences:
+        return body_text
+    return " ".join(sentences[:max_sentences]).strip()
+
+
+def render_completed_body_context(section_texts: list[tuple[str, str]]) -> str:
     payload = [
         {
-            "evidence_id": record.evidence_id,
-            "metaphor": record.metaphor,
-            "quote": record.quote,
-            "passage_id": record.passage_id,
-            "interpretation": record.interpretation,
+            "heading": heading,
+            "argument_summary": summarize_body_section_text(text),
         }
-        for record in evidence_records
+        for heading, text in section_texts
     ]
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
@@ -255,6 +279,7 @@ def build_draft_user_prompt(
     section_notes: str,
     evidence_records: list[EvidenceRecord],
     passage_index: PassageIndex,
+    completed_body_sections: list[tuple[str, str]] | None = None,
 ) -> str:
     instructions = [
         f"Section type: {section_type}",
@@ -286,13 +311,34 @@ def build_draft_user_prompt(
         instructions.append(section_word_target)
     if section_type == "introduction":
         instructions.append(
-            "Briefly explain what happens in the story, how the text uses metaphor as a literary device, "
-            "and why this selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable."
+            "Write this introduction after the body arguments already exist."
+        )
+        instructions.append(
+            "Open with a clear statement about F. Scott Fitzgerald's writing style in The Great Gatsby."
+        )
+        instructions.append(
+            "State a thesis about how Fitzgerald uses metaphor in the novel, based on the verified text discussed in the body sections."
+        )
+        instructions.append(
+            "Explain in plain English what the story is about, why these selected metaphors were chosen for an approximately ten-page analysis, "
+            "and how the body sections will prove the essay's argument."
+        )
+        instructions.append(
+            "End with a transition sentence that leads naturally into the first body section."
         )
         instructions.append("Prefer paraphrase over direct quotation in the introduction.")
     if section_type == "conclusion":
+        instructions.append("Write this conclusion after the body arguments already exist.")
         instructions.append("Keep the conclusion short, direct, and easy to read.")
+        instructions.append("Synthesize the body arguments into one closing judgment about Fitzgerald's use of metaphor.")
     if section_type == "body":
+        instructions.append(
+            "Structure this section as a compact argument chain: opening claim, quoted supporting evidence with citation, "
+            "analysis of how the text proves the claim in scene context, and a closing or transition sentence."
+        )
+        instructions.append(
+            "The opening sentence should make an arguable point, not just announce the topic."
+        )
         instructions.append("Use at least one bracketed chapter.paragraph citation from the provided evidence.")
         instructions.append(
             "Assume the exact metaphor text will be shown immediately before your analysis, so do not waste the opening sentence restating it."
@@ -301,12 +347,15 @@ def build_draft_user_prompt(
         "The only allowed locator markers for this section are: "
         + ", ".join(f"[{record.passage_id}]" for record in evidence_records)
     )
-    return "\n".join(instructions) + "\n\nVerified evidence entries:\n" + render_evidence_payload(
+    prompt_text = "\n".join(instructions) + "\n\nVerified evidence entries:\n" + render_evidence_payload(
         evidence_records,
         passage_index=passage_index,
         context_before=int(config.drafting.get("context_window_paragraphs_before", 1)),
         context_after=int(config.drafting.get("context_window_paragraphs_after", 1)),
     )
+    if section_type in {"introduction", "conclusion"} and completed_body_sections:
+        prompt_text += "\n\nCompleted body arguments:\n" + render_completed_body_context(completed_body_sections)
+    return prompt_text
 
 
 def build_intro_retry_user_prompt(
@@ -315,7 +364,7 @@ def build_intro_retry_user_prompt(
     *,
     heading: str,
     section_notes: str,
-    evidence_records: list[EvidenceRecord],
+    completed_body_sections: list[tuple[str, str]],
 ) -> str:
     instructions = [
         "Compact retry mode: introductory summary only.",
@@ -327,9 +376,11 @@ def build_intro_retry_user_prompt(
         "Write 3 short paragraphs in clear, readable English.",
         "Do not repeat the section heading.",
         "Do not include notes, self-critique, drafting commentary, or word-count checks.",
-        "Use only the evidence summary provided below.",
+        "Use only the completed body arguments provided below.",
         "Do not use any direct quotations or quotation marks in this introduction; paraphrase the evidence instead.",
+        "Explain F. Scott Fitzgerald's writing style in The Great Gatsby and how he uses metaphor, based on the body arguments already drafted.",
         "Briefly explain what happens in the story, how the text uses metaphor as a literary device, and why this selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable.",
+        "End with a transition sentence leading into the first body section.",
     ]
     overall_word_target = build_overall_word_target_guidance(config)
     if overall_word_target:
@@ -341,8 +392,8 @@ def build_intro_retry_user_prompt(
     )
     if section_word_target:
         instructions.append(section_word_target)
-    return "\n".join(instructions) + "\n\nEvidence summary:\n" + render_intro_retry_evidence_summary(
-        evidence_records
+    return "\n".join(instructions) + "\n\nCompleted body arguments:\n" + render_completed_body_context(
+        completed_body_sections
     )
 
 
@@ -375,6 +426,7 @@ def draft_section(
     passage_index: PassageIndex,
     output_path: str,
     require_citation: bool,
+    completed_body_sections: list[tuple[str, str]] | None = None,
 ) -> str:
     response_validator = build_section_response_validator(
         evidence_records,
@@ -393,6 +445,7 @@ def draft_section(
                 section_notes=section_notes,
                 evidence_records=evidence_records,
                 passage_index=passage_index,
+                completed_body_sections=completed_body_sections,
             ),
             output_path=output_path,
             response_validator=response_validator,
@@ -413,7 +466,7 @@ def draft_section(
                 outline,
                 heading=heading,
                 section_notes=section_notes,
-                evidence_records=evidence_records,
+                completed_body_sections=completed_body_sections or [],
             ),
             output_path=output_path,
             response_validator=response_validator,
@@ -482,24 +535,6 @@ def draft_english(
     evidence_lookup = build_evidence_lookup(loaded_records)
     outline_records = gather_outline_evidence(loaded_outline, evidence_lookup)
 
-    introduction_text = draft_section(
-        config,
-        outline=loaded_outline,
-        section_type="introduction",
-        heading="Introduction",
-        section_notes=loaded_outline.intro_notes,
-        evidence_records=outline_records,
-        passage_index=loaded_index,
-        output_path=str(config.section_drafts_dir_path / "00_introduction.md"),
-        require_citation=False,
-    )
-    write_section_file(
-        config,
-        filename="00_introduction.md",
-        heading="Introduction",
-        text=introduction_text,
-    )
-
     section_texts: list[tuple[str, str]] = []
     for section in loaded_outline.sections:
         section_records = gather_section_evidence(section, evidence_lookup)
@@ -522,6 +557,25 @@ def draft_english(
         )
         section_texts.append((section.heading, section_text))
 
+    introduction_text = draft_section(
+        config,
+        outline=loaded_outline,
+        section_type="introduction",
+        heading="Introduction",
+        section_notes=loaded_outline.intro_notes,
+        evidence_records=outline_records,
+        passage_index=loaded_index,
+        output_path=str(config.section_drafts_dir_path / "00_introduction.md"),
+        require_citation=False,
+        completed_body_sections=section_texts,
+    )
+    write_section_file(
+        config,
+        filename="00_introduction.md",
+        heading="Introduction",
+        text=introduction_text,
+    )
+
     conclusion_text = draft_section(
         config,
         outline=loaded_outline,
@@ -532,6 +586,7 @@ def draft_english(
         passage_index=loaded_index,
         output_path=str(config.section_drafts_dir_path / "99_conclusion.md"),
         require_citation=False,
+        completed_body_sections=section_texts,
     )
     write_section_file(
         config,

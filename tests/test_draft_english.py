@@ -209,7 +209,11 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
         "section_target": False,
         "context_payload": False,
         "scene_guidance": False,
+        "body_structure": False,
+        "intro_style": False,
+        "body_argument_context": False,
     }
+    call_order: list[str] = []
 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
         user_prompt = kwargs.get("user_prompt", "")
@@ -221,13 +225,35 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
             prompt_checks["context_payload"] = True
         if "Ground the analysis in what the text is doing in the current scene" in user_prompt:
             prompt_checks["scene_guidance"] = True
+        if "opening claim, quoted supporting evidence with citation" in user_prompt:
+            prompt_checks["body_structure"] = True
+        if "F. Scott Fitzgerald's writing style" in user_prompt:
+            prompt_checks["intro_style"] = True
+        if "Completed body arguments:" in user_prompt:
+            prompt_checks["body_argument_context"] = True
         if "Section type: introduction" in user_prompt:
-            return "The novel's metaphors organize desire and decay into visible social forms."
+            call_order.append("introduction")
+            return (
+                "F. Scott Fitzgerald writes in a style that turns emotion and ambition into images the reader can see. "
+                "In The Great Gatsby, he uses metaphor to make desire and decay feel concrete while the novel follows characters chasing wealth, love, and status. "
+                "This essay examines two selected metaphors to fit the assignment length, and the first body section begins with Gatsby's distant vision of desire."
+            )
         if "Section heading: Desire at a Distance" in user_prompt:
-            return 'In this scene, Gatsby\'s "green light" turns longing into a visible object of desire [1.2].'
+            call_order.append("body:S1")
+            return (
+                'This section argues that Gatsby\'s "green light" turns longing into a visible destination [1.2]. '
+                'The quoted image gives the reader a concrete object that carries Gatsby\'s desire in scene context [1.2]. '
+                'That visible distance prepares the essay to move from desire to decay.'
+            )
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return 'In this scene, the "valley of ashes" gives moral decay a physical landscape [2.2].'
-        return "The conclusion gathers the essay's claims into a final judgment."
+            call_order.append("body:S2")
+            return (
+                'This section argues that the "valley of ashes" turns moral damage into a physical landscape [2.2]. '
+                'The quoted image proves that Fitzgerald makes social decay visible in the scene itself [2.2]. '
+                'That shift from desire to ruin sets up the conclusion.'
+            )
+        call_order.append("conclusion")
+        return "The conclusion gathers the essay's claims into a final judgment about Fitzgerald's metaphors."
 
     monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
 
@@ -248,6 +274,10 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert prompt_checks["section_target"] is True
     assert prompt_checks["context_payload"] is True
     assert prompt_checks["scene_guidance"] is True
+    assert prompt_checks["body_structure"] is True
+    assert prompt_checks["intro_style"] is True
+    assert prompt_checks["body_argument_context"] is True
+    assert call_order == ["body:S1", "body:S2", "introduction", "conclusion"]
 
 
 def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp_path) -> None:
@@ -282,6 +312,7 @@ def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp
     assert "The novel follows Nick Carraway" in draft_text
     assert any("Compact retry mode: introductory summary only." in prompt for prompt in call_log)
     assert any("Do not use any direct quotations or quotation marks in this introduction" in prompt for prompt in call_log)
+    assert any("Completed body arguments:" in prompt for prompt in call_log)
     assert any("Section type: introduction" in prompt for prompt in call_log)
 
 

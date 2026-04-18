@@ -357,6 +357,7 @@ Only after the evidence ledger exists does the system plan the essay.
 - identify strongest evidence clusters
 - propose a thesis
 - organize body sections
+- assign one argumentative claim to each body section
 - assign evidence IDs to sections
 - plan introduction and conclusion around actual evidence
 
@@ -410,8 +411,10 @@ Section-bounded drafting produces better local coherence and makes debugging eas
 - metaphor interpretation should explain what is happening in the scene and why the figurative language makes sense in the surrounding text
 - claims about later developments should be tied to supporting evidence rather than vague story memory
 - the English report should use a plain assignment-friendly title such as `An Analysis of Metaphors in The Great Gatsby`
-- the introduction should briefly explain the story, explain metaphor as a literary device, and state that the selected number of metaphors was chosen to fit the target page length while remaining expandable
+- draft body sections first, then write the introduction and conclusion from the completed body arguments
+- the introduction should explain Fitzgerald's writing style, explain metaphor as a literary device in *The Great Gatsby*, and state that the selected number of metaphors was chosen to fit the target page length while remaining expandable
 - each body section should present the metaphor text explicitly before the analysis
+- each body section should follow a clear pattern: opening claim, quoted supporting evidence with citation, explanation of how the text proves the claim in context, and a closing or transition sentence
 
 ### Length targets
 - target roughly 2800-3200 words for the English essay

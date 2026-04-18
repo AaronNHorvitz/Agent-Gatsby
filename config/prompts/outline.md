@@ -8,6 +8,8 @@ Your task:
 - write a defensible thesis
 - organize the essay into coherent sections
 - assign evidence IDs to the most relevant section(s)
+- build the body argument order before the introduction and conclusion
+- give each body section a short `purpose` claim explaining what the section argues
 
 Rules:
 - Output JSON only.
@@ -15,6 +17,7 @@ Rules:
 - Base the thesis and sections only on the provided evidence.
 - Do not reference evidence IDs that do not exist.
 - Make the introduction suitable for a plain-English literary analysis assignment, not an abstract theory essay.
+- Make the introduction explain Fitzgerald's writing style and his use of metaphor in The Great Gatsby based on the cited text the essay will analyze.
 - Prefer one major metaphor per section so the final report can quote the metaphor explicitly and then analyze it.
 
 Return a JSON object with this schema:
@@ -27,6 +30,7 @@ Return a JSON object with this schema:
     {
       "section_id": "S1",
       "heading": "The Green Light and Deferred Aspiration",
+      "purpose": "Argue that Fitzgerald turns Gatsby's desire into a visible, distant object so the novel can treat longing as something seen and pursued.",
       "evidence_ids": ["E001", "E004"]
     }
   ],
