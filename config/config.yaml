@@ -113,7 +113,7 @@ drafting:
   master_output_path: "artifacts/final/analysis_english_master.md"
   write_section_by_section: true
   max_evidence_per_section: 4
-  citation_format: "(Passage {passage_id})"
+  citation_format: "[{passage_id}]"
   preserve_direct_quotes: true
   forbid_invented_citations: true
   forbid_invented_quotes: true

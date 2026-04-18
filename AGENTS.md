@@ -127,14 +127,19 @@ These are high-priority invariants.
 ## 4.4 Citation Integrity
 - Citation markers must be machine-parseable.
 - Citation markers must resolve to actual source or evidence records.
+- Citation markers must use the v1 `[chapter.paragraph]` format such as `[5.18]`.
+- Do not use page-number citations in v1.
 - Translation must preserve citation markers.
 
 ## 4.5 English Master Integrity
 - Translations must derive from the frozen English master.
 - Do not translate from intermediate English drafts once the master exists.
+- The English master is the only artifact used for exact quote verification.
+- Translated outputs should translate quoted content while preserving citation markers and quotation boundaries.
 
 ## 4.6 PDF Reliability
 - PDF generation must prioritize correctness and Unicode safety over fancy formatting.
+- PDF layout should remain plain and professional: title, headings, readable margins, and page numbers without decorative styling.
 - Mandarin rendering must use a valid CJK-capable font.
 
 ---

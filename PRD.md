@@ -460,13 +460,14 @@ The system shall generate the English essay section by section using only eviden
 - no invented citations
 - no unsupported claims
 - academic tone required
-- citations must use a consistent, machine-parseable format
+- citations must use bracketed chapter.paragraph locators such as `[5.18]`
+- page-number citations are out of scope for v1
 
 ### Acceptance Criteria
 - English draft exists
 - draft has multiple sections
 - section order matches outline
-- citations appear in expected format
+- citations appear in expected `[chapter.paragraph]` format
 
 ---
 
@@ -550,6 +551,8 @@ The system shall translate the frozen English master into Spanish in bounded chu
 ### Constraints
 - preserve headings
 - preserve citation markers
+- translate quoted content into Spanish
+- preserve quotation boundaries
 - preserve structural order
 - maintain academic tone
 
@@ -575,6 +578,8 @@ The system shall translate the frozen English master into Mandarin rendered in S
 ### Constraints
 - preserve headings
 - preserve citation markers
+- translate quoted content into Simplified Chinese
+- preserve quotation boundaries
 - preserve structure
 - output in Simplified Chinese
 - remain compatible with PDF rendering
@@ -605,12 +610,15 @@ The system shall generate structural QA reports for Spanish and Mandarin outputs
 - heading parity
 - citation marker parity
 - section count parity
-- quote marker parity if applicable
+- section order parity
+- quote marker parity after full translation
+- non-empty output checks
 
 ### Acceptance Criteria
 - both QA reports exist
 - mismatches are visible and understandable
 - major structural mismatches can be corrected before rendering
+- v1 QA is sufficient when structural parity passes and a human completes intro, middle, and conclusion spot checks
 
 ---
 
@@ -632,9 +640,11 @@ The system shall render three separate PDFs from finalized text artifacts.
 
 ### Constraints
 - readable page margins
-- professional formatting
+- plain academic formatting
+- page numbers
 - Unicode-safe rendering for Mandarin
 - separate files per language
+- no decorative layout
 
 ### Acceptance Criteria
 - all three PDF files exist
@@ -964,13 +974,14 @@ Prefer bounded, verifiable stages over a single elegant but fragile prompt chain
 
 ---
 
-## 25. Open Questions
+## 25. Locked V1 Decisions
 
-- What exact citation format should be used in the English essay?
-- Should quotations remain in English inside translated outputs or be translated fully while preserving markers?
-- How much stylistic formatting is worth adding to PDFs before it risks instability?
-- Should manual evidence overrides be included in v1 if the extraction stage is noisy?
-- What is the minimum acceptable translation QA for v1 given the timeline?
+- English citations use bracketed chapter.paragraph locators such as `[5.18]`. These locators reference the locked passage index rather than printed page numbers.
+- The Spanish and Mandarin outputs fully translate the essay, including quoted content, while preserving citation markers and quotation boundaries.
+- Exact quote verification applies to the English master only. Translated outputs are promoted through structural QA plus human spot checks.
+- PDF styling remains intentionally plain and professional: title, headings, readable margins, page numbers, and Unicode-safe fonts without decorative layout.
+- Manual evidence overrides are allowed only as a tiny explicit fallback in the verified evidence ledger, and every override must be logged.
+- Minimum translation QA for v1 is heading parity, citation parity, section order parity, quote-marker parity, non-empty output checks, and manual intro/middle/conclusion spot checks.
 
 ---
 

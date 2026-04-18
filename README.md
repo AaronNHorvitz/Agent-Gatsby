@@ -248,6 +248,11 @@ The model can reason over the full text if needed, but verification should opera
 }
 ```
 
+### Citation convention
+English citations use bracketed chapter.paragraph locators such as `[5.18]`.
+
+These locators reference the locked passage index, not printed page numbers. A brief note near the top of the English essay should explain this convention.
+
 ---
 
 ## 6.4 Stage 3: Candidate Metaphor Extraction
@@ -328,6 +333,11 @@ A candidate is only promoted if:
 - the passage ID resolves
 - the claim is interpretable as metaphor or a metaphor-adjacent symbolic image
 - the quotation is substantial enough to support analysis
+
+### v1 override policy
+If automated extraction misses an essential metaphor, a human may add a very small number of evidence entries directly to the verified ledger.
+
+Any override must be explicit, reviewable, and logged in the run artifacts. This is a fallback, not a parallel evidence system.
 
 ---
 
@@ -466,7 +476,8 @@ A long essay should not be translated in one uncontrolled pass. Chunked translat
 
 ### Responsibilities
 - translate section by section
-- preserve title, headings, quotations, and citation markers
+- translate title, headings, body prose, and quoted content into Spanish
+- preserve citation markers and quotation boundaries
 - maintain academic register
 - preserve proper nouns
 
@@ -481,7 +492,8 @@ The system translates the frozen English master into Mandarin rendered in Simpli
 
 ### Responsibilities
 - translate in bounded chunks
-- preserve citations and quote structure
+- translate quoted content into Simplified Chinese
+- preserve citation markers and quotation boundaries
 - preserve academic tone
 - preserve proper nouns and title references
 - ensure output is CJK-safe for final PDF rendering
@@ -496,17 +508,18 @@ The system translates the frozen English master into Mandarin rendered in Simpli
 Each translation is reviewed against the English master.
 
 ### Responsibilities
-- verify semantic fidelity
+- verify heading parity and section order
 - verify that citations survived unchanged
-- verify that quoted English source text is handled consistently
-- identify dropped nuance
-- identify literal but awkward phrasing
+- verify quotation-boundary parity after full translation
+- verify outputs are non-empty and structurally complete
+- support manual spot checks of intro, middle, and conclusion
 
 ### Example QA checks
 - heading count matches English master
 - citation count matches English master
-- direct quote inventory matches English master
+- quote-marker inventory matches English master
 - section order matches English master
+- translated files are non-empty
 
 ### Output artifacts
 - `artifacts/qa/spanish_qa_report.json`
@@ -765,6 +778,7 @@ Prompts should:
 Use only the evidence records provided.
 Do not invent quotations.
 Do not invent page numbers.
+Use bracketed chapter.paragraph citations such as `[5.18]`.
 Do not introduce claims unsupported by the evidence ledger.
 Preserve citation markers exactly as given.
 Write analytical prose, not conversational commentary.
@@ -803,11 +817,11 @@ Before a translated draft is finalized, it must pass:
 - **Citation parity check**  
   Citation inventory preserved.
 
-- **Quote integrity check**  
-  Quoted text not silently corrupted.
+- **Quote-marker parity check**
+  Quotation boundaries preserved after full translation.
 
-- **Semantic fidelity review**  
-  Key thesis and argumentative nuance preserved.
+- **Manual spot review**
+  Intro, middle, and conclusion reviewed by a human against the English master.
 
 ## 12.3 PDF verification gates
 Before final delivery, PDFs must pass:
@@ -840,7 +854,7 @@ Chunking improves:
 - preserve proper nouns
 - preserve heading structure
 - preserve citation markers
-- preserve quoted English text when appropriate
+- translate quoted content fully while preserving quotation boundaries and citation markers
 
 ## 13.4 Mandarin output convention
 The final Mandarin artifact is rendered in **Simplified Chinese** to ensure a stable written output format.
@@ -870,6 +884,7 @@ Each language is rendered to a separate file with:
 - readable line spacing
 - page numbers
 - professional margins
+- intentionally plain academic styling without decorative layout
 
 ---
 

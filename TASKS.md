@@ -326,6 +326,8 @@ This is critical.
 - [ ] 5.9.7 Save rejected candidates to `artifacts/evidence/rejected_candidates.json`
 - [ ] 5.9.8 Log promoted count
 - [ ] 5.9.9 Log rejected count
+- [ ] 5.9.10 Allow a tiny explicit manual override path only if extraction misses essential evidence
+- [ ] 5.9.11 Log any manual overrides clearly in the ledger or run artifacts
 
 ## 5.10 Create tests for the evidence ledger
 - [ ] 5.10.1 `test_evidence_ledger.py`
@@ -390,13 +392,13 @@ Do not move on until all are true:
 - [ ] 6.2.6 Save combined file to `artifacts/drafts/analysis_english_draft.md`
 - [ ] 6.2.7 Confirm headings exist
 - [ ] 6.2.8 Confirm text is non-empty
-- [ ] 6.2.9 Confirm citations appear in a consistent format
+- [ ] 6.2.9 Confirm citations appear in `[chapter.paragraph]` format
 
-## 6.3 Decide citation format now
-Pick one and use it consistently.
-- [ ] 6.3.1 Choose passage ID format such as `(Passage 5.18)`
-- [ ] 6.3.2 Or choose chapter/paragraph format
-- [ ] 6.3.3 Or choose a simple in-house textual locator
+## 6.3 Lock citation format now
+This decision is already made; implement it consistently.
+- [ ] 6.3.1 Use bracketed chapter.paragraph markers such as `[5.18]`
+- [ ] 6.3.2 Add a short note near the top of the essay explaining the locator convention
+- [ ] 6.3.3 Do not use page numbers
 - [ ] 6.3.4 Use the same format everywhere
 - [ ] 6.3.5 Update drafting and verification logic accordingly
 
@@ -483,7 +485,7 @@ Do not move on until all are true:
 - [ ] 7.2.3 Preserve order
 - [ ] 7.2.4 Preserve heading text
 - [ ] 7.2.5 Preserve citation markers
-- [ ] 7.2.6 Preserve quotes
+- [ ] 7.2.6 Preserve quotation boundaries while translating quoted content
 - [ ] 7.2.7 Save chunk metadata if helpful
 
 ## 7.3 Build `translate_spanish.py`
@@ -493,7 +495,7 @@ Do not move on until all are true:
   - [ ] 7.3.3.1 call LLM
   - [ ] 7.3.3.2 preserve heading structure
   - [ ] 7.3.3.3 preserve citation markers
-  - [ ] 7.3.3.4 preserve quote formatting
+  - [ ] 7.3.3.4 translate quoted content and preserve quotation boundaries
   - [ ] 7.3.3.5 save raw chunk output if needed
 - [ ] 7.3.4 Reassemble final Spanish markdown
 - [ ] 7.3.5 Save to `artifacts/translations/analysis_spanish_draft.md`
@@ -506,7 +508,7 @@ Do not move on until all are true:
   - [ ] 7.4.3.2 require Simplified Chinese
   - [ ] 7.4.3.3 preserve heading structure
   - [ ] 7.4.3.4 preserve citation markers
-  - [ ] 7.4.3.5 preserve quote formatting
+  - [ ] 7.4.3.5 translate quoted content and preserve quotation boundaries
 - [ ] 7.4.4 Reassemble final Mandarin markdown
 - [ ] 7.4.5 Save to `artifacts/translations/analysis_mandarin_draft.md`
 
@@ -515,20 +517,23 @@ This can be basic but must exist.
 - [ ] 7.5.1 Load English master
 - [ ] 7.5.2 Load Spanish draft
 - [ ] 7.5.3 Load Mandarin draft
-- [ ] 7.5.4 Count headings in English vs Spanish
-- [ ] 7.5.5 Count headings in English vs Mandarin
-- [ ] 7.5.6 Count citation markers in each file
-- [ ] 7.5.7 Count quote markers in each file
-- [ ] 7.5.8 Flag mismatches
-- [ ] 7.5.9 Save `artifacts/qa/spanish_qa_report.json`
-- [ ] 7.5.10 Save `artifacts/qa/mandarin_qa_report.json`
+- [ ] 7.5.4 Confirm both translation files are non-empty
+- [ ] 7.5.5 Count headings in English vs Spanish
+- [ ] 7.5.6 Count headings in English vs Mandarin
+- [ ] 7.5.7 Count citation markers in each file
+- [ ] 7.5.8 Count quote markers / quotation boundaries in each file
+- [ ] 7.5.9 Compare section order in each file
+- [ ] 7.5.10 Flag mismatches
+- [ ] 7.5.11 Save `artifacts/qa/spanish_qa_report.json`
+- [ ] 7.5.12 Save `artifacts/qa/mandarin_qa_report.json`
 
 ## 7.6 Create tests for translation integrity
 - [ ] 7.6.1 `test_translation_integrity.py`
   - [ ] 7.6.1.1 verify heading counts match
-  - [ ] 7.6.1.2 verify citation markers survive
-  - [ ] 7.6.1.3 verify translation files exist
-  - [ ] 7.6.1.4 verify translation files are non-empty
+  - [ ] 7.6.1.2 verify section order matches English
+  - [ ] 7.6.1.3 verify citation markers survive
+  - [ ] 7.6.1.4 verify quote-marker counts survive
+  - [ ] 7.6.1.5 verify translation files are non-empty
 
 ## 7.7 Manual translation spot checks
 You do not need to be perfect in both languages, but you must do spot checks.
@@ -538,7 +543,7 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [ ] 7.7.4 Check one conclusion paragraph in Spanish
 - [ ] 7.7.5 Check one middle paragraph in Mandarin
 - [ ] 7.7.6 Check one conclusion paragraph in Mandarin
-- [ ] 7.7.7 Confirm citations stayed intact
+- [ ] 7.7.7 Confirm quotations are translated and citation markers stayed intact
 - [ ] 7.7.8 Confirm weird garbage characters are absent
 
 ## 7.8 Build `pdf_compiler.py`
@@ -547,12 +552,14 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [ ] 7.8.3 Load Mandarin markdown/text
 - [ ] 7.8.4 Configure page size
 - [ ] 7.8.5 Configure margins
-- [ ] 7.8.6 Configure default font for English/Spanish
-- [ ] 7.8.7 Configure CJK-capable font for Mandarin
-- [ ] 7.8.8 Render English PDF
-- [ ] 7.8.9 Render Spanish PDF
-- [ ] 7.8.10 Render Mandarin PDF
-- [ ] 7.8.11 Save all three files in `outputs/`
+- [ ] 7.8.6 Keep layout plain and professional
+- [ ] 7.8.7 Configure default font for English/Spanish
+- [ ] 7.8.8 Configure CJK-capable font for Mandarin
+- [ ] 7.8.9 Add page numbers
+- [ ] 7.8.10 Render English PDF
+- [ ] 7.8.11 Render Spanish PDF
+- [ ] 7.8.12 Render Mandarin PDF
+- [ ] 7.8.13 Save all three files in `outputs/`
 
 ## 7.9 Add PDF tests
 - [ ] 7.9.1 `test_pdf_unicode.py`
