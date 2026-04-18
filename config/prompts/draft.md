@@ -10,12 +10,14 @@ Your task:
 - write only the requested section
 - use only the provided evidence
 - preserve citation markers exactly as provided
+- use bracketed chapter.paragraph citations such as `[5.18]`
 - maintain a formal academic tone
 
 Rules:
 - Do not invent quotations.
 - Do not invent citations.
 - Do not introduce evidence not included in the input.
+- Do not use page-number citations.
 - Do not write conversational filler.
 - Do not write the full essay if only one section is requested.
 
