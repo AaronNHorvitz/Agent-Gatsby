@@ -116,10 +116,17 @@ evidence_ledger:
 drafting:
   output_path: "artifacts/drafts/analysis_english_draft.md"
   section_drafts_dir: "artifacts/drafts/sections"
+  target_word_count_min: 2800
+  target_word_count_max: 3200
+  estimated_page_target: 10
+  words_per_page_estimate: 280
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
   fail_on_quote_mismatch: true
   fail_on_invalid_citation: true
+  invalid_quote_rate_threshold: 0.0
+  invalid_citation_rate_threshold: 0.0
+  unsupported_claim_ratio_threshold: 0.10
   normalize_curly_quotes_for_matching: true
   require_all_citations_to_resolve: true
 """
@@ -147,6 +154,15 @@ The "valley of ashes" gives decay a physical landscape [2.1].
 
     assert report.status == "passed"
     assert not report.issues
+    assert report.word_count and report.word_count > 0
+    assert report.estimated_pages and report.estimated_pages > 0
+    assert report.quote_checks_total == 2
+    assert report.quote_checks_passed == 2
+    assert report.citation_checks_total == 2
+    assert report.citation_checks_passed == 2
+    assert report.invalid_quote_rate == 0.0
+    assert report.invalid_citation_rate == 0.0
+    assert report.unsupported_sentence_ratio == 0.0
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
 
 
@@ -164,6 +180,12 @@ Gatsby's "imaginary lantern" turns longing into something else [9.9].
     with pytest.raises(ValueError, match="English verification failed"):
         verify_english_draft(config)
 
-    report_text = (repo_root / "artifacts/qa/english_verification_report.json").read_text(encoding="utf-8")
-    assert "missing_passage_locator" in report_text
-    assert "quote_not_in_passage" in report_text
+    report = json.loads((repo_root / "artifacts/qa/english_verification_report.json").read_text(encoding="utf-8"))
+    issue_codes = {issue["code"] for issue in report["issues"]}
+
+    assert "missing_passage_locator" in issue_codes
+    assert "quote_not_in_passage" in issue_codes
+    assert report["status"] == "failed"
+    assert report["invalid_quote_rate"] > 0.0
+    assert report["invalid_citation_rate"] > 0.0
+    assert report["unsupported_sentence_ratio"] > 0.0

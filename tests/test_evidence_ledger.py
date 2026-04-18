@@ -110,6 +110,7 @@ extraction:
 evidence_ledger:
   output_path: "artifacts/evidence/evidence_ledger.json"
   rejected_output_path: "artifacts/evidence/rejected_candidates.json"
+  target_verified_record_count: 3
   require_exact_quote_match: true
   reject_missing_passage_ids: true
   reject_empty_rationales: true
@@ -121,7 +122,7 @@ evidence_ledger:
     return config_path
 
 
-def test_build_evidence_ledger_promotes_valid_candidates_and_writes_rejections(tmp_path) -> None:
+def test_build_evidence_ledger_promotes_valid_candidates_and_writes_rejections(tmp_path, caplog) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_evidence_repo(repo_root))
 
@@ -143,3 +144,4 @@ def test_build_evidence_ledger_promotes_valid_candidates_and_writes_rejections(t
     assert '"source_candidate_id": "C009"' in ledger_text
     assert "Quote does not exact-match the source passage" in rejected_text
     assert "Passage ID does not exist in passage index" in rejected_text
+    assert "Verified evidence count is below target" in caplog.text

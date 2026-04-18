@@ -1087,7 +1087,27 @@ python -m agent_gatsby.orchestrator --run draft_english
 python -m agent_gatsby.orchestrator --run render_pdfs
 ```
 
-## 19.6 Recommended execution order
+## 19.6 Build the English report from the CLI
+These commands are enough to generate the English analysis and its deterministic verification artifacts without running translation or PDF stages.
+```bash
+python -m agent_gatsby.orchestrator --config config/config.yaml --run draft_english
+python -m agent_gatsby.orchestrator --config config/config.yaml --run verify_english
+python -m agent_gatsby.orchestrator --config config/config.yaml --run critique_english
+```
+
+Expected English-stage outputs:
+- `artifacts/drafts/analysis_english_draft.md`
+- `artifacts/qa/english_verification_report.json`
+- `artifacts/drafts/analysis_english_final.md`
+
+The verification report now includes:
+- word count
+- estimated page count
+- quote and citation check totals
+- invalid quote and citation rates
+- advisory unsupported-sentence ratio for human review
+
+## 19.7 Recommended execution order
 ```bash
 python -m agent_gatsby.orchestrator --run ingest
 python -m agent_gatsby.orchestrator --run normalize

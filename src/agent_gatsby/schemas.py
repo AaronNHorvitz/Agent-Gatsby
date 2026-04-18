@@ -115,6 +115,17 @@ class VerificationReport(BaseModel):
     stage: str
     status: str
     generated_at: str
+    word_count: int | None = None
+    estimated_pages: float | None = None
+    quote_checks_total: int | None = None
+    quote_checks_passed: int | None = None
+    citation_checks_total: int | None = None
+    citation_checks_passed: int | None = None
+    invalid_quote_rate: float | None = None
+    invalid_citation_rate: float | None = None
+    prose_sentence_count: int | None = None
+    unsupported_sentence_count: int | None = None
+    unsupported_sentence_ratio: float | None = None
     issues: list[VerificationIssue] = Field(default_factory=list)
 
 

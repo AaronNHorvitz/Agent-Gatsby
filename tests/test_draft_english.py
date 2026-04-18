@@ -131,6 +131,10 @@ drafting:
   section_drafts_dir: "artifacts/drafts/sections"
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
+  target_word_count_min: 2800
+  target_word_count_max: 3200
+  estimated_page_target: 10
+  words_per_page_estimate: 280
   write_section_by_section: true
   max_evidence_per_section: 4
   citation_format: "[{passage_id}]"
@@ -148,9 +152,17 @@ drafting:
 def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_draft_repo(repo_root))
+    prompt_checks = {
+        "overall_target": False,
+        "section_target": False,
+    }
 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
         user_prompt = kwargs.get("user_prompt", "")
+        if "Overall essay target: about 2800-3200 words; roughly 10 pages at about 280 words per page." in user_prompt:
+            prompt_checks["overall_target"] = True
+        if "Target section length:" in user_prompt:
+            prompt_checks["section_target"] = True
         if "Section type: introduction" in user_prompt:
             return "The novel's metaphors organize desire and decay into visible social forms."
         if "Section heading: Desire at a Distance" in user_prompt:
@@ -172,6 +184,8 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert "[1.1]" in draft_text
     assert "[2.1]" in draft_text
     assert "Citation note:" in draft_text
+    assert prompt_checks["overall_target"] is True
+    assert prompt_checks["section_target"] is True
 
 
 def test_section_response_validator_rejects_paraphrase_quotes_and_bad_locators() -> None:

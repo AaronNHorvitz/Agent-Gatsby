@@ -73,6 +73,73 @@ def collapse_spaces(text: str) -> str:
     return " ".join(text.split())
 
 
+def count_words(text: str) -> int:
+    cleaned = ANY_BRACKET_RE.sub("", text.replace("#", " ").replace("_", " "))
+    return len(re.findall(r"\b[\w'-]+\b", cleaned, flags=re.UNICODE))
+
+
+def estimate_page_count(word_count: int, words_per_page: int) -> float:
+    if words_per_page <= 0:
+        return 0.0
+    return round(word_count / words_per_page, 2)
+
+
+def build_overall_word_target_guidance(config: AppConfig) -> str | None:
+    minimum_words = int(config.drafting.get("target_word_count_min", 0))
+    maximum_words = int(config.drafting.get("target_word_count_max", 0))
+    estimated_pages = int(config.drafting.get("estimated_page_target", 0))
+    words_per_page = int(config.drafting.get("words_per_page_estimate", 280))
+
+    if minimum_words <= 0 and maximum_words <= 0 and estimated_pages <= 0:
+        return None
+
+    word_target_bits: list[str] = []
+    if minimum_words > 0 and maximum_words > 0:
+        word_target_bits.append(f"about {minimum_words}-{maximum_words} words")
+    elif minimum_words > 0:
+        word_target_bits.append(f"at least {minimum_words} words")
+    elif maximum_words > 0:
+        word_target_bits.append(f"no more than {maximum_words} words")
+
+    if estimated_pages > 0:
+        word_target_bits.append(
+            f"roughly {estimated_pages} pages at about {words_per_page} words per page"
+        )
+
+    return "Overall essay target: " + "; ".join(word_target_bits) + "."
+
+
+def build_section_word_target_guidance(
+    config: AppConfig,
+    *,
+    outline: OutlinePlan,
+    section_type: str,
+) -> str | None:
+    minimum_total = int(config.drafting.get("target_word_count_min", 0))
+    maximum_total = int(config.drafting.get("target_word_count_max", 0))
+    if minimum_total <= 0 and maximum_total <= 0:
+        return None
+
+    body_section_count = max(len(outline.sections), 1)
+    if section_type == "introduction":
+        weight = 0.12
+    elif section_type == "conclusion":
+        weight = 0.12
+    else:
+        weight = 0.76 / body_section_count
+
+    minimum_words = max(120, round(minimum_total * weight)) if minimum_total > 0 else None
+    maximum_words = max(minimum_words or 120, round(maximum_total * weight)) if maximum_total > 0 else None
+
+    if minimum_words and maximum_words:
+        return f"Target section length: about {minimum_words}-{maximum_words} words."
+    if minimum_words:
+        return f"Target section length: at least {minimum_words} words."
+    if maximum_words:
+        return f"Target section length: no more than {maximum_words} words."
+    return None
+
+
 def normalize_validator_text(text: str) -> str:
     normalized = (
         text.replace("“", '"')
@@ -150,6 +217,7 @@ def build_section_response_validator(
 
 
 def build_draft_user_prompt(
+    config: AppConfig,
     outline: OutlinePlan,
     *,
     section_type: str,
@@ -170,6 +238,16 @@ def build_draft_user_prompt(
         "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
         "Do not shorten, trim, or partially quote any provided quote string.",
     ]
+    overall_word_target = build_overall_word_target_guidance(config)
+    if overall_word_target:
+        instructions.append(overall_word_target)
+    section_word_target = build_section_word_target_guidance(
+        config,
+        outline=outline,
+        section_type=section_type,
+    )
+    if section_word_target:
+        instructions.append(section_word_target)
     if section_type == "body":
         instructions.append("Use at least one bracketed chapter.paragraph citation from the provided evidence.")
     instructions.append(
@@ -213,6 +291,7 @@ def draft_section(
         stage_name="draft_english",
         system_prompt=load_draft_prompt(config),
         user_prompt=build_draft_user_prompt(
+            config,
             outline,
             section_type=section_type,
             heading=heading,
@@ -350,4 +429,22 @@ def draft_english(
     )
     validate_combined_draft(draft_text, loaded_outline)
     write_english_draft(config, draft_text)
+
+    word_count = count_words(draft_text)
+    words_per_page = int(config.drafting.get("words_per_page_estimate", 280))
+    estimated_pages = estimate_page_count(word_count, words_per_page)
+    LOGGER.info(
+        "English draft length: %d words, %.2f estimated pages at %d words/page",
+        word_count,
+        estimated_pages,
+        words_per_page,
+    )
+
+    minimum_words = int(config.drafting.get("target_word_count_min", 0))
+    maximum_words = int(config.drafting.get("target_word_count_max", 0))
+    if minimum_words > 0 and word_count < minimum_words:
+        LOGGER.warning("English draft is below target word count: %d < %d", word_count, minimum_words)
+    if maximum_words > 0 and word_count > maximum_words:
+        LOGGER.warning("English draft is above target word count: %d > %d", word_count, maximum_words)
+
     return draft_text

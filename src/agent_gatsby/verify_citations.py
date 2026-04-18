@@ -21,6 +21,17 @@ CITATION_RE = re.compile(r"\[(\d+\.\d+)\]")
 ANY_BRACKET_RE = re.compile(r"\[([^\]]+)\]")
 DOUBLE_QUOTE_RE = re.compile(r"[\"“](.+?)[\"”]", re.DOTALL)
 SINGLE_QUOTE_RE = re.compile(r"(?<!\w)['‘]([^'\n]{2,}?)['’](?!\w)")
+QUOTE_ISSUE_CODES = {
+    "quote_not_in_passage",
+    "quote_not_in_evidence",
+}
+CITATION_ISSUE_CODES = {
+    "invalid_citation_format",
+    "missing_citations",
+    "missing_passage_locator",
+    "missing_evidence_link",
+    "missing_quote_citation",
+}
 
 
 def load_english_draft(source: AppConfig | str | Path) -> str:
@@ -44,6 +55,17 @@ def build_evidence_lookup(evidence_records: list[EvidenceRecord]) -> dict[str, l
 
 def collapse_spaces(text: str) -> str:
     return " ".join(text.split())
+
+
+def count_words(text: str) -> int:
+    cleaned = ANY_BRACKET_RE.sub("", text.replace("#", " ").replace("_", " "))
+    return len(re.findall(r"\b[\w'-]+\b", cleaned, flags=re.UNICODE))
+
+
+def estimate_page_count(word_count: int, words_per_page: int) -> float:
+    if words_per_page <= 0:
+        return 0.0
+    return round(word_count / words_per_page, 2)
 
 
 def normalize_match_text(text: str, *, normalize_curly_quotes: bool) -> str:
@@ -82,6 +104,75 @@ def extract_quoted_strings(text: str) -> list[str]:
 
 def paragraph_blocks(text: str) -> list[str]:
     return [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
+
+
+def prose_paragraph_blocks(text: str) -> list[str]:
+    prose_blocks: list[str] = []
+    for block in paragraph_blocks(text):
+        normalized = collapse_spaces(block.strip().strip("_"))
+        if not normalized:
+            continue
+        if normalized.startswith("#"):
+            continue
+        if normalized.lower().startswith("citation note:"):
+            continue
+        prose_blocks.append(block)
+    return prose_blocks
+
+
+def split_sentences(text: str) -> list[str]:
+    cleaned = collapse_spaces(ANY_BRACKET_RE.sub("", text)).strip(" _")
+    if not cleaned:
+        return []
+    sentences = [
+        sentence.strip(" _")
+        for sentence in re.split(r"(?<=[.!?])\s+", cleaned)
+        if sentence.strip(" _")
+    ]
+    return [sentence for sentence in sentences if len(sentence.split()) >= 3]
+
+
+def paragraph_has_resolved_citation(
+    paragraph: str,
+    *,
+    passage_lookup: dict[str, PassageRecord],
+    evidence_lookup: dict[str, list[EvidenceRecord]],
+) -> bool:
+    for marker in extract_citation_markers(paragraph):
+        if marker in passage_lookup and marker in evidence_lookup:
+            return True
+    return False
+
+
+def compute_unsupported_sentence_metrics(
+    text: str,
+    *,
+    passage_lookup: dict[str, PassageRecord],
+    evidence_lookup: dict[str, list[EvidenceRecord]],
+) -> tuple[int, int, float]:
+    prose_sentence_count = 0
+    unsupported_sentence_count = 0
+
+    for block in prose_paragraph_blocks(text):
+        sentences = split_sentences(block)
+        if not sentences:
+            continue
+        prose_sentence_count += len(sentences)
+        if not paragraph_has_resolved_citation(
+            block,
+            passage_lookup=passage_lookup,
+            evidence_lookup=evidence_lookup,
+        ):
+            unsupported_sentence_count += len(sentences)
+
+    if prose_sentence_count == 0:
+        return 0, 0, 0.0
+
+    return (
+        prose_sentence_count,
+        unsupported_sentence_count,
+        round(unsupported_sentence_count / prose_sentence_count, 4),
+    )
 
 
 def build_issue(code: str, message: str, *, passage_id: str | None = None, evidence_id: str | None = None) -> VerificationIssue:
@@ -177,6 +268,18 @@ def validate_quotes(
     return issues
 
 
+def count_issues_for_codes(issues: list[VerificationIssue], issue_codes: set[str]) -> int:
+    return sum(1 for issue in issues if issue.code in issue_codes)
+
+
+def capped_rate(failure_count: int, total_count: int) -> float:
+    if failure_count <= 0:
+        return 0.0
+    if total_count <= 0:
+        return 1.0
+    return round(min(1.0, failure_count / total_count), 4)
+
+
 def write_verification_report(config: AppConfig, report: VerificationReport) -> None:
     output_path = config.english_verification_report_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -212,22 +315,79 @@ def verify_english_draft(
         ),
     ]
 
+    word_count = count_words(loaded_text)
+    words_per_page = int(config.drafting.get("words_per_page_estimate", 280))
+    estimated_pages = estimate_page_count(word_count, words_per_page)
+    quote_count = len(extract_quoted_strings(loaded_text))
+    citation_count = len(extract_citation_markers(loaded_text))
+    invalid_quote_issue_count = count_issues_for_codes(issues, QUOTE_ISSUE_CODES)
+    invalid_citation_issue_count = count_issues_for_codes(issues, CITATION_ISSUE_CODES)
+    quote_checks_total = quote_count
+    citation_checks_total = citation_count or (1 if invalid_citation_issue_count else 0)
+    prose_sentence_count, unsupported_sentence_count, unsupported_sentence_ratio = compute_unsupported_sentence_metrics(
+        loaded_text,
+        passage_lookup=passage_lookup,
+        evidence_lookup=evidence_lookup,
+    )
+
     report = VerificationReport(
         stage="verify_english",
         status="passed" if not issues else "failed",
         generated_at=utc_now_iso(),
+        word_count=word_count,
+        estimated_pages=estimated_pages,
+        quote_checks_total=quote_checks_total,
+        quote_checks_passed=max(quote_checks_total - invalid_quote_issue_count, 0),
+        citation_checks_total=citation_checks_total,
+        citation_checks_passed=max(citation_checks_total - invalid_citation_issue_count, 0),
+        invalid_quote_rate=capped_rate(invalid_quote_issue_count, quote_checks_total),
+        invalid_citation_rate=capped_rate(invalid_citation_issue_count, citation_checks_total),
+        prose_sentence_count=prose_sentence_count,
+        unsupported_sentence_count=unsupported_sentence_count,
+        unsupported_sentence_ratio=unsupported_sentence_ratio,
         issues=issues,
     )
     write_verification_report(config, report)
 
-    quote_count = len(extract_quoted_strings(loaded_text))
-    citation_count = len(extract_citation_markers(loaded_text))
     LOGGER.info(
-        "English verification completed with %d quotes, %d citations, %d issues",
+        "English verification completed with %d words, %.2f estimated pages, %d quotes, %d citations, and %d issues",
+        word_count,
+        estimated_pages,
         quote_count,
         citation_count,
         len(issues),
     )
+
+    target_minimum_words = int(config.drafting.get("target_word_count_min", 0))
+    target_maximum_words = int(config.drafting.get("target_word_count_max", 0))
+    if target_minimum_words > 0 and word_count < target_minimum_words:
+        LOGGER.warning("Verified English draft is below target word count: %d < %d", word_count, target_minimum_words)
+    if target_maximum_words > 0 and word_count > target_maximum_words:
+        LOGGER.warning("Verified English draft is above target word count: %d > %d", word_count, target_maximum_words)
+
+    invalid_quote_rate_threshold = float(config.verification.get("invalid_quote_rate_threshold", 0.0))
+    if report.invalid_quote_rate is not None and report.invalid_quote_rate > invalid_quote_rate_threshold:
+        LOGGER.warning(
+            "Invalid quote rate exceeds threshold: %.4f > %.4f",
+            report.invalid_quote_rate,
+            invalid_quote_rate_threshold,
+        )
+
+    invalid_citation_rate_threshold = float(config.verification.get("invalid_citation_rate_threshold", 0.0))
+    if report.invalid_citation_rate is not None and report.invalid_citation_rate > invalid_citation_rate_threshold:
+        LOGGER.warning(
+            "Invalid citation rate exceeds threshold: %.4f > %.4f",
+            report.invalid_citation_rate,
+            invalid_citation_rate_threshold,
+        )
+
+    unsupported_threshold = float(config.verification.get("unsupported_claim_ratio_threshold", 0.10))
+    if unsupported_sentence_ratio > unsupported_threshold:
+        LOGGER.warning(
+            "Unsupported-claim heuristic exceeds advisory threshold: %.4f > %.4f",
+            unsupported_sentence_ratio,
+            unsupported_threshold,
+        )
 
     if issues and (
         config.verification.get("fail_on_quote_mismatch", True)

@@ -225,5 +225,19 @@ def build_evidence_ledger(
 
     write_evidence_ledger(config, evidence_records)
     write_rejections(config, rejected_candidates)
+    target_verified_record_count = int(config.evidence_ledger.get("target_verified_record_count", 0))
+    if target_verified_record_count > 0:
+        if len(evidence_records) < target_verified_record_count:
+            LOGGER.warning(
+                "Verified evidence count is below target: %d < %d. Human review or manual overrides may be needed before freezing the English master.",
+                len(evidence_records),
+                target_verified_record_count,
+            )
+        else:
+            LOGGER.info(
+                "Verified evidence count meets target: %d >= %d",
+                len(evidence_records),
+                target_verified_record_count,
+            )
     LOGGER.info("Promoted %d evidence records and rejected %d candidates", len(evidence_records), len(rejected_candidates))
     return evidence_records, rejected_candidates
