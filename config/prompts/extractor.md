@@ -6,9 +6,19 @@ Rules:
 - Output JSON only.
 - Do not write an essay.
 - Do not include conversational filler.
+- Do not reveal reasoning or chain-of-thought.
+- Do not include any text before or after the JSON.
 - Use only the provided passages.
 - Every `quote` must be an exact substring from the referenced passage text.
 - Every `passage_id` must come from the provided input.
+- Each candidate object must use exactly these keys:
+  - `candidate_id`
+  - `label`
+  - `passage_id`
+  - `quote`
+  - `rationale`
+  - `confidence`
+- Do not rename keys.
 - Prefer high-signal candidates that can support literary analysis.
 
 Return a JSON array of objects with this schema:

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from agent_gatsby.config import load_config
-from agent_gatsby.extract_metaphors import extract_metaphor_candidates
+from agent_gatsby.extract_metaphors import extract_metaphor_candidates, parse_candidate_response
 from agent_gatsby.llm_client import LLMResponseValidationError
 from agent_gatsby.schemas import PassageIndex, PassageRecord
 
@@ -162,3 +162,56 @@ def test_extract_metaphor_candidates_saves_raw_output_and_retries_once(monkeypat
     assert calls["count"] == 2
     assert debug_path.exists()
     assert "not json at all" in debug_path.read_text(encoding="utf-8")
+
+
+def test_parse_candidate_response_repairs_common_live_model_key_typos() -> None:
+    response_text = json.dumps(
+        [
+            {
+                "candidate_im": "C001",
+                "label": "green light",
+                "passage_id": "1.1",
+                "quote": "green light",
+                "rationale": "A recurring image that turns Gatsby's longing into a visible object of desire.",
+                "confidence": 0.95,
+            },
+            {
+                "canidate_id": "C002",
+                "label": "dark promise",
+                "passage_id": "1.2",
+                "quote": "dark promise",
+                "ratione": "A metaphor-adjacent image that frames desire as both alluring and ominous.",
+                "confidence": 0.81,
+            },
+        ]
+    )
+
+    candidates = parse_candidate_response(response_text)
+
+    assert len(candidates) == 2
+    assert candidates[0].candidate_id == "C001"
+    assert candidates[1].candidate_id == "C002"
+    assert candidates[1].rationale.startswith("A metaphor-adjacent image")
+
+
+def test_parse_candidate_response_handles_wrapped_candidate_list_objects() -> None:
+    response_text = json.dumps(
+        {
+            "candidates": [
+                {
+                    "label": "green light",
+                    "passage_id": "1.1",
+                    "quote_span": "green light",
+                    "notes": "A recurring image that turns Gatsby's longing into a visible object of desire.",
+                    "confidence": 0.91,
+                }
+            ]
+        }
+    )
+
+    candidates = parse_candidate_response(response_text)
+
+    assert len(candidates) == 1
+    assert candidates[0].candidate_id == "RAW001"
+    assert candidates[0].quote == "green light"
+    assert candidates[0].rationale.startswith("A recurring image")

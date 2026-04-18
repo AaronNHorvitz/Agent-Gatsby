@@ -4,10 +4,12 @@ Candidate metaphor extraction for Agent Gatsby.
 
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import re
 from pathlib import Path
+from typing import Any
 
 from agent_gatsby.config import AppConfig
 from agent_gatsby.index_text import load_passage_index
@@ -19,20 +21,120 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_MAX_PASSAGE_CHARS = 12000
 DEFAULT_MAX_PASSAGES_PER_BATCH = 40
 JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+JSON_ARRAY_RE = re.compile(r"\[\s*{.*}\s*\]", re.DOTALL)
+JSON_OBJECT_RE = re.compile(r"{.*}", re.DOTALL)
+
+CANONICAL_CANDIDATE_FIELDS = {
+    "candidate_id",
+    "label",
+    "passage_id",
+    "quote",
+    "rationale",
+    "confidence",
+}
+FIELD_ALIAS_MAP = {
+    "candidateid": "candidate_id",
+    "canidateid": "candidate_id",
+    "candidateim": "candidate_id",
+    "candidateids": "candidate_id",
+    "label": "label",
+    "metaphor": "label",
+    "image": "label",
+    "symbol": "label",
+    "passageid": "passage_id",
+    "passage": "passage_id",
+    "passagelocator": "passage_id",
+    "quote": "quote",
+    "quotespan": "quote",
+    "quotation": "quote",
+    "excerpt": "quote",
+    "rationale": "rationale",
+    "rational": "rationale",
+    "ratione": "rationale",
+    "reason": "rationale",
+    "notes": "rationale",
+    "interpretation": "rationale",
+    "confidence": "confidence",
+    "score": "confidence",
+    "confidencescore": "confidence",
+}
+LIST_CONTAINER_KEYS = ("candidates", "results", "items")
+
+
+def normalize_field_key(key: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", key.lower())
+
+
+def find_json_segment(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("[") or stripped.startswith("{"):
+        return stripped
+
+    array_match = JSON_ARRAY_RE.search(stripped)
+    if array_match:
+        return array_match.group(0)
+
+    object_match = JSON_OBJECT_RE.search(stripped)
+    if object_match:
+        return object_match.group(0)
+
+    return stripped
 
 
 def extract_json_payload(response_text: str) -> str:
     text = response_text.strip()
     if text.startswith("```"):
         text = JSON_FENCE_RE.sub("", text).strip()
-    return text
+    return find_json_segment(text)
+
+
+def map_candidate_field(raw_key: str) -> str | None:
+    normalized_key = normalize_field_key(raw_key)
+    if normalized_key in FIELD_ALIAS_MAP:
+        return FIELD_ALIAS_MAP[normalized_key]
+
+    canonical_lookup = {normalize_field_key(field): field for field in CANONICAL_CANDIDATE_FIELDS}
+    closest = difflib.get_close_matches(normalized_key, canonical_lookup.keys(), n=1, cutoff=0.78)
+    if closest:
+        return canonical_lookup[closest[0]]
+    return None
+
+
+def extract_candidate_items(payload: Any) -> list[Any]:
+    if isinstance(payload, list):
+        return payload
+
+    if isinstance(payload, dict):
+        for key in LIST_CONTAINER_KEYS:
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value
+
+    raise ValueError("Expected extraction response to be a JSON array or an object containing candidate list data")
+
+
+def canonicalize_candidate_item(item: Any, *, index: int) -> dict[str, Any]:
+    if not isinstance(item, dict):
+        raise ValueError(f"Candidate item {index} is not an object")
+
+    canonical: dict[str, Any] = {}
+    for raw_key, value in item.items():
+        mapped_key = map_candidate_field(str(raw_key))
+        if mapped_key is None:
+            continue
+        canonical.setdefault(mapped_key, value)
+
+    canonical.setdefault("candidate_id", f"RAW{index:03d}")
+    return canonical
 
 
 def parse_candidate_response(response_text: str) -> list[MetaphorCandidate]:
     payload = json.loads(extract_json_payload(response_text))
-    if not isinstance(payload, list):
-        raise ValueError("Expected extraction response to be a JSON array")
-    return [MetaphorCandidate.model_validate(item) for item in payload]
+    items = extract_candidate_items(payload)
+    return [
+        MetaphorCandidate.model_validate(canonicalize_candidate_item(item, index=index))
+        for index, item in enumerate(items, start=1)
+    ]
 
 
 def validate_candidate_response(response_text: str) -> None:
@@ -99,9 +201,14 @@ def build_extraction_user_prompt(
         "Return only a JSON array of candidate objects.",
         "Use only the provided passages.",
         "Every quote must be an exact substring from the referenced passage text.",
+        "Do not reveal reasoning, chain-of-thought, or any text before or after the JSON.",
+        "Each candidate object must use exactly these keys: candidate_id, label, passage_id, quote, rationale, confidence.",
+        "Do not rename keys, even if you are uncertain.",
+        "If you are unsure about a candidate, omit it rather than returning malformed JSON.",
     ]
     if stricter_json:
         instructions.append("Do not wrap the JSON in markdown fences or add any explanation.")
+        instructions.append("If no good candidates exist, return [] exactly.")
 
     return "\n".join(instructions) + "\n\nPassages:\n" + render_passage_payload(passages)
 

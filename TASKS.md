@@ -271,7 +271,7 @@ Create clear structures.
 - [x] 5.4.6 Add retry handling for malformed output
 - [x] 5.4.7 Log each call with stage name
 - [x] 5.4.8 Log output path for each call
-- [ ] 5.4.9 Confirm one successful round-trip call
+- [x] 5.4.9 Confirm one successful round-trip call
 
 ## 5.5 Write extraction prompt
 - [x] 5.5.1 Create prompt file or prompt string for metaphor extraction
@@ -294,7 +294,7 @@ Create clear structures.
 - [x] 5.6.6 Validate each candidate has required fields
 - [x] 5.6.7 Save to `artifacts/evidence/metaphor_candidates.json`
 - [x] 5.6.8 Log candidate count
-- [ ] 5.6.9 Manually inspect output for obvious garbage
+- [x] 5.6.9 Manually inspect output for obvious garbage
 
 ## 5.7 Add extraction fallback logic
 - [x] 5.7.1 If JSON parse fails, save raw response to a debug file
@@ -314,7 +314,7 @@ Create clear structures.
 This is critical.
 - [x] 5.9.1 Load candidate file
 - [x] 5.9.2 Load passage index
-- [ ] 5.9.3 For each candidate:
+- [x] 5.9.3 For each candidate:
   - [x] 5.9.3.1 confirm passage_id exists
   - [x] 5.9.3.2 confirm quote string exists exactly inside passage text
   - [x] 5.9.3.3 reject candidate if quote does not match
@@ -358,11 +358,11 @@ This is critical.
 
 ## 5.13 End of Friday checkpoint
 Do not move on until all are true:
-- [ ] 5.13.1 passage index exists
-- [ ] 5.13.2 LLM client works
-- [ ] 5.13.3 metaphor candidate file exists
-- [ ] 5.13.4 evidence ledger exists
-- [ ] 5.13.5 rejected candidates file exists if needed
+- [x] 5.13.1 passage index exists
+- [x] 5.13.2 LLM client works
+- [x] 5.13.3 metaphor candidate file exists
+- [x] 5.13.4 evidence ledger exists
+- [x] 5.13.5 rejected candidates file exists if needed
 - [ ] 5.13.6 outline exists
 - [ ] 5.13.7 all Friday tests pass
 
