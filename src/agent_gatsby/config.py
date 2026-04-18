@@ -167,6 +167,10 @@ class AppConfig(BaseModel):
         return self.resolve_repo_path(self.require_mapping_value("drafting", "output_path"))
 
     @property
+    def final_draft_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("drafting", "final_output_path"))
+
+    @property
     def section_drafts_dir_path(self) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("drafting", "section_drafts_dir"))
 

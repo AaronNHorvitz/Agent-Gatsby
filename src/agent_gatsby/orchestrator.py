@@ -11,6 +11,7 @@ from typing import Any
 
 from agent_gatsby.build_evidence_ledger import build_evidence_ledger
 from agent_gatsby.config import AppConfig, load_config
+from agent_gatsby.critique_and_edit import critique_and_edit
 from agent_gatsby.data_ingest import ingest_source
 from agent_gatsby.draft_english import draft_english
 from agent_gatsby.extract_metaphors import extract_metaphor_candidates
@@ -33,6 +34,7 @@ IMPLEMENTED_STAGE_ORDER = (
     "plan_outline",
     "draft_english",
     "verify_english",
+    "critique_english",
 )
 
 
@@ -114,6 +116,18 @@ def stage_verify_english(config: AppConfig, context: StageContext) -> None:
     )
 
 
+def stage_critique_english(config: AppConfig, context: StageContext) -> None:
+    if "english_verification_report" not in context:
+        stage_verify_english(config, context)
+    if "english_draft" not in context:
+        stage_draft_english(config, context)
+
+    context["english_final"] = critique_and_edit(
+        config,
+        draft_text=context["english_draft"],
+    )
+
+
 def get_stage_registry() -> dict[str, StageHandler]:
     return {
         "ingest": stage_ingest,
@@ -124,6 +138,7 @@ def get_stage_registry() -> dict[str, StageHandler]:
         "plan_outline": stage_plan_outline,
         "draft_english": stage_draft_english,
         "verify_english": stage_verify_english,
+        "critique_english": stage_critique_english,
     }
 
 

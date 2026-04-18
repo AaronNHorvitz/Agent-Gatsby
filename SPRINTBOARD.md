@@ -65,7 +65,7 @@ This is the version you must finish first before adding anything fancy.
 - [x] 2.1.8 `src/agent_gatsby/plan_outline.py`
 - [x] 2.1.9 `src/agent_gatsby/draft_english.py`
 - [x] 2.1.10 `src/agent_gatsby/verify_citations.py`
-- [ ] 2.1.11 `src/agent_gatsby/critique_and_edit.py`
+- [x] 2.1.11 `src/agent_gatsby/critique_and_edit.py`
 - [ ] 2.1.12 `src/agent_gatsby/translate_spanish.py`
 - [ ] 2.1.13 `src/agent_gatsby/translate_mandarin.py`
 - [ ] 2.1.14 `src/agent_gatsby/bilingual_qa.py`
@@ -425,21 +425,21 @@ This file is non-negotiable.
   - [x] 6.5.1.4 verify invalid passage ID fails
 
 ## 6.6 Build `critique_and_edit.py`
-- [ ] 6.6.1 Load verified English draft
-- [ ] 6.6.2 Ask LLM to improve transitions, cohesion, and style
-- [ ] 6.6.3 Explicitly forbid changing quoted text
-- [ ] 6.6.4 Explicitly forbid adding new citations
-- [ ] 6.6.5 Explicitly forbid changing citation markers
-- [ ] 6.6.6 Save output to `artifacts/drafts/analysis_english_final.md`
-- [ ] 6.6.7 Compare old and new versions manually
-- [ ] 6.6.8 Confirm quotes stayed identical
-- [ ] 6.6.9 Confirm no citations disappeared
+- [x] 6.6.1 Load verified English draft
+- [x] 6.6.2 Ask LLM to improve transitions, cohesion, and style
+- [x] 6.6.3 Explicitly forbid changing quoted text
+- [x] 6.6.4 Explicitly forbid adding new citations
+- [x] 6.6.5 Explicitly forbid changing citation markers
+- [x] 6.6.6 Save output to `artifacts/drafts/analysis_english_final.md`
+- [x] 6.6.7 Compare old and new versions manually
+- [x] 6.6.8 Confirm quotes stayed identical
+- [x] 6.6.9 Confirm no citations disappeared
 
 ## 6.7 Add test or validation for editorial integrity
-- [ ] 6.7.1 `test_editorial_integrity.py`
-  - [ ] 6.7.1.1 verify all original citation markers remain in final draft
-  - [ ] 6.7.1.2 verify all direct quotes remain present
-  - [ ] 6.7.1.3 verify final file exists and is non-empty
+- [x] 6.7.1 `test_editorial_integrity.py`
+  - [x] 6.7.1.1 verify all original citation markers remain in final draft
+  - [x] 6.7.1.2 verify all direct quotes remain present
+  - [x] 6.7.1.3 verify final file exists and is non-empty
 
 ## 6.8 Manual English review pass
 Read it like a hiring reviewer, not like a coder.
@@ -465,9 +465,9 @@ Read it like a hiring reviewer, not like a coder.
 Do not move on until all are true:
 - [x] 6.10.1 English draft exists
 - [x] 6.10.2 English verification report exists
-- [ ] 6.10.3 English final file exists
+- [x] 6.10.3 English final file exists
 - [x] 6.10.4 quote verification tests pass
-- [ ] 6.10.5 editorial integrity checks pass
+- [x] 6.10.5 editorial integrity checks pass
 - [ ] 6.10.6 smoke test passes
 - [ ] 6.10.7 English essay is human-reviewed once
 
@@ -714,9 +714,9 @@ Do not stop until all are true:
 
 ## 8.10 `src/agent_gatsby/critique_and_edit.py`
 - [ ] 8.10.1 improve prose only
-- [ ] 8.10.2 preserve quotes
-- [ ] 8.10.3 preserve citations
-- [ ] 8.10.4 write final English file
+- [x] 8.10.2 preserve quotes
+- [x] 8.10.3 preserve citations
+- [x] 8.10.4 write final English file
 
 ## 8.11 `src/agent_gatsby/translate_spanish.py`
 - [ ] 8.11.1 chunk English master
@@ -850,7 +850,7 @@ You are done only when every box below is checked:
 - [x] 12.6 outline saved
 - [x] 12.7 English draft saved
 - [x] 12.8 English verification passed
-- [ ] 12.9 English final saved
+- [x] 12.9 English final saved
 - [ ] 12.10 Spanish draft saved
 - [ ] 12.11 Mandarin draft saved
 - [ ] 12.12 translation QA reports saved
