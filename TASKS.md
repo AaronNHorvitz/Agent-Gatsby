@@ -13,15 +13,15 @@ Build, test, debug, and package a working local AI pipeline that:
 ---
 
 # 0. Ground Rules for the Weekend
-- [ ] 0.1 Do **not** start by chasing perfection.
-- [ ] 0.2 Do **not** start by polishing the README again.
-- [ ] 0.3 Do **not** start by designing advanced future features.
-- [ ] 0.4 Build the **smallest working pipeline first**, then harden it.
-- [ ] 0.5 At every stage, make sure there is a file on disk that proves the stage worked.
-- [ ] 0.6 At every stage, add at least one test or one validation check.
-- [ ] 0.7 If a stage fails, fix the stage before moving on.
-- [ ] 0.8 Always keep the pipeline runnable from the command line.
-- [ ] 0.9 Commit after each major milestone.
+- [x] 0.1 Do **not** start by chasing perfection.
+- [x] 0.2 Do **not** start by polishing the README again.
+- [x] 0.3 Do **not** start by designing advanced future features.
+- [x] 0.4 Build the **smallest working pipeline first**, then harden it.
+- [x] 0.5 At every stage, make sure there is a file on disk that proves the stage worked.
+- [x] 0.6 At every stage, add at least one test or one validation check.
+- [x] 0.7 If a stage fails, fix the stage before moving on.
+- [x] 0.8 Always keep the pipeline runnable from the command line.
+- [x] 0.9 Commit after each major milestone.
 
 ---
 
