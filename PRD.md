@@ -138,6 +138,7 @@ The system is successful if it can:
 - Solve literary scholarship comprehensively
 - Build a benchmark-level translation system
 - Add advanced retrieval, embeddings, or Docker unless time allows after MVP completion
+- Train a custom metaphor classifier or create a labeled metaphor dataset during the weekend MVP window
 
 ---
 
@@ -462,12 +463,16 @@ The system shall generate the English essay section by section using only eviden
 - academic tone required
 - citations must use bracketed chapter.paragraph locators such as `[5.18]`
 - page-number citations are out of scope for v1
+- the English draft should target roughly 2800-3200 words, using about 280 words per page as a planning heuristic
+- the draft should not be frozen as the English master until the verified evidence ledger is broad enough to support a full-length essay
 
 ### Acceptance Criteria
 - English draft exists
 - draft has multiple sections
 - section order matches outline
 - citations appear in expected `[chapter.paragraph]` format
+- word count is reported
+- estimated page count is reported
 
 ---
 
@@ -489,6 +494,9 @@ The system shall verify quotes and citation markers in the English draft.
 - citation resolution
 - evidence linkage validation
 - readable failure reporting
+- zero tolerance for invalid quote rate
+- zero tolerance for invalid citation rate
+- advisory reporting for unsupported-sentence ratio or a comparable human-review metric
 
 ### Acceptance Criteria
 - verification report exists
@@ -936,7 +944,7 @@ The repo should be navigable by a reviewer within a few minutes.
 ## 23. Risks and Mitigations
 
 ## 23.1 Risk: Candidate extraction quality is weak
-**Mitigation:** allow manual curation fallback for the evidence ledger.
+**Mitigation:** allow manual curation fallback for the evidence ledger and require a human accuracy review of promoted metaphor records because v1 does not use a trained metaphor classifier.
 
 ## 23.2 Risk: Quote verification fails repeatedly
 **Mitigation:** simplify citation format, normalize punctuation carefully, and keep evidence bounded.
@@ -979,6 +987,8 @@ Prefer bounded, verifiable stages over a single elegant but fragile prompt chain
 - English citations use bracketed chapter.paragraph locators such as `[5.18]`. These locators reference the locked passage index rather than printed page numbers.
 - The Spanish and Mandarin outputs fully translate the essay, including quoted content, while preserving citation markers and quotation boundaries.
 - Exact quote verification applies to the English master only. Translated outputs are promoted through structural QA plus human spot checks.
+- The weekend MVP will not attempt to train a custom metaphor classifier or create a labeled metaphor dataset. Metaphor identification remains heuristic and requires a human review pass before final submission.
+- The current build targets are roughly 15-20 verified evidence records and an English draft of about 2800-3200 words, using about 280 words per page as an estimated planning heuristic.
 - PDF styling remains intentionally plain and professional: title, headings, readable margins, page numbers, and Unicode-safe fonts without decorative layout.
 - Manual evidence overrides are allowed only as a tiny explicit fallback in the verified evidence ledger, and every override must be logged.
 - Minimum translation QA for v1 is heading parity, citation parity, section order parity, quote-marker parity, non-empty output checks, and manual intro/middle/conclusion spot checks.

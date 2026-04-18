@@ -48,7 +48,7 @@ The central design decision in this repository is simple:
 
 The objective of Agent Gatsby is to take a locked source text of *The Great Gatsby* and produce a submission package that satisfies the following output requirements:
 
-- a polished **English literary analysis of the novel’s major recurring metaphor systems, including citations**, targeting approximately 10 pages
+- a polished **English literary analysis of the novel’s major recurring metaphor systems, including citations**, targeting approximately 10 pages and operationalized as roughly 2800-3200 words at an estimate of about 280 words per page
 - a **Spanish translation** of that analysis
 - a **Mandarin translation** of that analysis, rendered in Simplified Chinese
 - three separate, professional **PDF artifacts** suitable for upload
@@ -124,6 +124,7 @@ Agent Gatsby is **not**:
 - a generic autonomous agent platform
 - a chain-of-thought visualizer
 - a human replacement for literary scholarship
+- a weekend attempt to train a custom metaphor classifier or build a labeled metaphor dataset from scratch
 
 It is a **production-minded local AI pipeline** built for a concrete deliverable.
 
@@ -304,6 +305,11 @@ The evidence ledger is the bridge between raw text and final analysis. It is the
 ### Why this matters
 The final essay should be written from a ledger of evidence, not from unconstrained recollection.
 
+### Current build targets
+- aim for roughly 15-20 verified evidence records before freezing the English master
+- spread evidence across multiple chapters instead of clustering only in early passages
+- require one human review of promoted metaphor records because v1 does not use a trained metaphor classifier
+
 ### Example output artifact
 `artifacts/evidence/evidence_ledger.json`
 
@@ -399,6 +405,11 @@ Section-bounded drafting produces better local coherence and makes debugging eas
 - every citation must resolve to a passage ID
 - unsupported thematic claims are disallowed
 
+### Length targets
+- target roughly 2800-3200 words for the English essay
+- estimate page count using about 280 words per page as a planning heuristic, not as a formatting guarantee
+- do not freeze the English master until both evidence breadth and draft length are in a credible range for the assignment
+
 ### Example output artifact
 `artifacts/drafts/analysis_english_draft.md`
 
@@ -413,6 +424,10 @@ After the English draft is generated, a deterministic verifier checks every quot
 - ensure cited passage IDs exist
 - ensure every citation in the draft maps to a ledger entry
 - ensure no quote has been silently altered
+- report draft word count and estimated page count
+- keep invalid quote rate at zero
+- keep invalid citation rate at zero
+- treat unsupported-claim ratio as an advisory human-review metric rather than a substitute for deterministic verification
 
 ### Why this matters
 A literary essay with weak citations fails the core deliverable.
@@ -1125,13 +1140,13 @@ In short:
 ## 21. Known Risks and Mitigations
 
 ## 21.1 Risk: weak metaphor selection
-**Mitigation:** extract multiple candidates, score them, and require evidence promotion rules.
+**Mitigation:** extract multiple candidates, score them, require evidence promotion rules, and perform one human review of the promoted metaphor set because the weekend MVP does not include a trained metaphor classifier.
 
 ## 21.2 Risk: hallucinated citations
-**Mitigation:** exact substring verification against locked source.
+**Mitigation:** exact substring verification against locked source, zero tolerance for invalid quote and citation rates, and advisory reporting for unsupported claims.
 
 ## 21.3 Risk: generic literary filler
-**Mitigation:** bounded section drafting from evidence IDs only.
+**Mitigation:** bounded section drafting from evidence IDs only, explicit evidence-count targets, and draft-length targets tied to the assignment.
 
 ## 21.4 Risk: translation drift
 **Mitigation:** chunked translation plus bilingual QA.

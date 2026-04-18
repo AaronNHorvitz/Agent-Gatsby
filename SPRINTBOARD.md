@@ -78,13 +78,14 @@ This is the version you must finish first before adding anything fancy.
 ## 2.2 Explicitly postpone until MVP works
 - [ ] 2.2.1 Embeddings
 - [ ] 2.2.2 Semantic retrieval
-- [ ] 2.2.3 Multi-model routing
-- [ ] 2.2.4 Docker
-- [ ] 2.2.5 CI/CD
-- [ ] 2.2.6 Web UI
-- [ ] 2.2.7 Fancy observability dashboards
-- [ ] 2.2.8 Parallel execution
-- [ ] 2.2.9 Advanced retry schedulers
+- [ ] 2.2.3 Train a custom metaphor classifier or create a labeled metaphor dataset
+- [ ] 2.2.4 Multi-model routing
+- [ ] 2.2.5 Docker
+- [ ] 2.2.6 CI/CD
+- [ ] 2.2.7 Web UI
+- [ ] 2.2.8 Fancy observability dashboards
+- [ ] 2.2.9 Parallel execution
+- [ ] 2.2.10 Advanced retry schedulers
 
 ---
 
@@ -328,6 +329,9 @@ This is critical.
 - [x] 5.9.9 Log rejected count
 - [ ] 5.9.10 Allow a tiny explicit manual override path only if extraction misses essential evidence
 - [ ] 5.9.11 Log any manual overrides clearly in the ledger or run artifacts
+- [ ] 5.9.12 Set a target verified evidence count for the final essay build
+- [ ] 5.9.13 Review promoted metaphor records manually for obvious misclassification before freezing the ledger
+- [ ] 5.9.14 Use manual overrides only for high-confidence core metaphors the model misses
 
 ## 5.10 Create tests for the evidence ledger
 - [x] 5.10.1 `test_evidence_ledger.py`
@@ -393,6 +397,11 @@ Do not move on until all are true:
 - [x] 6.2.7 Confirm headings exist
 - [x] 6.2.8 Confirm text is non-empty
 - [x] 6.2.9 Confirm citations appear in `[chapter.paragraph]` format
+- [ ] 6.2.10 Add target word count variable
+- [ ] 6.2.11 Add estimated page target variable
+- [ ] 6.2.12 Add words-per-page estimate variable
+- [ ] 6.2.13 Report actual draft word count
+- [ ] 6.2.14 Report estimated page count
 
 ## 6.3 Lock citation format now
 This decision is already made; implement it consistently.
@@ -416,6 +425,10 @@ This file is non-negotiable.
 - [x] 6.4.8 Create a verification report
 - [x] 6.4.9 Save report to `artifacts/qa/english_verification_report.json`
 - [x] 6.4.10 If verification fails, exit with failure
+- [ ] 6.4.11 Add zero-tolerance invalid quote rate variable
+- [ ] 6.4.12 Add zero-tolerance invalid citation rate variable
+- [ ] 6.4.13 Add advisory unsupported-claim threshold variable
+- [ ] 6.4.14 Report unsupported-claim estimate for human review
 
 ## 6.5 Create tests for quote verification
 - [x] 6.5.1 `test_quote_verification.py`
@@ -452,6 +465,8 @@ Read it like a hiring reviewer, not like a coder.
 - [ ] 6.8.7 Check whether metaphor analysis feels serious and not canned
 - [ ] 6.8.8 Mark any obvious weak sections
 - [ ] 6.8.9 Fix weak sections now, not later
+- [ ] 6.8.10 Review whether promoted metaphors are actually defensible readings of the text
+- [ ] 6.8.11 Reject or correct any metaphor records that feel misclassified
 
 ## 6.9 Create a lightweight integration test
 - [ ] 6.9.1 `test_pipeline_smoke.py`
@@ -470,6 +485,11 @@ Do not move on until all are true:
 - [x] 6.10.5 editorial integrity checks pass
 - [ ] 6.10.6 smoke test passes
 - [ ] 6.10.7 English essay is human-reviewed once
+- [ ] 6.10.8 verified evidence count meets target
+- [ ] 6.10.9 draft word count is in target range
+- [ ] 6.10.10 invalid quote rate is zero
+- [ ] 6.10.11 invalid citation rate is zero
+- [ ] 6.10.12 metaphor accuracy has one human review pass
 
 ---
 
