@@ -30,9 +30,9 @@ The project is considered done only if all of the following are true:
 
 - [ ] 1.1 Repo has a clean structure.
 - [ ] 1.2 README reflects the final architecture.
-- [ ] 1.3 Config file exists and is used by code.
-- [ ] 1.4 Source text is locked and hashed.
-- [ ] 1.5 Passage indexing works.
+- [x] 1.3 Config file exists and is used by code.
+- [x] 1.4 Source text is locked and hashed.
+- [x] 1.5 Passage indexing works.
 - [ ] 1.6 Candidate metaphor extraction works.
 - [ ] 1.7 Evidence ledger file is produced.
 - [ ] 1.8 English outline is produced.
@@ -43,9 +43,9 @@ The project is considered done only if all of the following are true:
 - [ ] 1.13 Mandarin translation file is produced.
 - [ ] 1.14 QA checks for translations run.
 - [ ] 1.15 Three PDFs are successfully rendered.
-- [ ] 1.16 Unit tests run cleanly.
-- [ ] 1.17 At least one lightweight end-to-end test runs.
-- [ ] 1.18 Logs are written to disk.
+- [x] 1.16 Unit tests run cleanly.
+- [x] 1.17 At least one lightweight end-to-end test runs.
+- [x] 1.18 Logs are written to disk.
 - [ ] 1.19 Final manifest is written.
 - [ ] 1.20 The repo can be demonstrated by running a clear command sequence.
 
@@ -55,11 +55,11 @@ The project is considered done only if all of the following are true:
 This is the version you must finish first before adding anything fancy.
 
 ## 2.1 Required MVP components
-- [ ] 2.1.1 `config/config.yaml`
-- [ ] 2.1.2 `src/agent_gatsby/orchestrator.py`
-- [ ] 2.1.3 `src/agent_gatsby/data_ingest.py`
-- [ ] 2.1.4 `src/agent_gatsby/normalize.py`
-- [ ] 2.1.5 `src/agent_gatsby/index_text.py`
+- [x] 2.1.1 `config/config.yaml`
+- [x] 2.1.2 `src/agent_gatsby/orchestrator.py`
+- [x] 2.1.3 `src/agent_gatsby/data_ingest.py`
+- [x] 2.1.4 `src/agent_gatsby/normalize.py`
+- [x] 2.1.5 `src/agent_gatsby/index_text.py`
 - [ ] 2.1.6 `src/agent_gatsby/extract_metaphors.py`
 - [ ] 2.1.7 `src/agent_gatsby/build_evidence_ledger.py`
 - [ ] 2.1.8 `src/agent_gatsby/plan_outline.py`
@@ -71,9 +71,9 @@ This is the version you must finish first before adding anything fancy.
 - [ ] 2.1.14 `src/agent_gatsby/bilingual_qa.py`
 - [ ] 2.1.15 `src/agent_gatsby/pdf_compiler.py`
 - [ ] 2.1.16 `src/agent_gatsby/manifest_writer.py`
-- [ ] 2.1.17 `tests/`
-- [ ] 2.1.18 `requirements.txt`
-- [ ] 2.1.19 `README.md`
+- [x] 2.1.17 `tests/`
+- [x] 2.1.18 `requirements.txt`
+- [x] 2.1.19 `README.md`
 
 ## 2.2 Explicitly postpone until MVP works
 - [ ] 2.2.1 Embeddings
@@ -105,31 +105,31 @@ Focus: translations + translation QA + PDFs + manifest + full dry run + final cl
 
 # 4. Thursday Night — Setup and Foundation
 ## 4.1 Create the repo structure
-- [ ] 4.1.1 Open the repository root.
-- [ ] 4.1.2 Create `config/`
-- [ ] 4.1.3 Create `data/source/`
-- [ ] 4.1.4 Create `data/normalized/`
-- [ ] 4.1.5 Create `artifacts/manifests/`
-- [ ] 4.1.6 Create `artifacts/evidence/`
-- [ ] 4.1.7 Create `artifacts/drafts/`
-- [ ] 4.1.8 Create `artifacts/translations/`
-- [ ] 4.1.9 Create `artifacts/qa/`
-- [ ] 4.1.10 Create `artifacts/logs/`
-- [ ] 4.1.11 Create `outputs/`
-- [ ] 4.1.12 Create `fonts/`
-- [ ] 4.1.13 Create `src/agent_gatsby/`
+- [x] 4.1.1 Open the repository root.
+- [x] 4.1.2 Create `config/`
+- [x] 4.1.3 Create `data/source/`
+- [x] 4.1.4 Create `data/normalized/`
+- [x] 4.1.5 Create `artifacts/manifests/`
+- [x] 4.1.6 Create `artifacts/evidence/`
+- [x] 4.1.7 Create `artifacts/drafts/`
+- [x] 4.1.8 Create `artifacts/translations/`
+- [x] 4.1.9 Create `artifacts/qa/`
+- [x] 4.1.10 Create `artifacts/logs/`
+- [x] 4.1.11 Create `outputs/`
+- [x] 4.1.12 Create `fonts/`
+- [x] 4.1.13 Create `src/agent_gatsby/`
 - [ ] 4.1.14 Create `src/agent_gatsby/utils/`
-- [ ] 4.1.15 Create `tests/`
+- [x] 4.1.15 Create `tests/`
 
 ## 4.2 Create base files
-- [ ] 4.2.1 Create `README.md`
-- [ ] 4.2.2 Create `requirements.txt`
-- [ ] 4.2.3 Create `pyproject.toml` if you want packaging consistency
-- [ ] 4.2.4 Create `config/config.yaml`
-- [ ] 4.2.5 Create `src/agent_gatsby/__init__.py`
-- [ ] 4.2.6 Create `src/agent_gatsby/schemas.py`
-- [ ] 4.2.7 Create `src/agent_gatsby/config.py`
-- [ ] 4.2.8 Create `src/agent_gatsby/orchestrator.py`
+- [x] 4.2.1 Create `README.md`
+- [x] 4.2.2 Create `requirements.txt`
+- [x] 4.2.3 Create `pyproject.toml` if you want packaging consistency
+- [x] 4.2.4 Create `config/config.yaml`
+- [x] 4.2.5 Create `src/agent_gatsby/__init__.py`
+- [x] 4.2.6 Create `src/agent_gatsby/schemas.py`
+- [x] 4.2.7 Create `src/agent_gatsby/config.py`
+- [x] 4.2.8 Create `src/agent_gatsby/orchestrator.py`
 
 ## 4.3 Install and verify local environment
 - [ ] 4.3.1 Activate your environment.
@@ -143,124 +143,124 @@ Focus: translations + translation QA + PDFs + manifest + full dry run + final cl
 
 ## 4.4 Build `requirements.txt`
 Include only what you actually need.
-- [ ] 4.4.1 Add `pyyaml`
-- [ ] 4.4.2 Add `requests`
-- [ ] 4.4.3 Add `fpdf2`
-- [ ] 4.4.4 Add `pytest`
-- [ ] 4.4.5 Add `pydantic` if you want schema validation
-- [ ] 4.4.6 Add `openai` only if using Ollama’s OpenAI-compatible endpoint
+- [x] 4.4.1 Add `pyyaml`
+- [x] 4.4.2 Add `requests`
+- [x] 4.4.3 Add `fpdf2`
+- [x] 4.4.4 Add `pytest`
+- [x] 4.4.5 Add `pydantic` if you want schema validation
+- [x] 4.4.6 Add `openai` only if using Ollama’s OpenAI-compatible endpoint
 - [ ] 4.4.7 Add anything else only if truly necessary
 
 ## 4.5 Build `config/config.yaml`
-- [ ] 4.5.1 Add output directory paths
-- [ ] 4.5.2 Add artifact directory paths
-- [ ] 4.5.3 Add model endpoint
-- [ ] 4.5.4 Add model name
-- [ ] 4.5.5 Add drafting temperature
-- [ ] 4.5.6 Add translation settings
-- [ ] 4.5.7 Add PDF settings
-- [ ] 4.5.8 Add log level
-- [ ] 4.5.9 Add source file path
-- [ ] 4.5.10 Add final output file names
+- [x] 4.5.1 Add output directory paths
+- [x] 4.5.2 Add artifact directory paths
+- [x] 4.5.3 Add model endpoint
+- [x] 4.5.4 Add model name
+- [x] 4.5.5 Add drafting temperature
+- [x] 4.5.6 Add translation settings
+- [x] 4.5.7 Add PDF settings
+- [x] 4.5.8 Add log level
+- [x] 4.5.9 Add source file path
+- [x] 4.5.10 Add final output file names
 
 ## 4.6 Build `config.py`
-- [ ] 4.6.1 Write code to load YAML config
-- [ ] 4.6.2 Validate required keys exist
-- [ ] 4.6.3 Return config object
-- [ ] 4.6.4 Add clean error if config file missing
-- [ ] 4.6.5 Add clean error if required key missing
+- [x] 4.6.1 Write code to load YAML config
+- [x] 4.6.2 Validate required keys exist
+- [x] 4.6.3 Return config object
+- [x] 4.6.4 Add clean error if config file missing
+- [x] 4.6.5 Add clean error if required key missing
 
 ## 4.7 Build logging utility
-- [ ] 4.7.1 Create `logging_utils.py`
-- [ ] 4.7.2 Add file logger
-- [ ] 4.7.3 Add console logger
-- [ ] 4.7.4 Make logs go to `artifacts/logs/pipeline.log`
-- [ ] 4.7.5 Confirm a log message writes successfully
+- [x] 4.7.1 Create `logging_utils.py`
+- [x] 4.7.2 Add file logger
+- [x] 4.7.3 Add console logger
+- [x] 4.7.4 Make logs go to `artifacts/logs/pipeline.log`
+- [x] 4.7.5 Confirm a log message writes successfully
 
 ## 4.8 Lock the source text
 Decide now: use a local source file as canonical.
-- [ ] 4.8.1 Place source text in `data/source/gatsby_source.txt`
-- [ ] 4.8.2 Open file and visually inspect beginning and end
-- [ ] 4.8.3 Confirm encoding is UTF-8
+- [x] 4.8.1 Place source text in `data/source/gatsby_source.txt`
+- [x] 4.8.2 Open file and visually inspect beginning and end
+- [x] 4.8.3 Confirm encoding is UTF-8
 - [ ] 4.8.4 Create `hashing.py`
 - [ ] 4.8.5 Write a SHA-256 hash function
-- [ ] 4.8.6 Hash the raw source file
-- [ ] 4.8.7 Save the hash to `artifacts/manifests/source_manifest.json`
+- [x] 4.8.6 Hash the raw source file
+- [x] 4.8.7 Save the hash to `artifacts/manifests/source_manifest.json`
 
 ## 4.9 Build `data_ingest.py`
-- [ ] 4.9.1 Load source text from local file
-- [ ] 4.9.2 Validate file exists
-- [ ] 4.9.3 Validate text is non-empty
-- [ ] 4.9.4 Log file size
-- [ ] 4.9.5 Log source hash
-- [ ] 4.9.6 Return raw text string
+- [x] 4.9.1 Load source text from local file
+- [x] 4.9.2 Validate file exists
+- [x] 4.9.3 Validate text is non-empty
+- [x] 4.9.4 Log file size
+- [x] 4.9.5 Log source hash
+- [x] 4.9.6 Return raw text string
 
 ## 4.10 Build `normalize.py`
-- [ ] 4.10.1 Write function to normalize line endings
-- [ ] 4.10.2 Write function to collapse excessive blank lines
-- [ ] 4.10.3 Preserve chapter markers
-- [ ] 4.10.4 Preserve paragraph boundaries
-- [ ] 4.10.5 Save normalized text to `data/normalized/gatsby_locked.txt`
-- [ ] 4.10.6 Confirm output file exists
-- [ ] 4.10.7 Confirm output file is readable
-- [ ] 4.10.8 Confirm chapter headings remain intact
+- [x] 4.10.1 Write function to normalize line endings
+- [x] 4.10.2 Write function to collapse excessive blank lines
+- [x] 4.10.3 Preserve chapter markers
+- [x] 4.10.4 Preserve paragraph boundaries
+- [x] 4.10.5 Save normalized text to `data/normalized/gatsby_locked.txt`
+- [x] 4.10.6 Confirm output file exists
+- [x] 4.10.7 Confirm output file is readable
+- [x] 4.10.8 Confirm chapter headings remain intact
 
 ## 4.11 Create first unit tests
-- [ ] 4.11.1 `test_hashing.py`
-  - [ ] 4.11.1.1 verify same file always gives same hash
-  - [ ] 4.11.1.2 verify non-empty hash string
-- [ ] 4.11.2 `test_normalize.py`
-  - [ ] 4.11.2.1 verify normalized text is non-empty
-  - [ ] 4.11.2.2 verify output still contains chapter markers
-  - [ ] 4.11.2.3 verify output does not contain absurd blank-line sequences
+- [x] 4.11.1 `test_hashing.py`
+  - [x] 4.11.1.1 verify same file always gives same hash
+  - [x] 4.11.1.2 verify non-empty hash string
+- [x] 4.11.2 `test_normalize.py`
+  - [x] 4.11.2.1 verify normalized text is non-empty
+  - [x] 4.11.2.2 verify output still contains chapter markers
+  - [x] 4.11.2.3 verify output does not contain absurd blank-line sequences
 
 ## 4.12 End of Thursday checkpoint
 Do not move on until all are true:
-- [ ] 4.12.1 config loads
-- [ ] 4.12.2 logger works
-- [ ] 4.12.3 source file is locked
-- [ ] 4.12.4 source hash manifest exists
-- [ ] 4.12.5 normalized text file exists
-- [ ] 4.12.6 first tests pass
+- [x] 4.12.1 config loads
+- [x] 4.12.2 logger works
+- [x] 4.12.3 source file is locked
+- [x] 4.12.4 source hash manifest exists
+- [x] 4.12.5 normalized text file exists
+- [x] 4.12.6 first tests pass
 
 ---
 
 # 5. Friday — Passage Index, Extraction, Evidence Ledger, Outline
 ## 5.1 Build `schemas.py`
 Create clear structures.
-- [ ] 5.1.1 Define `SourceManifest`
-- [ ] 5.1.2 Define `PassageRecord`
+- [x] 5.1.1 Define `SourceManifest`
+- [x] 5.1.2 Define `PassageRecord`
 - [ ] 5.1.3 Define `MetaphorCandidate`
 - [ ] 5.1.4 Define `EvidenceRecord`
 - [ ] 5.1.5 Define `OutlineSection`
 - [ ] 5.1.6 Define `VerificationReport`
 - [ ] 5.1.7 Define `FinalManifest`
-- [ ] 5.1.8 Decide whether to use dataclasses or Pydantic
-- [ ] 5.1.9 Keep schemas simple and serializable
+- [x] 5.1.8 Decide whether to use dataclasses or Pydantic
+- [x] 5.1.9 Keep schemas simple and serializable
 
 ## 5.2 Build `index_text.py`
 - [ ] 5.2.1 Load `gatsby_locked.txt`
-- [ ] 5.2.2 Split text into chapters
-- [ ] 5.2.3 Split chapters into paragraphs
-- [ ] 5.2.4 Strip useless whitespace from each paragraph
-- [ ] 5.2.5 Skip empty paragraphs
-- [ ] 5.2.6 Assign stable `passage_id` values such as `1.1`, `1.2`, etc.
-- [ ] 5.2.7 Store chapter number
-- [ ] 5.2.8 Store paragraph number
-- [ ] 5.2.9 Store raw text
-- [ ] 5.2.10 Write output to `artifacts/manifests/passage_index.json`
-- [ ] 5.2.11 Confirm file exists
-- [ ] 5.2.12 Inspect first 10 passages manually
-- [ ] 5.2.13 Inspect a middle passage manually
-- [ ] 5.2.14 Inspect a late passage manually
+- [x] 5.2.2 Split text into chapters
+- [x] 5.2.3 Split chapters into paragraphs
+- [x] 5.2.4 Strip useless whitespace from each paragraph
+- [x] 5.2.5 Skip empty paragraphs
+- [x] 5.2.6 Assign stable `passage_id` values such as `1.1`, `1.2`, etc.
+- [x] 5.2.7 Store chapter number
+- [x] 5.2.8 Store paragraph number
+- [x] 5.2.9 Store raw text
+- [x] 5.2.10 Write output to `artifacts/manifests/passage_index.json`
+- [x] 5.2.11 Confirm file exists
+- [x] 5.2.12 Inspect first 10 passages manually
+- [x] 5.2.13 Inspect a middle passage manually
+- [x] 5.2.14 Inspect a late passage manually
 
 ## 5.3 Create tests for passage indexing
-- [ ] 5.3.1 `test_passage_index.py`
-  - [ ] 5.3.1.1 verify index file is created
-  - [ ] 5.3.1.2 verify passage IDs are unique
-  - [ ] 5.3.1.3 verify passage IDs are deterministic across reruns
-  - [ ] 5.3.1.4 verify every passage has non-empty text
-  - [ ] 5.3.1.5 verify chapter numbers are valid integers
+- [x] 5.3.1 `test_passage_index.py`
+  - [x] 5.3.1.1 verify index file is created
+  - [x] 5.3.1.2 verify passage IDs are unique
+  - [x] 5.3.1.3 verify passage IDs are deterministic across reruns
+  - [x] 5.3.1.4 verify every passage has non-empty text
+  - [x] 5.3.1.5 verify chapter numbers are valid integers
 
 ## 5.4 Build local LLM client helper
 - [ ] 5.4.1 Create a helper function for chat completion calls
@@ -577,13 +577,13 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [ ] 7.10.7 Save to `outputs/final_manifest.json`
 
 ## 7.11 Wire everything into `orchestrator.py`
-- [ ] 7.11.1 Add stage registry
-- [ ] 7.11.2 Add command-line argument parsing
-- [ ] 7.11.3 Add `--run all`
-- [ ] 7.11.4 Add `--run <stage>`
-- [ ] 7.11.5 Add stage-level logging
-- [ ] 7.11.6 Add clean failure messages
-- [ ] 7.11.7 Add exit code non-zero on stage failure
+- [x] 7.11.1 Add stage registry
+- [x] 7.11.2 Add command-line argument parsing
+- [x] 7.11.3 Add `--run all`
+- [x] 7.11.4 Add `--run <stage>`
+- [x] 7.11.5 Add stage-level logging
+- [x] 7.11.6 Add clean failure messages
+- [x] 7.11.7 Add exit code non-zero on stage failure
 
 ## 7.12 Do a full dry run
 - [ ] 7.12.1 Delete stale intermediate files if necessary
@@ -645,35 +645,35 @@ Do not stop until all are true:
 
 # 8. Detailed File-by-File Build Checklist
 ## 8.1 `src/agent_gatsby/orchestrator.py`
-- [ ] 8.1.1 load config
-- [ ] 8.1.2 initialize logger
-- [ ] 8.1.3 parse CLI args
-- [ ] 8.1.4 map stage names to functions
-- [ ] 8.1.5 support `all`
-- [ ] 8.1.6 support single-stage runs
-- [ ] 8.1.7 handle exceptions cleanly
-- [ ] 8.1.8 log start and finish for each stage
+- [x] 8.1.1 load config
+- [x] 8.1.2 initialize logger
+- [x] 8.1.3 parse CLI args
+- [x] 8.1.4 map stage names to functions
+- [x] 8.1.5 support `all`
+- [x] 8.1.6 support single-stage runs
+- [x] 8.1.7 handle exceptions cleanly
+- [x] 8.1.8 log start and finish for each stage
 
 ## 8.2 `src/agent_gatsby/data_ingest.py`
-- [ ] 8.2.1 read local source file
-- [ ] 8.2.2 validate existence
-- [ ] 8.2.3 validate encoding
-- [ ] 8.2.4 validate non-empty contents
-- [ ] 8.2.5 compute file hash
-- [ ] 8.2.6 return raw text
+- [x] 8.2.1 read local source file
+- [x] 8.2.2 validate existence
+- [x] 8.2.3 validate encoding
+- [x] 8.2.4 validate non-empty contents
+- [x] 8.2.5 compute file hash
+- [x] 8.2.6 return raw text
 
 ## 8.3 `src/agent_gatsby/normalize.py`
-- [ ] 8.3.1 normalize whitespace
-- [ ] 8.3.2 normalize line endings
-- [ ] 8.3.3 preserve structure
-- [ ] 8.3.4 write locked normalized file
+- [x] 8.3.1 normalize whitespace
+- [x] 8.3.2 normalize line endings
+- [x] 8.3.3 preserve structure
+- [x] 8.3.4 write locked normalized file
 
 ## 8.4 `src/agent_gatsby/index_text.py`
-- [ ] 8.4.1 split chapters
-- [ ] 8.4.2 split paragraphs
-- [ ] 8.4.3 assign IDs
-- [ ] 8.4.4 serialize JSON
-- [ ] 8.4.5 write passage index
+- [x] 8.4.1 split chapters
+- [x] 8.4.2 split paragraphs
+- [x] 8.4.3 assign IDs
+- [x] 8.4.4 serialize JSON
+- [x] 8.4.5 write passage index
 
 ## 8.5 `src/agent_gatsby/extract_metaphors.py`
 - [ ] 8.5.1 load index
