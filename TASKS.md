@@ -33,9 +33,9 @@ The project is considered done only if all of the following are true:
 - [x] 1.3 Config file exists and is used by code.
 - [x] 1.4 Source text is locked and hashed.
 - [x] 1.5 Passage indexing works.
-- [ ] 1.6 Candidate metaphor extraction works.
-- [ ] 1.7 Evidence ledger file is produced.
-- [ ] 1.8 English outline is produced.
+- [x] 1.6 Candidate metaphor extraction works.
+- [x] 1.7 Evidence ledger file is produced.
+- [x] 1.8 English outline is produced.
 - [ ] 1.9 English draft is produced.
 - [ ] 1.10 English quote/citation verification runs.
 - [ ] 1.11 English final master is produced.
@@ -62,7 +62,7 @@ This is the version you must finish first before adding anything fancy.
 - [x] 2.1.5 `src/agent_gatsby/index_text.py`
 - [x] 2.1.6 `src/agent_gatsby/extract_metaphors.py`
 - [x] 2.1.7 `src/agent_gatsby/build_evidence_ledger.py`
-- [ ] 2.1.8 `src/agent_gatsby/plan_outline.py`
+- [x] 2.1.8 `src/agent_gatsby/plan_outline.py`
 - [ ] 2.1.9 `src/agent_gatsby/draft_english.py`
 - [ ] 2.1.10 `src/agent_gatsby/verify_citations.py`
 - [ ] 2.1.11 `src/agent_gatsby/critique_and_edit.py`
@@ -337,24 +337,24 @@ This is critical.
   - [x] 5.10.1.4 verify rejected file is created if rejections exist
 
 ## 5.11 Build `plan_outline.py`
-- [ ] 5.11.1 Load evidence ledger
-- [ ] 5.11.2 Feed evidence records to LLM
-- [ ] 5.11.3 Ask for thesis + section plan
-- [ ] 5.11.4 Force structured JSON output
-- [ ] 5.11.5 Require section headings
-- [ ] 5.11.6 Require assigned evidence IDs per section
-- [ ] 5.11.7 Require intro and conclusion concept
-- [ ] 5.11.8 Save to `artifacts/drafts/outline.json`
-- [ ] 5.11.9 Inspect outline manually
-- [ ] 5.11.10 Confirm section ordering makes sense
-- [ ] 5.11.11 Confirm no section uses nonexistent evidence IDs
+- [x] 5.11.1 Load evidence ledger
+- [x] 5.11.2 Feed evidence records to LLM
+- [x] 5.11.3 Ask for thesis + section plan
+- [x] 5.11.4 Force structured JSON output
+- [x] 5.11.5 Require section headings
+- [x] 5.11.6 Require assigned evidence IDs per section
+- [x] 5.11.7 Require intro and conclusion concept
+- [x] 5.11.8 Save to `artifacts/drafts/outline.json`
+- [x] 5.11.9 Inspect outline manually
+- [x] 5.11.10 Confirm section ordering makes sense
+- [x] 5.11.11 Confirm no section uses nonexistent evidence IDs
 
 ## 5.12 Create tests for outline integrity
-- [ ] 5.12.1 `test_outline.py`
-  - [ ] 5.12.1.1 verify outline file exists
-  - [ ] 5.12.1.2 verify thesis is non-empty
-  - [ ] 5.12.1.3 verify sections exist
-  - [ ] 5.12.1.4 verify all referenced evidence IDs exist in ledger
+- [x] 5.12.1 `test_outline.py`
+  - [x] 5.12.1.1 verify outline file exists
+  - [x] 5.12.1.2 verify thesis is non-empty
+  - [x] 5.12.1.3 verify sections exist
+  - [x] 5.12.1.4 verify all referenced evidence IDs exist in ledger
 
 ## 5.13 End of Friday checkpoint
 Do not move on until all are true:
@@ -363,8 +363,8 @@ Do not move on until all are true:
 - [x] 5.13.3 metaphor candidate file exists
 - [x] 5.13.4 evidence ledger exists
 - [x] 5.13.5 rejected candidates file exists if needed
-- [ ] 5.13.6 outline exists
-- [ ] 5.13.7 all Friday tests pass
+- [x] 5.13.6 outline exists
+- [x] 5.13.7 all Friday tests pass
 
 ---
 
@@ -693,10 +693,10 @@ Do not stop until all are true:
 - [x] 8.6.6 save rejected list
 
 ## 8.7 `src/agent_gatsby/plan_outline.py`
-- [ ] 8.7.1 load ledger
-- [ ] 8.7.2 build thesis prompt
-- [ ] 8.7.3 parse structured output
-- [ ] 8.7.4 save outline JSON
+- [x] 8.7.1 load ledger
+- [x] 8.7.2 build thesis prompt
+- [x] 8.7.3 parse structured output
+- [x] 8.7.4 save outline JSON
 
 ## 8.8 `src/agent_gatsby/draft_english.py`
 - [ ] 8.8.1 load outline
@@ -842,12 +842,12 @@ Before you submit your application materials:
 # 12. Absolute Final Checklist
 You are done only when every box below is checked:
 
-- [ ] 12.1 source locked
-- [ ] 12.2 normalized text saved
-- [ ] 12.3 passage index saved
-- [ ] 12.4 candidate metaphors saved
-- [ ] 12.5 evidence ledger saved
-- [ ] 12.6 outline saved
+- [x] 12.1 source locked
+- [x] 12.2 normalized text saved
+- [x] 12.3 passage index saved
+- [x] 12.4 candidate metaphors saved
+- [x] 12.5 evidence ledger saved
+- [x] 12.6 outline saved
 - [ ] 12.7 English draft saved
 - [ ] 12.8 English verification passed
 - [ ] 12.9 English final saved

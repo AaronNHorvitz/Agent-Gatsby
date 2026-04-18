@@ -86,8 +86,18 @@ class OutlineSection(BaseModel):
 
     section_id: str
     heading: str
-    purpose: str
+    purpose: str | None = None
     evidence_ids: list[str] = Field(default_factory=list)
+
+
+class OutlinePlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    thesis: str
+    intro_notes: str
+    sections: list[OutlineSection] = Field(default_factory=list)
+    conclusion_notes: str
 
 
 class VerificationIssue(BaseModel):

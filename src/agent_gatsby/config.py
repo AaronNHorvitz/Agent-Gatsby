@@ -158,6 +158,10 @@ class AppConfig(BaseModel):
     def rejected_candidates_path(self) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("evidence_ledger", "rejected_output_path"))
 
+    @property
+    def outline_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("outline", "output_path"))
+
     def resolve_prompt_path(self, prompt_key: str) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("prompts", prompt_key))
 

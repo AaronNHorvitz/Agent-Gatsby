@@ -10,6 +10,7 @@ def write_test_repo(repo_root: Path) -> Path:
     (repo_root / "config/prompts").mkdir(parents=True)
     (repo_root / "data/source").mkdir(parents=True)
     (repo_root / "config/prompts/extractor.md").write_text("Output JSON only.\n", encoding="utf-8")
+    (repo_root / "config/prompts/outline.md").write_text("Output JSON only.\n", encoding="utf-8")
 
     source_text = (
         "\ufeffThe Project Gutenberg eBook of The Great Gatsby\n\n"
@@ -69,6 +70,7 @@ llm_defaults:
   max_tokens: 512
 prompts:
   extractor_prompt_path: "config/prompts/extractor.md"
+  outline_prompt_path: "config/prompts/outline.md"
 indexing:
   output_path: "artifacts/manifests/passage_index.json"
   chapter_pattern: "^Chapter\\\\s+[IVXLC0-9]+$"
@@ -86,6 +88,14 @@ evidence_ledger:
   reject_empty_rationales: true
   minimum_quote_length: 8
   status_for_verified_entries: "verified"
+outline:
+  output_path: "artifacts/drafts/outline.json"
+  minimum_section_count: 1
+  maximum_section_count: 4
+  require_intro: true
+  require_conclusion: true
+  require_thesis: true
+  require_evidence_ids_per_section: true
 orchestration:
   supported_stages:
     - "ingest"
@@ -93,6 +103,7 @@ orchestration:
     - "index"
     - "extract_metaphors"
     - "build_evidence_ledger"
+    - "plan_outline"
 """
     config_path = repo_root / "config/config.yaml"
     config_path.write_text(config_text.strip() + "\n", encoding="utf-8")
@@ -104,6 +115,23 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     config_path = write_test_repo(repo_root)
 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
+        stage_name = kwargs.get("stage_name")
+        if stage_name == "plan_outline":
+            return json.dumps(
+                {
+                    "title": "Metaphor and Desire in Gatsby",
+                    "thesis": "Fitzgerald turns desire into distance through recurring metaphor.",
+                    "intro_notes": "Frame metaphor as a structural device.",
+                    "sections": [
+                        {
+                            "section_id": "S1",
+                            "heading": "The Green Light",
+                            "evidence_ids": ["E001"],
+                        }
+                    ],
+                    "conclusion_notes": "Return to the collapse of idealized longing.",
+                }
+            )
         return json.dumps(
             [
                 {
@@ -118,6 +146,7 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
         )
 
     monkeypatch.setattr("agent_gatsby.extract_metaphors.invoke_text_completion", fake_invoke_text_completion)
+    monkeypatch.setattr("agent_gatsby.plan_outline.invoke_text_completion", fake_invoke_text_completion)
     exit_code = main(["--config", str(config_path), "--run", "all"])
 
     assert exit_code == 0
@@ -126,10 +155,11 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     assert (repo_root / "artifacts/manifests/passage_index.json").exists()
     assert (repo_root / "artifacts/evidence/metaphor_candidates.json").exists()
     assert (repo_root / "artifacts/evidence/evidence_ledger.json").exists()
+    assert (repo_root / "artifacts/drafts/outline.json").exists()
 
     log_text = (repo_root / "artifacts/logs/pipeline.log").read_text(encoding="utf-8")
     assert "Starting stage: ingest" in log_text
-    assert "Finished stage: build_evidence_ledger" in log_text
+    assert "Finished stage: plan_outline" in log_text
 
 
 def test_orchestrator_single_stage_run_builds_upstream_artifacts(tmp_path) -> None:
