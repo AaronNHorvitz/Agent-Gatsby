@@ -118,6 +118,14 @@ class AppConfig(BaseModel):
             return path
         return (self.repo_root_path / path).resolve()
 
+    def require_mapping_value(self, section_name: str, key: str) -> Any:
+        section = getattr(self, section_name)
+        if not isinstance(section, dict):
+            raise ValueError(f"Config section '{section_name}' is not a mapping")
+        if key not in section or section[key] in (None, ""):
+            raise ValueError(f"Missing required config value: {section_name}.{key}")
+        return section[key]
+
     @property
     def source_file_path(self) -> Path:
         return self.resolve_repo_path(self.source.file_path)
@@ -133,6 +141,28 @@ class AppConfig(BaseModel):
     @property
     def passage_index_path(self) -> Path:
         return self.resolve_repo_path(self.indexing.output_path)
+
+    @property
+    def metaphor_candidates_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("extraction", "output_path"))
+
+    @property
+    def extraction_raw_debug_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("extraction", "raw_debug_output_path"))
+
+    @property
+    def evidence_ledger_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("evidence_ledger", "output_path"))
+
+    @property
+    def rejected_candidates_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("evidence_ledger", "rejected_output_path"))
+
+    def resolve_prompt_path(self, prompt_key: str) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("prompts", prompt_key))
+
+    def model_name_for(self, model_key: str) -> str:
+        return str(self.require_mapping_value("models", model_key))
 
 
 def load_config(config_path: str | Path = "config/config.yaml") -> AppConfig:

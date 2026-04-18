@@ -60,8 +60,8 @@ This is the version you must finish first before adding anything fancy.
 - [x] 2.1.3 `src/agent_gatsby/data_ingest.py`
 - [x] 2.1.4 `src/agent_gatsby/normalize.py`
 - [x] 2.1.5 `src/agent_gatsby/index_text.py`
-- [ ] 2.1.6 `src/agent_gatsby/extract_metaphors.py`
-- [ ] 2.1.7 `src/agent_gatsby/build_evidence_ledger.py`
+- [x] 2.1.6 `src/agent_gatsby/extract_metaphors.py`
+- [x] 2.1.7 `src/agent_gatsby/build_evidence_ledger.py`
 - [ ] 2.1.8 `src/agent_gatsby/plan_outline.py`
 - [ ] 2.1.9 `src/agent_gatsby/draft_english.py`
 - [ ] 2.1.10 `src/agent_gatsby/verify_citations.py`
@@ -230,11 +230,11 @@ Do not move on until all are true:
 Create clear structures.
 - [x] 5.1.1 Define `SourceManifest`
 - [x] 5.1.2 Define `PassageRecord`
-- [ ] 5.1.3 Define `MetaphorCandidate`
-- [ ] 5.1.4 Define `EvidenceRecord`
-- [ ] 5.1.5 Define `OutlineSection`
-- [ ] 5.1.6 Define `VerificationReport`
-- [ ] 5.1.7 Define `FinalManifest`
+- [x] 5.1.3 Define `MetaphorCandidate`
+- [x] 5.1.4 Define `EvidenceRecord`
+- [x] 5.1.5 Define `OutlineSection`
+- [x] 5.1.6 Define `VerificationReport`
+- [x] 5.1.7 Define `FinalManifest`
 - [x] 5.1.8 Decide whether to use dataclasses or Pydantic
 - [x] 5.1.9 Keep schemas simple and serializable
 
@@ -263,78 +263,78 @@ Create clear structures.
   - [x] 5.3.1.5 verify chapter numbers are valid integers
 
 ## 5.4 Build local LLM client helper
-- [ ] 5.4.1 Create a helper function for chat completion calls
-- [ ] 5.4.2 Put it in `utils/` or dedicated `llm_client.py`
-- [ ] 5.4.3 Read model name from config
-- [ ] 5.4.4 Read endpoint from config
-- [ ] 5.4.5 Add timeout handling
-- [ ] 5.4.6 Add retry handling for malformed output
-- [ ] 5.4.7 Log each call with stage name
-- [ ] 5.4.8 Log output path for each call
+- [x] 5.4.1 Create a helper function for chat completion calls
+- [x] 5.4.2 Put it in `utils/` or dedicated `llm_client.py`
+- [x] 5.4.3 Read model name from config
+- [x] 5.4.4 Read endpoint from config
+- [x] 5.4.5 Add timeout handling
+- [x] 5.4.6 Add retry handling for malformed output
+- [x] 5.4.7 Log each call with stage name
+- [x] 5.4.8 Log output path for each call
 - [ ] 5.4.9 Confirm one successful round-trip call
 
 ## 5.5 Write extraction prompt
-- [ ] 5.5.1 Create prompt file or prompt string for metaphor extraction
-- [ ] 5.5.2 Force JSON output only
-- [ ] 5.5.3 Ask for candidate metaphor/image/symbol entries
-- [ ] 5.5.4 Require `candidate_id`
-- [ ] 5.5.5 Require `label`
-- [ ] 5.5.6 Require `passage_id`
-- [ ] 5.5.7 Require exact quote substring
-- [ ] 5.5.8 Require short rationale
-- [ ] 5.5.9 Require confidence score
-- [ ] 5.5.10 Require no essay prose
+- [x] 5.5.1 Create prompt file or prompt string for metaphor extraction
+- [x] 5.5.2 Force JSON output only
+- [x] 5.5.3 Ask for candidate metaphor/image/symbol entries
+- [x] 5.5.4 Require `candidate_id`
+- [x] 5.5.5 Require `label`
+- [x] 5.5.6 Require `passage_id`
+- [x] 5.5.7 Require exact quote substring
+- [x] 5.5.8 Require short rationale
+- [x] 5.5.9 Require confidence score
+- [x] 5.5.10 Require no essay prose
 
 ## 5.6 Build `extract_metaphors.py`
-- [ ] 5.6.1 Load passage index
-- [ ] 5.6.2 Decide how many passages to send per call
-- [ ] 5.6.3 If using full context, still keep outputs structured
-- [ ] 5.6.4 Call LLM
-- [ ] 5.6.5 Parse JSON response
-- [ ] 5.6.6 Validate each candidate has required fields
-- [ ] 5.6.7 Save to `artifacts/evidence/metaphor_candidates.json`
-- [ ] 5.6.8 Log candidate count
+- [x] 5.6.1 Load passage index
+- [x] 5.6.2 Decide how many passages to send per call
+- [x] 5.6.3 If using full context, still keep outputs structured
+- [x] 5.6.4 Call LLM
+- [x] 5.6.5 Parse JSON response
+- [x] 5.6.6 Validate each candidate has required fields
+- [x] 5.6.7 Save to `artifacts/evidence/metaphor_candidates.json`
+- [x] 5.6.8 Log candidate count
 - [ ] 5.6.9 Manually inspect output for obvious garbage
 
 ## 5.7 Add extraction fallback logic
-- [ ] 5.7.1 If JSON parse fails, save raw response to a debug file
-- [ ] 5.7.2 Retry once with stricter JSON instruction
-- [ ] 5.7.3 If still failing, stop and inspect
-- [ ] 5.7.4 Do not silently continue with bad data
+- [x] 5.7.1 If JSON parse fails, save raw response to a debug file
+- [x] 5.7.2 Retry once with stricter JSON instruction
+- [x] 5.7.3 If still failing, stop and inspect
+- [x] 5.7.4 Do not silently continue with bad data
 
 ## 5.8 Create tests for extraction output shape
-- [ ] 5.8.1 `test_metaphor_candidates.py`
-  - [ ] 5.8.1.1 verify output file exists
-  - [ ] 5.8.1.2 verify candidates are a list
-  - [ ] 5.8.1.3 verify each candidate has passage_id
-  - [ ] 5.8.1.4 verify each candidate has quote
-  - [ ] 5.8.1.5 verify confidence is numeric or convertible
+- [x] 5.8.1 `test_metaphor_candidates.py`
+  - [x] 5.8.1.1 verify output file exists
+  - [x] 5.8.1.2 verify candidates are a list
+  - [x] 5.8.1.3 verify each candidate has passage_id
+  - [x] 5.8.1.4 verify each candidate has quote
+  - [x] 5.8.1.5 verify confidence is numeric or convertible
 
 ## 5.9 Build `build_evidence_ledger.py`
 This is critical.
-- [ ] 5.9.1 Load candidate file
-- [ ] 5.9.2 Load passage index
+- [x] 5.9.1 Load candidate file
+- [x] 5.9.2 Load passage index
 - [ ] 5.9.3 For each candidate:
-  - [ ] 5.9.3.1 confirm passage_id exists
-  - [ ] 5.9.3.2 confirm quote string exists exactly inside passage text
-  - [ ] 5.9.3.3 reject candidate if quote does not match
-  - [ ] 5.9.3.4 reject candidate if rationale is too vague
-  - [ ] 5.9.3.5 normalize label text
-- [ ] 5.9.4 Promote good candidates into evidence entries
-- [ ] 5.9.5 Add `status = verified`
-- [ ] 5.9.6 Save to `artifacts/evidence/evidence_ledger.json`
-- [ ] 5.9.7 Save rejected candidates to `artifacts/evidence/rejected_candidates.json`
-- [ ] 5.9.8 Log promoted count
-- [ ] 5.9.9 Log rejected count
+  - [x] 5.9.3.1 confirm passage_id exists
+  - [x] 5.9.3.2 confirm quote string exists exactly inside passage text
+  - [x] 5.9.3.3 reject candidate if quote does not match
+  - [x] 5.9.3.4 reject candidate if rationale is too vague
+  - [x] 5.9.3.5 normalize label text
+- [x] 5.9.4 Promote good candidates into evidence entries
+- [x] 5.9.5 Add `status = verified`
+- [x] 5.9.6 Save to `artifacts/evidence/evidence_ledger.json`
+- [x] 5.9.7 Save rejected candidates to `artifacts/evidence/rejected_candidates.json`
+- [x] 5.9.8 Log promoted count
+- [x] 5.9.9 Log rejected count
 - [ ] 5.9.10 Allow a tiny explicit manual override path only if extraction misses essential evidence
 - [ ] 5.9.11 Log any manual overrides clearly in the ledger or run artifacts
 
 ## 5.10 Create tests for the evidence ledger
-- [ ] 5.10.1 `test_evidence_ledger.py`
-  - [ ] 5.10.1.1 verify each evidence record points to valid passage_id
-  - [ ] 5.10.1.2 verify quote exists exactly in passage text
-  - [ ] 5.10.1.3 verify status is `verified`
-  - [ ] 5.10.1.4 verify rejected file is created if rejections exist
+- [x] 5.10.1 `test_evidence_ledger.py`
+  - [x] 5.10.1.1 verify each evidence record points to valid passage_id
+  - [x] 5.10.1.2 verify quote exists exactly in passage text
+  - [x] 5.10.1.3 verify status is `verified`
+  - [x] 5.10.1.4 verify rejected file is created if rejections exist
 
 ## 5.11 Build `plan_outline.py`
 - [ ] 5.11.1 Load evidence ledger
@@ -676,21 +676,21 @@ Do not stop until all are true:
 - [x] 8.4.5 write passage index
 
 ## 8.5 `src/agent_gatsby/extract_metaphors.py`
-- [ ] 8.5.1 load index
-- [ ] 8.5.2 build prompt
-- [ ] 8.5.3 call model
-- [ ] 8.5.4 parse JSON
-- [ ] 8.5.5 validate fields
-- [ ] 8.5.6 save candidate file
-- [ ] 8.5.7 save raw response on failure
+- [x] 8.5.1 load index
+- [x] 8.5.2 build prompt
+- [x] 8.5.3 call model
+- [x] 8.5.4 parse JSON
+- [x] 8.5.5 validate fields
+- [x] 8.5.6 save candidate file
+- [x] 8.5.7 save raw response on failure
 
 ## 8.6 `src/agent_gatsby/build_evidence_ledger.py`
-- [ ] 8.6.1 load candidates
-- [ ] 8.6.2 exact-match quotes
-- [ ] 8.6.3 validate locators
-- [ ] 8.6.4 promote valid entries
-- [ ] 8.6.5 save verified ledger
-- [ ] 8.6.6 save rejected list
+- [x] 8.6.1 load candidates
+- [x] 8.6.2 exact-match quotes
+- [x] 8.6.3 validate locators
+- [x] 8.6.4 promote valid entries
+- [x] 8.6.5 save verified ledger
+- [x] 8.6.6 save rejected list
 
 ## 8.7 `src/agent_gatsby/plan_outline.py`
 - [ ] 8.7.1 load ledger

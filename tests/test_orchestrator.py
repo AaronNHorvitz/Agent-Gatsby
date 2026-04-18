@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from agent_gatsby.orchestrator import main
 
 
 def write_test_repo(repo_root: Path) -> Path:
-    (repo_root / "config").mkdir(parents=True)
+    (repo_root / "config/prompts").mkdir(parents=True)
     (repo_root / "data/source").mkdir(parents=True)
+    (repo_root / "config/prompts/extractor.md").write_text("Output JSON only.\n", encoding="utf-8")
 
     source_text = (
         "\ufeffThe Project Gutenberg eBook of The Great Gatsby\n\n"
@@ -54,37 +56,80 @@ logging:
   file_path: "artifacts/logs/pipeline.log"
   include_timestamps: false
   include_stage_names: true
+models:
+  endpoint: "http://localhost:11434/v1"
+  api_key: "ollama"
+  primary_reasoner: "gemma4:26b"
+  timeout_seconds: 1
+  max_retries: 0
+  retry_backoff_seconds: 0
+llm_defaults:
+  temperature: 0.2
+  top_p: 0.9
+  max_tokens: 512
+prompts:
+  extractor_prompt_path: "config/prompts/extractor.md"
 indexing:
   output_path: "artifacts/manifests/passage_index.json"
   chapter_pattern: "^Chapter\\\\s+[IVXLC0-9]+$"
   paragraph_split_strategy: "blank_line"
   remove_empty_paragraphs: true
   passage_id_format: "{chapter}.{paragraph}"
+extraction:
+  output_path: "artifacts/evidence/metaphor_candidates.json"
+  raw_debug_output_path: "artifacts/evidence/metaphor_candidates_raw.txt"
+evidence_ledger:
+  output_path: "artifacts/evidence/evidence_ledger.json"
+  rejected_output_path: "artifacts/evidence/rejected_candidates.json"
+  require_exact_quote_match: true
+  reject_missing_passage_ids: true
+  reject_empty_rationales: true
+  minimum_quote_length: 8
+  status_for_verified_entries: "verified"
 orchestration:
   supported_stages:
     - "ingest"
     - "normalize"
     - "index"
+    - "extract_metaphors"
+    - "build_evidence_ledger"
 """
     config_path = repo_root / "config/config.yaml"
     config_path.write_text(config_text.strip() + "\n", encoding="utf-8")
     return config_path
 
 
-def test_orchestrator_runs_all_stages_and_writes_artifacts(tmp_path) -> None:
+def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config_path = write_test_repo(repo_root)
 
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        return json.dumps(
+            [
+                {
+                    "candidate_id": "C999",
+                    "label": "green light",
+                    "passage_id": "1.1",
+                    "quote": "green light",
+                    "rationale": "A recurring image that turns Gatsby's longing into a visible object of desire.",
+                    "confidence": 0.94,
+                }
+            ]
+        )
+
+    monkeypatch.setattr("agent_gatsby.extract_metaphors.invoke_text_completion", fake_invoke_text_completion)
     exit_code = main(["--config", str(config_path), "--run", "all"])
 
     assert exit_code == 0
     assert (repo_root / "artifacts/manifests/source_manifest.json").exists()
     assert (repo_root / "data/normalized/gatsby_locked.txt").exists()
     assert (repo_root / "artifacts/manifests/passage_index.json").exists()
+    assert (repo_root / "artifacts/evidence/metaphor_candidates.json").exists()
+    assert (repo_root / "artifacts/evidence/evidence_ledger.json").exists()
 
     log_text = (repo_root / "artifacts/logs/pipeline.log").read_text(encoding="utf-8")
     assert "Starting stage: ingest" in log_text
-    assert "Finished stage: index" in log_text
+    assert "Finished stage: build_evidence_ledger" in log_text
 
 
 def test_orchestrator_single_stage_run_builds_upstream_artifacts(tmp_path) -> None:

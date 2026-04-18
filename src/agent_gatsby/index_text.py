@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from pathlib import Path
 
 from agent_gatsby.config import AppConfig
 from agent_gatsby.data_ingest import utc_now_iso
@@ -122,6 +123,16 @@ def write_passage_index(config: AppConfig, passage_index: PassageIndex) -> None:
     LOGGER.info("Wrote passage index to %s", output_path)
 
 
+def load_passage_index(source: AppConfig | str | Path) -> PassageIndex:
+    if isinstance(source, AppConfig):
+        path = source.passage_index_path
+    else:
+        path = Path(source)
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return PassageIndex.model_validate(data)
+
+
 def index_normalized_text(config: AppConfig, normalized_text: str) -> PassageIndex:
     passage_index = build_passage_index(
         normalized_text,
@@ -133,4 +144,3 @@ def index_normalized_text(config: AppConfig, normalized_text: str) -> PassageInd
     )
     write_passage_index(config, passage_index)
     return passage_index
-
