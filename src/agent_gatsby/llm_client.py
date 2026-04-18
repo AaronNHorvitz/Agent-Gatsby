@@ -46,6 +46,27 @@ def extract_message_text(response: Any) -> str:
     return str(content or "")
 
 
+def extract_reasoning_text(response: Any) -> str:
+    reasoning = getattr(response.choices[0].message, "reasoning", None)
+    if isinstance(reasoning, str):
+        return reasoning
+    if isinstance(reasoning, list):
+        chunks: list[str] = []
+        for item in reasoning:
+            if isinstance(item, dict) and "text" in item:
+                chunks.append(str(item["text"]))
+            elif hasattr(item, "text"):
+                chunks.append(str(item.text))
+        return "".join(chunks)
+    return str(reasoning or "")
+
+
+def describe_response(response: Any) -> str:
+    finish_reason = getattr(response.choices[0], "finish_reason", None) or "unknown"
+    reasoning_text = extract_reasoning_text(response)
+    return f"finish_reason={finish_reason}, reasoning_len={len(reasoning_text)}"
+
+
 def invoke_text_completion(
     config: AppConfig,
     *,
@@ -85,7 +106,10 @@ def invoke_text_completion(
             )
             response_text = extract_message_text(response).strip()
             if not response_text:
-                raise LLMResponseValidationError("Model returned empty content", response_text)
+                raise LLMResponseValidationError(
+                    f"Model returned empty content ({describe_response(response)})",
+                    response_text,
+                )
 
             if response_validator is not None:
                 try:

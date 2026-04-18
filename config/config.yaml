@@ -102,6 +102,7 @@ outline:
   output_path: "artifacts/drafts/outline.json"
   minimum_section_count: 4
   maximum_section_count: 7
+  fixed_title: "An Analysis of Metaphors in The Great Gatsby"
   require_intro: true
   require_conclusion: true
   require_thesis: true

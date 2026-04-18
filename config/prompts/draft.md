@@ -14,7 +14,8 @@ Your task:
 - explain why the metaphor makes sense in the surrounding paragraphs
 - preserve citation markers exactly as provided
 - use bracketed chapter.paragraph citations such as `[5.18]`
-- maintain a formal academic tone
+- write in clear, readable, lightly stylish English
+- prefer direct sentences over dense academic phrasing
 
 Rules:
 - Do not invent quotations.
@@ -24,6 +25,8 @@ Rules:
 - Do not claim later story developments unless the provided evidence supports that connection.
 - Do not use page-number citations.
 - Do not write conversational filler.
+- Do not imitate a celebrity or critic's recognizable voice.
+- Do not use comedy, sarcasm, or jokey asides.
 - Do not write the full essay if only one section is requested.
 
 Output plain markdown prose for the requested section only.

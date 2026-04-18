@@ -53,9 +53,14 @@ llm_defaults:
     return config_path
 
 
-def fake_response(content):
+def fake_response(content, *, reasoning=None, finish_reason="stop"):
     return SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content=content, reasoning=reasoning),
+                finish_reason=finish_reason,
+            )
+        ]
     )
 
 
@@ -125,4 +130,27 @@ def test_invoke_text_completion_raises_when_validator_rejects_all_attempts(monke
             system_prompt="system",
             user_prompt="user",
             response_validator=lambda text: (_ for _ in ()).throw(ValueError("not acceptable")),
+        )
+
+
+def test_invoke_text_completion_reports_reasoning_diagnostics_for_empty_content(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_llm_config(repo_root))
+    fake_client = FakeClient(
+        [
+            fake_response("", reasoning="internal draft planning", finish_reason="length"),
+            fake_response("", reasoning="internal draft planning", finish_reason="length"),
+        ]
+    )
+
+    monkeypatch.setattr("agent_gatsby.llm_client.build_client", lambda config: fake_client)
+    monkeypatch.setattr("agent_gatsby.llm_client.time.sleep", lambda seconds: None)
+
+    with pytest.raises(ValueError, match=r"finish_reason=length, reasoning_len=23"):
+        invoke_text_completion(
+            config,
+            stage_name="draft_english",
+            system_prompt="system",
+            user_prompt="user",
+            response_validator=lambda text: None,
         )

@@ -208,13 +208,12 @@ def test_critique_and_edit_writes_final_file_and_preserves_integrity(monkeypatch
 
     final_path = repo_root / "artifacts/drafts/analysis_english_final.md"
     assert final_path.exists()
-    assert '"green light"' in final_text
-    assert '"valley of ashes"' in final_text
-    assert "[#1, Chapter 1, Paragraph 1]" in final_text
-    assert "[#2, Chapter 2, Paragraph 1]" in final_text
+    assert '*"green light"*' in final_text
+    assert '*"valley of ashes"*' in final_text
+    assert "<a href='#citation-1'><u>[#1, Chapter 1, Paragraph 1]</u></a>" in final_text
+    assert "<a href='#citation-2'><u>[#2, Chapter 2, Paragraph 1]</u></a>" in final_text
     assert "## Citations" in final_text
-    assert "Canonical locator: [1.1]" in final_text
-    assert "Canonical locator: [2.1]" in final_text
+    assert "Canonical locator:" not in final_text
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
     assert (repo_root / "artifacts/qa/citation_registry.json").exists()
 
@@ -271,6 +270,6 @@ def test_critique_and_edit_falls_back_to_verified_draft_when_editor_returns_empt
     monkeypatch.setattr("agent_gatsby.critique_and_edit.invoke_text_completion", fake_invoke_text_completion)
 
     final_text = critique_and_edit(config)
-    assert 'Gatsby\'s "green light" turns longing into a visible object of desire [#1, Chapter 1, Paragraph 1].' in final_text
+    assert "Gatsby's *\"green light\"* turns longing into a visible object of desire <a href='#citation-1'><u>[#1, Chapter 1, Paragraph 1]</u></a>." in final_text
     assert "## Citations" in final_text
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8").strip() == final_text.strip()

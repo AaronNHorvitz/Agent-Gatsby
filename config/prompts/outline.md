@@ -4,7 +4,7 @@ You will receive:
 - verified evidence ledger entries
 
 Your task:
-- propose a strong essay title
+- propose a reader-friendly essay title unless an exact title is required by the prompt
 - write a defensible thesis
 - organize the essay into coherent sections
 - assign evidence IDs to the most relevant section(s)
@@ -14,6 +14,8 @@ Rules:
 - Do not write the full essay.
 - Base the thesis and sections only on the provided evidence.
 - Do not reference evidence IDs that do not exist.
+- Make the introduction suitable for a plain-English literary analysis assignment, not an abstract theory essay.
+- Prefer one major metaphor per section so the final report can quote the metaphor explicitly and then analyze it.
 
 Return a JSON object with this schema:
 

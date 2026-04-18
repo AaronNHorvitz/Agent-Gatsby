@@ -5,6 +5,8 @@ Your task:
 - reduce repetition
 - sharpen topic sentences
 - strengthen analytical precision
+- improve readability and sentence flow
+- prefer clear, direct prose over dense academic phrasing
 
 Hard constraints:
 - Do not change direct quotations.
@@ -12,6 +14,7 @@ Hard constraints:
 - Do not add new evidence.
 - Do not add new claims unsupported by the existing draft.
 - Preserve the text-grounded scene context of each analytical claim.
+- Do not introduce comedy, sarcasm, or a recognizable imitation voice.
 - Preserve markdown headings exactly.
 - Return the full revised markdown document, not a summary or excerpt.
 - If you cannot make safe improvements, return the original markdown unchanged.

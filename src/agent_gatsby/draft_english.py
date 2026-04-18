@@ -12,7 +12,7 @@ from pathlib import Path
 from agent_gatsby.citation_registry import build_context_payload, extract_citation_passage_ids, extract_invalid_bracket_markers
 from agent_gatsby.config import AppConfig
 from agent_gatsby.index_text import PassageIndex, load_passage_index
-from agent_gatsby.llm_client import invoke_text_completion
+from agent_gatsby.llm_client import LLMResponseValidationError, invoke_text_completion
 from agent_gatsby.plan_outline import load_evidence_records, load_outline
 from agent_gatsby.schemas import EvidenceRecord, OutlinePlan, OutlineSection
 
@@ -118,6 +118,37 @@ def build_overall_word_target_guidance(config: AppConfig) -> str | None:
         )
 
     return "Overall essay target: " + "; ".join(word_target_bits) + "."
+
+
+def build_selection_scope_note(section_count: int) -> str:
+    return (
+        f"_This report analyzes {section_count} selected metaphors to fit an approximately ten-page assignment requirement. "
+        "The analysis could be expanded with additional metaphors if a longer study were desired._"
+    )
+
+
+def render_metaphor_focus_block(evidence_records: list[EvidenceRecord]) -> str:
+    if not evidence_records:
+        return ""
+
+    lines = ["Metaphor text:"]
+    for record in evidence_records:
+        lines.append(f'> "{record.quote}" [{record.passage_id}]')
+    return "\n".join(lines)
+
+
+def render_intro_retry_evidence_summary(evidence_records: list[EvidenceRecord]) -> str:
+    payload = [
+        {
+            "evidence_id": record.evidence_id,
+            "metaphor": record.metaphor,
+            "quote": record.quote,
+            "passage_id": record.passage_id,
+            "interpretation": record.interpretation,
+        }
+        for record in evidence_records
+    ]
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 def build_section_word_target_guidance(
@@ -237,6 +268,8 @@ def build_draft_user_prompt(
         "Ground the analysis in what the text is doing in the current scene, not in unsupported claims about author intent.",
         "Explain why the metaphor makes sense in the surrounding paragraphs and how it clarifies character, setting, or theme in that moment.",
         "Only connect a metaphor to later developments in the novel when that claim is supported by the provided evidence.",
+        "Use clear, readable English rather than dense academic jargon.",
+        "Treat the surrounding context as paraphrase-only background unless the exact words also appear in a provided quote field.",
         "If you use a direct quotation, keep it exact and preserve its locator exactly as given.",
         "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
         "Do not shorten, trim, or partially quote any provided quote string.",
@@ -251,8 +284,19 @@ def build_draft_user_prompt(
     )
     if section_word_target:
         instructions.append(section_word_target)
+    if section_type == "introduction":
+        instructions.append(
+            "Briefly explain what happens in the story, how the text uses metaphor as a literary device, "
+            "and why this selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable."
+        )
+        instructions.append("Prefer paraphrase over direct quotation in the introduction.")
+    if section_type == "conclusion":
+        instructions.append("Keep the conclusion short, direct, and easy to read.")
     if section_type == "body":
         instructions.append("Use at least one bracketed chapter.paragraph citation from the provided evidence.")
+        instructions.append(
+            "Assume the exact metaphor text will be shown immediately before your analysis, so do not waste the opening sentence restating it."
+        )
     instructions.append(
         "The only allowed locator markers for this section are: "
         + ", ".join(f"[{record.passage_id}]" for record in evidence_records)
@@ -262,6 +306,43 @@ def build_draft_user_prompt(
         passage_index=passage_index,
         context_before=int(config.drafting.get("context_window_paragraphs_before", 1)),
         context_after=int(config.drafting.get("context_window_paragraphs_after", 1)),
+    )
+
+
+def build_intro_retry_user_prompt(
+    config: AppConfig,
+    outline: OutlinePlan,
+    *,
+    heading: str,
+    section_notes: str,
+    evidence_records: list[EvidenceRecord],
+) -> str:
+    instructions = [
+        "Compact retry mode: introductory summary only.",
+        f"Essay title: {outline.title}",
+        f"Thesis: {outline.thesis}",
+        f"Section heading: {heading}",
+        f"Section notes: {section_notes.strip()}",
+        "Write markdown prose only for this section body.",
+        "Write 3 short paragraphs in clear, readable English.",
+        "Do not repeat the section heading.",
+        "Do not include notes, self-critique, drafting commentary, or word-count checks.",
+        "Use only the evidence summary provided below.",
+        "Do not use any direct quotations or quotation marks in this introduction; paraphrase the evidence instead.",
+        "Briefly explain what happens in the story, how the text uses metaphor as a literary device, and why this selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable.",
+    ]
+    overall_word_target = build_overall_word_target_guidance(config)
+    if overall_word_target:
+        instructions.append(overall_word_target)
+    section_word_target = build_section_word_target_guidance(
+        config,
+        outline=outline,
+        section_type="introduction",
+    )
+    if section_word_target:
+        instructions.append(section_word_target)
+    return "\n".join(instructions) + "\n\nEvidence summary:\n" + render_intro_retry_evidence_summary(
+        evidence_records
     )
 
 
@@ -295,26 +376,53 @@ def draft_section(
     output_path: str,
     require_citation: bool,
 ) -> str:
-    response_text = invoke_text_completion(
-        config,
-        stage_name="draft_english",
-        system_prompt=load_draft_prompt(config),
-        user_prompt=build_draft_user_prompt(
-            config,
-            outline,
-            section_type=section_type,
-            heading=heading,
-            section_notes=section_notes,
-            evidence_records=evidence_records,
-            passage_index=passage_index,
-        ),
-        output_path=output_path,
-        response_validator=build_section_response_validator(
-            evidence_records,
-            require_citation=require_citation,
-        ),
+    response_validator = build_section_response_validator(
+        evidence_records,
+        require_citation=require_citation,
     )
-    return validate_section_text(response_text, heading=heading, require_citation=require_citation)
+    try:
+        response_text = invoke_text_completion(
+            config,
+            stage_name="draft_english",
+            system_prompt=load_draft_prompt(config),
+            user_prompt=build_draft_user_prompt(
+                config,
+                outline,
+                section_type=section_type,
+                heading=heading,
+                section_notes=section_notes,
+                evidence_records=evidence_records,
+                passage_index=passage_index,
+            ),
+            output_path=output_path,
+            response_validator=response_validator,
+        )
+    except LLMResponseValidationError as exc:
+        if section_type != "introduction" or "Model returned empty content" not in str(exc):
+            raise
+        LOGGER.warning(
+            "Introduction draft returned empty content; retrying with compact intro prompt: %s",
+            exc,
+        )
+        response_text = invoke_text_completion(
+            config,
+            stage_name="draft_english",
+            system_prompt=load_draft_prompt(config),
+            user_prompt=build_intro_retry_user_prompt(
+                config,
+                outline,
+                heading=heading,
+                section_notes=section_notes,
+                evidence_records=evidence_records,
+            ),
+            output_path=output_path,
+            response_validator=response_validator,
+        )
+    section_text = validate_section_text(response_text, heading=heading, require_citation=require_citation)
+    if section_type == "body":
+        focus_block = render_metaphor_focus_block(evidence_records)
+        return f"{focus_block}\n\n{section_text}".strip()
+    return section_text
 
 
 def compose_full_draft(
@@ -326,6 +434,8 @@ def compose_full_draft(
 ) -> str:
     parts = [
         f"# {outline.title}",
+        "",
+        build_selection_scope_note(len(outline.sections)),
         "",
         "## Introduction",
         "",

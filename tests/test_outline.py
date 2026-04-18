@@ -98,6 +98,7 @@ outline:
   output_path: "artifacts/drafts/outline.json"
   minimum_section_count: 2
   maximum_section_count: 4
+  fixed_title: "An Analysis of Metaphors in The Great Gatsby"
   require_intro: true
   require_conclusion: true
   require_thesis: true
@@ -115,7 +116,7 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
     def fake_invoke_text_completion(*args, **kwargs) -> str:
         return json.dumps(
             {
-                "title": "Metaphor and the Shape of Desire",
+                "title": "Some Other Title",
                 "thesis": "Fitzgerald's metaphors turn longing, class decay, and idealization into visible structures.",
                 "intro_notes": "Introduce metaphor as an organizing device.",
                 "sections": [
@@ -139,10 +140,12 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
 
     outline_path = repo_root / "artifacts/drafts/outline.json"
     assert outline_path.exists()
+    assert outline.title == "An Analysis of Metaphors in The Great Gatsby"
     assert outline.thesis
     assert len(outline.sections) == 2
 
     saved_outline = json.loads(outline_path.read_text(encoding="utf-8"))
+    assert saved_outline["title"] == "An Analysis of Metaphors in The Great Gatsby"
     assert saved_outline["sections"]
     assert saved_outline["sections"][0]["evidence_ids"] == ["E001"]
     assert saved_outline["sections"][1]["evidence_ids"] == ["E002"]

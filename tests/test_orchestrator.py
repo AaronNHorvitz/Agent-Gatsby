@@ -217,7 +217,7 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").exists()
     final_text = (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8")
-    assert "[#1, Chapter 1, Paragraph 1]" in final_text
+    assert "<a href='#citation-1'><u>[#1, Chapter 1, Paragraph 1]</u></a>" in final_text
     assert "## Citations" in final_text
     assert (repo_root / "artifacts/qa/citation_registry.json").exists()
 

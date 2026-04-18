@@ -7,6 +7,7 @@ import pytest
 
 from agent_gatsby.config import load_config
 from agent_gatsby.draft_english import build_section_response_validator, draft_english
+from agent_gatsby.llm_client import LLMResponseValidationError
 from agent_gatsby.schemas import EvidenceRecord
 
 
@@ -235,15 +236,53 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert (repo_root / "artifacts/drafts/analysis_english_draft.md").exists()
     assert (repo_root / "artifacts/drafts/sections/S1.md").exists()
     assert (repo_root / "artifacts/drafts/sections/S2.md").exists()
+    assert "_This report analyzes 2 selected metaphors" in draft_text
     assert "## Introduction" in draft_text
     assert "## Desire at a Distance" in draft_text
     assert "## Material Decay and Social Vision" in draft_text
+    assert 'Metaphor text:\n> "green light" [1.2]' in draft_text
+    assert 'Metaphor text:\n> "valley of ashes" [2.2]' in draft_text
     assert "[1.2]" in draft_text
     assert "[2.2]" in draft_text
     assert prompt_checks["overall_target"] is True
     assert prompt_checks["section_target"] is True
     assert prompt_checks["context_payload"] is True
     assert prompt_checks["scene_guidance"] is True
+
+
+def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    call_log: list[str] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        call_log.append(user_prompt)
+        if "Compact retry mode: introductory summary only." in user_prompt:
+            return (
+                "The novel follows Nick Carraway as he watches Gatsby pursue an idealized vision of love and status. "
+                "Fitzgerald uses metaphor to make desire, decay, and distance easier to see.\n\n"
+                "These two selected metaphors were chosen to fit the assignment length while still showing how the novel turns longing and social damage into concrete images."
+            )
+        if "Section type: introduction" in user_prompt:
+            raise LLMResponseValidationError(
+                "Model returned empty content (finish_reason=length, reasoning_len=22)",
+                "",
+            )
+        if "Section heading: Desire at a Distance" in user_prompt:
+            return 'In this scene, Gatsby\'s "green light" turns longing into a visible object of desire [1.2].'
+        if "Section heading: Material Decay and Social Vision" in user_prompt:
+            return 'In this scene, the "valley of ashes" gives moral decay a physical landscape [2.2].'
+        return "The conclusion gathers the essay's claims into a final judgment."
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+
+    draft_text = draft_english(config)
+
+    assert "The novel follows Nick Carraway" in draft_text
+    assert any("Compact retry mode: introductory summary only." in prompt for prompt in call_log)
+    assert any("Do not use any direct quotations or quotation marks in this introduction" in prompt for prompt in call_log)
+    assert any("Section type: introduction" in prompt for prompt in call_log)
 
 
 def test_section_response_validator_rejects_paraphrase_quotes_and_bad_locators() -> None:

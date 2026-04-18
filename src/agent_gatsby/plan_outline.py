@@ -80,6 +80,7 @@ def load_outline(source: AppConfig | str | Path) -> OutlinePlan:
 def build_outline_user_prompt(config: AppConfig, evidence_records: list[EvidenceRecord]) -> str:
     minimum_sections = int(config.outline.get("minimum_section_count", 0))
     maximum_sections = int(config.outline.get("maximum_section_count", 0))
+    fixed_title = str(config.outline.get("fixed_title", "")).strip()
     evidence_payload = [record.model_dump(exclude_none=True) for record in evidence_records]
 
     instructions = [
@@ -87,7 +88,12 @@ def build_outline_user_prompt(config: AppConfig, evidence_records: list[Evidence
         "Return only a JSON object with the required schema.",
         "Use only evidence IDs that appear in the ledger.",
         "Do not invent evidence, quotations, or section support.",
+        "This outline should support a reader-friendly English report rather than an abstract technical artifact.",
+        "The introduction should briefly explain what happens in the story, how the text uses metaphor as a literary device, and why the selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable later.",
+        "Prefer one main metaphor per body section, with section headings that clearly name the metaphor or image being analyzed.",
     ]
+    if fixed_title:
+        instructions.append(f'Use this exact essay title: "{fixed_title}".')
     if minimum_sections:
         instructions.append(f"Use at least {minimum_sections} body sections.")
     if maximum_sections:
@@ -173,6 +179,9 @@ def plan_outline(
         response_validator=validate_outline_response,
     )
     outline = parse_outline_response(response_text)
+    fixed_title = str(config.outline.get("fixed_title", "")).strip()
+    if fixed_title:
+        outline = outline.model_copy(update={"title": fixed_title})
     validate_outline_against_evidence(outline, evidence_records=loaded_records, config=config)
     write_outline(config, outline)
     return outline

@@ -13,6 +13,10 @@ from agent_gatsby.schemas import CitationRegistryEntry, PassageIndex, PassageRec
 CANONICAL_CITATION_RE = re.compile(r"\[(\d+)\.(\d+)\]")
 DISPLAY_CITATION_RE = re.compile(r"\[#(\d+),\s*Chapter\s+(\d+),\s*Paragraph\s+(\d+)\]")
 ANY_BRACKET_RE = re.compile(r"\[([^\]]+)\]")
+LEGACY_CITATION_NOTE_RE = re.compile(r"(?m)^_?Citation note:[^\n]*_?\n?")
+BODY_SECTION_HEADING_RE = re.compile(r"(?m)^## (?!Citations$)")
+STRAIGHT_DOUBLE_QUOTE_RE = re.compile(r'(?<!\*)"([^"\n]+?)"(?!\*)')
+CURLY_DOUBLE_QUOTE_RE = re.compile(r"(?<!\*)“([^”\n]+?)”(?!\*)")
 
 
 def canonical_locator_from_passage(passage: PassageRecord) -> str:
@@ -34,6 +38,10 @@ def format_display_citation(*, display_format: str, citation_number: int, passag
         paragraph=passage.paragraph,
         passage_id=passage.passage_id,
     )
+
+
+def citation_anchor_id(citation_number: int) -> str:
+    return f"citation-{citation_number}"
 
 
 def is_valid_citation_marker(marker: str) -> bool:
@@ -182,13 +190,34 @@ def build_citation_registry(
 
 
 def render_text_with_display_citations(text: str, registry: list[CitationRegistryEntry]) -> str:
-    display_lookup = {entry.passage_id: entry.display_label for entry in registry}
+    display_lookup = {
+        entry.passage_id: (entry.display_label, citation_anchor_id(entry.citation_number))
+        for entry in registry
+    }
 
     def replace(match: re.Match[str]) -> str:
         passage_id = f"{int(match.group(1))}.{int(match.group(2))}"
-        return display_lookup.get(passage_id, match.group(0))
+        display_entry = display_lookup.get(passage_id)
+        if display_entry is None:
+            return match.group(0)
+        display_label, anchor = display_entry
+        return f"<a href='#{anchor}'><u>{display_label}</u></a>"
 
     return CANONICAL_CITATION_RE.sub(replace, text)
+
+
+def italicize_quoted_text(text: str) -> str:
+    italicized = STRAIGHT_DOUBLE_QUOTE_RE.sub(r'*"\1"*', text)
+    return CURLY_DOUBLE_QUOTE_RE.sub(r"*“\1”*", italicized)
+
+
+def strip_legacy_citation_note(text: str) -> str:
+    stripped = LEGACY_CITATION_NOTE_RE.sub("", text)
+    return re.sub(r"\n{3,}", "\n\n", stripped).strip()
+
+
+def shrink_body_headings(text: str) -> str:
+    return BODY_SECTION_HEADING_RE.sub("### ", text)
 
 
 def render_citations_appendix(
@@ -203,11 +232,9 @@ def render_citations_appendix(
     for entry in registry:
         parts.extend(
             [
-                f"### {entry.display_label}",
+                f"### <a id='{citation_anchor_id(entry.citation_number)}'></a>{entry.display_label}",
                 "",
-                f"Canonical locator: {entry.canonical_locator}",
-                "",
-                f"> {entry.exact_passage_text}",
+                italicize_quoted_text(f"> {entry.exact_passage_text}"),
                 "",
             ]
         )
@@ -220,7 +247,10 @@ def render_report_with_citation_appendix(
     *,
     appendix_heading: str,
 ) -> str:
-    rendered_body = render_text_with_display_citations(body_text.strip(), registry).strip()
+    rendered_body = strip_legacy_citation_note(body_text.strip())
+    rendered_body = render_text_with_display_citations(rendered_body, registry).strip()
+    rendered_body = italicize_quoted_text(rendered_body)
+    rendered_body = shrink_body_headings(rendered_body)
     appendix = render_citations_appendix(registry, heading=appendix_heading).strip()
     return rendered_body + "\n\n" + appendix + "\n"
 

@@ -73,7 +73,12 @@ def test_build_context_payload_collects_same_chapter_neighbors() -> None:
 
 
 def test_render_report_with_citation_appendix_uses_display_labels_and_exact_text() -> None:
-    body_text = '# Sample Essay\n\nThe "green light" matters here [1.2].\n'
+    body_text = (
+        "# Sample Essay\n\n"
+        "_Citation note: bracketed locators reference chapter.paragraph positions in the locked source text._\n\n"
+        "## Introduction\n\n"
+        'The "green light" matters here [1.2].\n'
+    )
     registry = build_citation_registry(
         body_text,
         sample_passage_index(),
@@ -82,7 +87,11 @@ def test_render_report_with_citation_appendix_uses_display_labels_and_exact_text
 
     rendered = render_report_with_citation_appendix(body_text, registry, appendix_heading="Citations")
 
-    assert "[#1, Chapter 1, Paragraph 2]" in rendered
+    assert "<a href='#citation-1'><u>[#1, Chapter 1, Paragraph 2]</u></a>" in rendered
     assert "## Citations" in rendered
-    assert "Canonical locator: [1.2]" in rendered
+    assert "Canonical locator:" not in rendered
+    assert "_Citation note:" not in rendered
+    assert "### Introduction" in rendered
+    assert '*"green light"*' in rendered
+    assert "### <a id='citation-1'></a>[#1, Chapter 1, Paragraph 2]" in rendered
     assert "Gatsby reached toward the green light at the end of the dock." in rendered

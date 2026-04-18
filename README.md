@@ -409,6 +409,9 @@ Section-bounded drafting produces better local coherence and makes debugging eas
 - unsupported thematic claims are disallowed
 - metaphor interpretation should explain what is happening in the scene and why the figurative language makes sense in the surrounding text
 - claims about later developments should be tied to supporting evidence rather than vague story memory
+- the English report should use a plain assignment-friendly title such as `An Analysis of Metaphors in The Great Gatsby`
+- the introduction should briefly explain the story, explain metaphor as a literary device, and state that the selected number of metaphors was chosen to fit the target page length while remaining expandable
+- each body section should present the metaphor text explicitly before the analysis
 
 ### Length targets
 - target roughly 2800-3200 words for the English essay
