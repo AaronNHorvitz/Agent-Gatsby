@@ -171,6 +171,10 @@ class AppConfig(BaseModel):
         return self.resolve_repo_path(self.require_mapping_value("drafting", "final_output_path"))
 
     @property
+    def english_master_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("drafting", "master_output_path"))
+
+    @property
     def section_drafts_dir_path(self) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("drafting", "section_drafts_dir"))
 
@@ -185,6 +189,38 @@ class AppConfig(BaseModel):
     @property
     def citation_text_output_path(self) -> Path:
         return self.resolve_repo_path(str(self.drafting.get("citation_text_output_path", "artifacts/final/citation_text.md")))
+
+    @property
+    def spanish_translation_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("translation_outputs", "spanish_output_path"))
+
+    @property
+    def mandarin_translation_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("translation_outputs", "mandarin_output_path"))
+
+    @property
+    def spanish_qa_report_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("translation_outputs", "spanish_qa_report_path"))
+
+    @property
+    def mandarin_qa_report_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("translation_outputs", "mandarin_qa_report_path"))
+
+    @property
+    def english_pdf_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("pdf", "english_pdf_path"))
+
+    @property
+    def spanish_pdf_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("pdf", "spanish_pdf_path"))
+
+    @property
+    def mandarin_pdf_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("pdf", "mandarin_pdf_path"))
+
+    @property
+    def final_manifest_output_path(self) -> Path:
+        return self.resolve_repo_path(self.require_mapping_value("manifest", "output_path"))
 
     def resolve_prompt_path(self, prompt_key: str) -> Path:
         return self.resolve_repo_path(self.require_mapping_value("prompts", prompt_key))

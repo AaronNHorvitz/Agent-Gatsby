@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import Any
 
 from agent_gatsby.build_evidence_ledger import build_evidence_ledger
+from agent_gatsby.bilingual_qa import qa_mandarin, qa_spanish
 from agent_gatsby.config import AppConfig, load_config
 from agent_gatsby.critique_and_edit import critique_and_edit
 from agent_gatsby.data_ingest import ingest_source
@@ -18,8 +19,13 @@ from agent_gatsby.draft_english import draft_english
 from agent_gatsby.extract_metaphors import extract_metaphor_candidates
 from agent_gatsby.index_text import index_normalized_text
 from agent_gatsby.logging_utils import configure_logging
+from agent_gatsby.manifest_writer import write_manifest
 from agent_gatsby.normalize import normalize_source
+from agent_gatsby.pdf_compiler import render_pdfs
 from agent_gatsby.plan_outline import plan_outline
+from agent_gatsby.translation_common import freeze_english_master
+from agent_gatsby.translate_mandarin import translate_mandarin
+from agent_gatsby.translate_spanish import translate_spanish
 from agent_gatsby.verify_citations import verify_english_draft
 
 LOGGER = logging.getLogger(__name__)
@@ -36,6 +42,13 @@ IMPLEMENTED_STAGE_ORDER = (
     "draft_english",
     "verify_english",
     "critique_english",
+    "freeze_english",
+    "translate_spanish",
+    "qa_spanish",
+    "translate_mandarin",
+    "qa_mandarin",
+    "render_pdfs",
+    "write_manifest",
 )
 
 
@@ -132,6 +145,80 @@ def stage_critique_english(config: AppConfig, context: StageContext) -> None:
     )
 
 
+def stage_freeze_english(config: AppConfig, context: StageContext) -> None:
+    if "english_final" not in context and not config.final_draft_output_path.exists():
+        stage_critique_english(config, context)
+    context["english_master"] = freeze_english_master(config)
+
+
+def stage_translate_spanish(config: AppConfig, context: StageContext) -> None:
+    if "english_master" not in context and not config.english_master_output_path.exists():
+        stage_freeze_english(config, context)
+
+    context["spanish_translation"] = translate_spanish(
+        config,
+        english_master_text=context.get("english_master"),
+    )
+
+
+def stage_qa_spanish(config: AppConfig, context: StageContext) -> None:
+    if "spanish_translation" not in context and not config.spanish_translation_output_path.exists():
+        stage_translate_spanish(config, context)
+    if "english_master" not in context and not config.english_master_output_path.exists():
+        stage_freeze_english(config, context)
+
+    context["spanish_qa_report"] = qa_spanish(
+        config,
+        english_master_text=context.get("english_master"),
+        translated_text=context.get("spanish_translation"),
+    )
+
+
+def stage_translate_mandarin(config: AppConfig, context: StageContext) -> None:
+    if "english_master" not in context and not config.english_master_output_path.exists():
+        stage_freeze_english(config, context)
+
+    context["mandarin_translation"] = translate_mandarin(
+        config,
+        english_master_text=context.get("english_master"),
+    )
+
+
+def stage_qa_mandarin(config: AppConfig, context: StageContext) -> None:
+    if "mandarin_translation" not in context and not config.mandarin_translation_output_path.exists():
+        stage_translate_mandarin(config, context)
+    if "english_master" not in context and not config.english_master_output_path.exists():
+        stage_freeze_english(config, context)
+
+    context["mandarin_qa_report"] = qa_mandarin(
+        config,
+        english_master_text=context.get("english_master"),
+        translated_text=context.get("mandarin_translation"),
+    )
+
+
+def stage_render_pdfs(config: AppConfig, context: StageContext) -> None:
+    if "english_master" not in context and not config.english_master_output_path.exists():
+        stage_freeze_english(config, context)
+    if "spanish_translation" not in context and not config.spanish_translation_output_path.exists():
+        stage_translate_spanish(config, context)
+    if "mandarin_translation" not in context and not config.mandarin_translation_output_path.exists():
+        stage_translate_mandarin(config, context)
+
+    context["pdf_outputs"] = render_pdfs(config)
+
+
+def stage_write_manifest(config: AppConfig, context: StageContext) -> None:
+    if "spanish_qa_report" not in context and not config.spanish_qa_report_path.exists():
+        stage_qa_spanish(config, context)
+    if "mandarin_qa_report" not in context and not config.mandarin_qa_report_path.exists():
+        stage_qa_mandarin(config, context)
+    if "pdf_outputs" not in context and not config.english_pdf_output_path.exists():
+        stage_render_pdfs(config, context)
+
+    context["final_manifest"] = write_manifest(config)
+
+
 def get_stage_registry() -> dict[str, StageHandler]:
     return {
         "ingest": stage_ingest,
@@ -143,6 +230,13 @@ def get_stage_registry() -> dict[str, StageHandler]:
         "draft_english": stage_draft_english,
         "verify_english": stage_verify_english,
         "critique_english": stage_critique_english,
+        "freeze_english": stage_freeze_english,
+        "translate_spanish": stage_translate_spanish,
+        "qa_spanish": stage_qa_spanish,
+        "translate_mandarin": stage_translate_mandarin,
+        "qa_mandarin": stage_qa_mandarin,
+        "render_pdfs": stage_render_pdfs,
+        "write_manifest": stage_write_manifest,
     }
 
 

@@ -13,6 +13,9 @@ def write_test_repo(repo_root: Path) -> Path:
     (repo_root / "config/prompts/outline.md").write_text("Output JSON only.\n", encoding="utf-8")
     (repo_root / "config/prompts/draft.md").write_text("Output markdown only.\n", encoding="utf-8")
     (repo_root / "config/prompts/critic.md").write_text("Output revised markdown only.\n", encoding="utf-8")
+    (repo_root / "config/prompts/translator_es.md").write_text("Output translated markdown only.\n", encoding="utf-8")
+    (repo_root / "config/prompts/translator_zh.md").write_text("Output translated markdown only.\n", encoding="utf-8")
+    (repo_root / "config/prompts/translation_qa.md").write_text("Output JSON only.\n", encoding="utf-8")
 
     source_text = (
         "\ufeffThe Project Gutenberg eBook of The Great Gatsby\n\n"
@@ -63,6 +66,8 @@ models:
   endpoint: "http://localhost:11434/v1"
   api_key: "ollama"
   primary_reasoner: "gemma4:26b"
+  translator_es: "gemma4:26b"
+  translator_zh: "gemma4:26b"
   timeout_seconds: 1
   max_retries: 0
   retry_backoff_seconds: 0
@@ -75,6 +80,9 @@ prompts:
   outline_prompt_path: "config/prompts/outline.md"
   draft_prompt_path: "config/prompts/draft.md"
   critic_prompt_path: "config/prompts/critic.md"
+  translator_es_prompt_path: "config/prompts/translator_es.md"
+  translator_zh_prompt_path: "config/prompts/translator_zh.md"
+  qa_prompt_path: "config/prompts/translation_qa.md"
 indexing:
   output_path: "artifacts/manifests/passage_index.json"
   chapter_pattern: "^Chapter\\\\s+[IVXLC0-9]+$"
@@ -125,6 +133,24 @@ verification:
   fail_on_invalid_citation: true
   normalize_curly_quotes_for_matching: true
   require_all_citations_to_resolve: true
+translation:
+  max_chunk_chars: 5000
+translation_outputs:
+  spanish_output_path: "artifacts/translations/analysis_spanish_draft.md"
+  mandarin_output_path: "artifacts/translations/analysis_mandarin_draft.md"
+  spanish_qa_report_path: "artifacts/qa/spanish_qa_report.json"
+  mandarin_qa_report_path: "artifacts/qa/mandarin_qa_report.json"
+pdf:
+  english_pdf_path: "outputs/Gatsby_Analysis_English.pdf"
+  spanish_pdf_path: "outputs/Gatsby_Analysis_Spanish.pdf"
+  mandarin_pdf_path: "outputs/Gatsby_Analysis_Mandarin.pdf"
+  english_font_regular: "NotoSerif-Regular.ttf"
+  english_font_bold: "NotoSerif-Bold.ttf"
+  spanish_font_regular: "NotoSerif-Regular.ttf"
+  spanish_font_bold: "NotoSerif-Bold.ttf"
+  mandarin_font_regular: "NotoSansCJK-VF.ttc"
+manifest:
+  output_path: "outputs/final_manifest.json"
 orchestration:
   supported_stages:
     - "ingest"
@@ -136,6 +162,13 @@ orchestration:
     - "draft_english"
     - "verify_english"
     - "critique_english"
+    - "freeze_english"
+    - "translate_spanish"
+    - "qa_spanish"
+    - "translate_mandarin"
+    - "qa_mandarin"
+    - "render_pdfs"
+    - "write_manifest"
 """
     config_path = repo_root / "config/config.yaml"
     config_path.write_text(config_text.strip() + "\n", encoding="utf-8")
@@ -189,6 +222,9 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
                     'The novel closes by showing how the "green light" remains a durable sign of desire even as it recedes [1.1].',
                 ]
             )
+        if stage_name in {"translate_spanish", "translate_mandarin"}:
+            user_prompt = kwargs.get("user_prompt", "")
+            return user_prompt.split("English markdown chunk:\n\n", maxsplit=1)[1]
         return json.dumps(
             [
                 {
@@ -206,6 +242,30 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     monkeypatch.setattr("agent_gatsby.plan_outline.invoke_text_completion", fake_invoke_text_completion)
     monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
     monkeypatch.setattr("agent_gatsby.critique_and_edit.invoke_text_completion", fake_invoke_text_completion)
+    monkeypatch.setattr("agent_gatsby.translation_common.invoke_text_completion", fake_invoke_text_completion)
+
+    def fake_render_pdfs(config):
+        for path in (
+            config.english_pdf_output_path,
+            config.spanish_pdf_output_path,
+            config.mandarin_pdf_output_path,
+        ):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("pdf\n", encoding="utf-8")
+        return [
+            config.english_pdf_output_path,
+            config.spanish_pdf_output_path,
+            config.mandarin_pdf_output_path,
+        ]
+
+    def fake_write_manifest(config):
+        payload = {"output_files": [str(config.english_pdf_output_path)]}
+        config.final_manifest_output_path.parent.mkdir(parents=True, exist_ok=True)
+        config.final_manifest_output_path.write_text(json.dumps(payload), encoding="utf-8")
+        return payload
+
+    monkeypatch.setattr("agent_gatsby.orchestrator.render_pdfs", fake_render_pdfs)
+    monkeypatch.setattr("agent_gatsby.orchestrator.write_manifest", fake_write_manifest)
     exit_code = main(["--config", str(config_path), "--run", "all"])
 
     assert exit_code == 0
@@ -219,16 +279,25 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     assert (repo_root / "artifacts/qa/english_draft_timing.json").exists()
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").exists()
+    assert (repo_root / "artifacts/final/analysis_english_master.md").exists()
     final_text = (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8")
     assert "[1]" in final_text
     assert "## Citations" in final_text
     assert '1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1' in final_text
     assert (repo_root / "artifacts/final/citation_text.md").exists()
     assert (repo_root / "artifacts/qa/citation_registry.json").exists()
+    assert (repo_root / "artifacts/translations/analysis_spanish_draft.md").exists()
+    assert (repo_root / "artifacts/translations/analysis_mandarin_draft.md").exists()
+    assert (repo_root / "artifacts/qa/spanish_qa_report.json").exists()
+    assert (repo_root / "artifacts/qa/mandarin_qa_report.json").exists()
+    assert (repo_root / "outputs/Gatsby_Analysis_English.pdf").exists()
+    assert (repo_root / "outputs/Gatsby_Analysis_Spanish.pdf").exists()
+    assert (repo_root / "outputs/Gatsby_Analysis_Mandarin.pdf").exists()
+    assert (repo_root / "outputs/final_manifest.json").exists()
 
     log_text = (repo_root / "artifacts/logs/pipeline.log").read_text(encoding="utf-8")
     assert "Starting stage: ingest" in log_text
-    assert "Finished stage: critique_english (" in log_text
+    assert "Finished stage: write_manifest (" in log_text
     assert "Total pipeline time:" in log_text
 
 
