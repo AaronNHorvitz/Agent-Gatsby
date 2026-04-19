@@ -15,6 +15,7 @@ LOGGER = logging.getLogger(__name__)
 BLOCK_SPLIT_RE = re.compile(r"\n\s*\n")
 HEADING_RE = re.compile(r"(?m)^(#{1,6})\s+.+$")
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
+TRANSLATION_CITATION_PLACEHOLDER_RE = re.compile(r"__AG_CIT_(\d+)__")
 STRAIGHT_QUOTE_SPAN_RE = re.compile(r'"[^"\n]+?"')
 CURLY_QUOTE_SPAN_RE = re.compile(r"“[^”\n]+?”")
 LOW_SINGLE_QUOTE_SPAN_RE = re.compile(r"‘[^’\n]+?’")
@@ -66,6 +67,32 @@ def extract_visible_citation_markers(text: str) -> list[str]:
     return [match.group(0) for match in VISIBLE_CITATION_RE.finditer(text)]
 
 
+def mask_visible_citation_markers(text: str) -> tuple[str, list[str]]:
+    original_markers: list[str] = []
+
+    def replace(match: re.Match[str]) -> str:
+        original_markers.append(match.group(0))
+        return f"__AG_CIT_{len(original_markers)}__"
+
+    return VISIBLE_CITATION_RE.sub(replace, text), original_markers
+
+
+def extract_translation_placeholders(text: str) -> list[str]:
+    return [match.group(0) for match in TRANSLATION_CITATION_PLACEHOLDER_RE.finditer(text)]
+
+
+def restore_visible_citation_markers(text: str, original_markers: list[str]) -> str:
+    expected_placeholders = [f"__AG_CIT_{index}__" for index in range(1, len(original_markers) + 1)]
+    observed_placeholders = extract_translation_placeholders(text)
+    if observed_placeholders != expected_placeholders:
+        raise ValueError("Translated chunk changed the citation placeholder inventory")
+
+    restored_text = text
+    for index, marker in enumerate(original_markers, start=1):
+        restored_text = restored_text.replace(f"__AG_CIT_{index}__", marker)
+    return restored_text
+
+
 def count_quote_spans(text: str) -> int:
     patterns = (
         STRAIGHT_QUOTE_SPAN_RE,
@@ -108,7 +135,7 @@ def build_translation_user_prompt(chunk_text: str, *, chunk_index: int, total_ch
         f"Chunk {chunk_index} of {total_chunks}.",
         f"Translate this markdown chunk into {language_name}.",
         "Preserve markdown heading markers exactly.",
-        "Preserve citation markers exactly.",
+        "Preserve placeholder tokens like __AG_CIT_1__ exactly and do not translate or alter them.",
         "Preserve quotation boundaries.",
         "Return translated markdown only.",
     ]
@@ -125,6 +152,18 @@ def validate_translation_chunk(source_chunk: str, translated_chunk: str) -> None
 
     if extract_visible_citation_markers(stripped) != extract_visible_citation_markers(source_chunk):
         raise ValueError("Translated chunk changed the citation marker inventory")
+
+
+def validate_placeholder_chunk(source_chunk: str, translated_chunk: str) -> None:
+    stripped = translated_chunk.strip()
+    if not stripped:
+        raise ValueError("Translated chunk is empty")
+
+    if extract_heading_levels(stripped) != extract_heading_levels(source_chunk):
+        raise ValueError("Translated chunk changed the markdown heading structure")
+
+    if extract_translation_placeholders(stripped) != extract_translation_placeholders(source_chunk):
+        raise ValueError("Translated chunk changed the citation placeholder inventory")
 
 
 def write_translation_output(output_path, text: str, *, language_name: str) -> None:
@@ -155,24 +194,25 @@ def translate_document(
 
     translated_chunks: list[str] = []
     for index, chunk in enumerate(chunks, start=1):
-        translated_chunks.append(
-            invoke_text_completion(
+        masked_chunk, original_markers = mask_visible_citation_markers(chunk)
+        translated_chunk = invoke_text_completion(
                 config,
                 stage_name=stage_name,
                 system_prompt=system_prompt,
                 user_prompt=build_translation_user_prompt(
-                    chunk,
+                    masked_chunk,
                     chunk_index=index,
                     total_chunks=len(chunks),
                     language_name=language_name,
                 ),
                 output_path=str(output_path),
                 model_name=config.model_name_for(model_key),
-                response_validator=lambda text, source_chunk=chunk: validate_translation_chunk(source_chunk, text),
+                response_validator=lambda text, source_chunk=masked_chunk: validate_placeholder_chunk(source_chunk, text),
                 transport_override=transport_override,
             ).strip()
-        )
+        translated_chunks.append(restore_visible_citation_markers(translated_chunk, original_markers))
 
     translated_text = "\n\n".join(translated_chunks).strip() + "\n"
+    validate_translation_chunk(master_text, translated_text)
     write_translation_output(output_path, translated_text, language_name=language_name)
     return translated_text
