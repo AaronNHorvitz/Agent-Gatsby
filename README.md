@@ -7,7 +7,9 @@ Agent Gatsby is a local-first, deterministic, evidence-led AI system for produci
 2. **Spanish translation**
 3. **Mandarin translation (Simplified Chinese)**
 
-This repository is intentionally designed to demonstrate more than prompt-writing. It is meant to show the ability to **engineer, implement, test, verify, and package an AI-enabled system** that can run in a constrained local environment with explicit controls around evidence, citations, translation fidelity, and artifact generation.
+> **For this assignment, I deliberately chose to build the reference implementation around a local instance of Gemma 4 running through Ollama on a single NVIDIA RTX 4090, rather than a hosted API workflow.** That decision keeps the novel, drafts, translations, QA artifacts, and final PDFs on-device; reduces exfiltration and secret-management risk; and creates a smaller, more auditable trust boundary. It also forces the solution to behave like a real engineering system: evidence is extracted before prose is drafted, citations are verified, translations are checked structurally, and final PDFs are rendered deterministically.
+
+This repository is intentionally designed to demonstrate more than prompt-writing. It is meant to show the ability to **engineer, implement, test, verify, and package an AI-enabled system** that can run in a constrained local environment with explicit controls around evidence, citations, translation fidelity, privacy, and artifact generation.
 
 The central design decision in this repository is simple:
 
@@ -48,7 +50,7 @@ The central design decision in this repository is simple:
 
 The objective of Agent Gatsby is to take a locked source text of *The Great Gatsby* and produce a submission package that satisfies the following output requirements:
 
-- a polished **English literary analysis of the novel’s major recurring metaphor systems, including citations**, targeting approximately 10 pages and operationalized as roughly 2800-3200 words at an estimate of about 280 words per page
+- a polished **English literary analysis of the novel’s major recurring metaphor systems, including citations**, targeting approximately 10 pages in the rendered submission format
 - a **Spanish translation** of that analysis
 - a **Mandarin translation** of that analysis, rendered in Simplified Chinese
 - three separate, professional **PDF artifacts** suitable for upload

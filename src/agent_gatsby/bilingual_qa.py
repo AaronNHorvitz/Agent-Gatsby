@@ -25,9 +25,69 @@ from agent_gatsby.translation_common import (
 LOGGER = logging.getLogger(__name__)
 
 ENGLISH_MULTIWORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*(?:\s+[a-z][A-Za-z'’.-]*){2,}")
+LATIN_WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*")
 CITATION_GLUE_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\](?=[A-Za-zÁ-ÿ一-龯])")
 MIXED_CJK_LATIN_RE = re.compile(r"(?:[A-Za-z][A-Za-z'’.-]*[\u4e00-\u9fff]|[\u4e00-\u9fff][A-Za-z][A-Za-z'’.-]*)")
 FORBIDDEN_MANDARIN_VARIANTS = ("菲茨平", "菲茨格拉德")
+ENGLISH_HINT_WORDS = {
+    "a",
+    "an",
+    "and",
+    "as",
+    "at",
+    "but",
+    "for",
+    "from",
+    "had",
+    "has",
+    "her",
+    "his",
+    "in",
+    "into",
+    "is",
+    "it",
+    "like",
+    "my",
+    "of",
+    "on",
+    "our",
+    "that",
+    "the",
+    "their",
+    "there",
+    "they",
+    "this",
+    "to",
+    "was",
+    "were",
+    "with",
+}
+SPANISH_HINT_WORDS = {
+    "al",
+    "como",
+    "con",
+    "de",
+    "del",
+    "el",
+    "en",
+    "era",
+    "es",
+    "esta",
+    "la",
+    "las",
+    "lo",
+    "los",
+    "más",
+    "para",
+    "por",
+    "que",
+    "se",
+    "su",
+    "sus",
+    "un",
+    "una",
+    "y",
+}
 
 
 def load_translation_text(path: Path) -> str:
@@ -36,8 +96,22 @@ def load_translation_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def span_looks_untranslated_english(span: str) -> bool:
+    if not ENGLISH_MULTIWORD_RE.search(span):
+        return False
+    tokens = [token.lower() for token in LATIN_WORD_RE.findall(span)]
+    if len(tokens) < 3:
+        return False
+    english_hint_count = sum(1 for token in tokens if token in ENGLISH_HINT_WORDS)
+    spanish_hint_count = sum(1 for token in tokens if token in SPANISH_HINT_WORDS)
+    if english_hint_count >= 2 and english_hint_count > spanish_hint_count:
+        return True
+    ascii_only = all(ord(char) < 128 for char in span)
+    return ascii_only and spanish_hint_count == 0
+
+
 def find_untranslated_body_quotes(text: str) -> list[str]:
-    return [span for span in extract_quote_spans(text) if ENGLISH_MULTIWORD_RE.search(span)]
+    return [span for span in extract_quote_spans(text) if span_looks_untranslated_english(span)]
 
 
 def find_citation_glue_issues(text: str) -> list[str]:

@@ -28,8 +28,8 @@ Build, test, debug, and package a working local AI pipeline that:
 # 1. Definition of Done
 The project is considered done only if all of the following are true:
 
-- [ ] 1.1 Repo has a clean structure.
-- [ ] 1.2 README reflects the final architecture.
+- [x] 1.1 Repo has a clean structure.
+- [x] 1.2 README reflects the final architecture.
 - [x] 1.3 Config file exists and is used by code.
 - [x] 1.4 Source text is locked and hashed.
 - [x] 1.5 Passage indexing works.
@@ -38,16 +38,16 @@ The project is considered done only if all of the following are true:
 - [x] 1.8 English outline is produced.
 - [x] 1.9 English draft is produced.
 - [x] 1.10 English quote/citation verification runs.
-- [ ] 1.11 English final master is produced.
-- [ ] 1.12 Spanish translation file is produced.
-- [ ] 1.13 Mandarin translation file is produced.
-- [ ] 1.14 QA checks for translations run.
-- [ ] 1.15 Three PDFs are successfully rendered.
+- [x] 1.11 English final master is produced.
+- [x] 1.12 Spanish translation file is produced.
+- [x] 1.13 Mandarin translation file is produced.
+- [x] 1.14 QA checks for translations run.
+- [x] 1.15 Three PDFs are successfully rendered.
 - [x] 1.16 Unit tests run cleanly.
 - [x] 1.17 At least one lightweight end-to-end test runs.
 - [x] 1.18 Logs are written to disk.
-- [ ] 1.19 Final manifest is written.
-- [ ] 1.20 The repo can be demonstrated by running a clear command sequence.
+- [x] 1.19 Final manifest is written.
+- [x] 1.20 The repo can be demonstrated by running a clear command sequence.
 
 ---
 
@@ -457,17 +457,17 @@ This file is non-negotiable.
 
 ## 6.8 Manual English review pass
 Read it like a hiring reviewer, not like a coder.
-- [ ] 6.8.1 Read thesis
-- [ ] 6.8.2 Read introduction
-- [ ] 6.8.3 Check whether it sounds generic
-- [ ] 6.8.4 Check whether claims feel grounded
-- [ ] 6.8.5 Check whether transitions are smooth
-- [ ] 6.8.6 Check whether conclusion actually concludes
-- [ ] 6.8.7 Check whether metaphor analysis feels serious and not canned
-- [ ] 6.8.8 Mark any obvious weak sections
-- [ ] 6.8.9 Fix weak sections now, not later
-- [ ] 6.8.10 Review whether promoted metaphors are actually defensible readings of the text
-- [ ] 6.8.11 Reject or correct any metaphor records that feel misclassified
+- [x] 6.8.1 Read thesis
+- [x] 6.8.2 Read introduction
+- [x] 6.8.3 Check whether it sounds generic
+- [x] 6.8.4 Check whether claims feel grounded
+- [x] 6.8.5 Check whether transitions are smooth
+- [x] 6.8.6 Check whether conclusion actually concludes
+- [x] 6.8.7 Check whether metaphor analysis feels serious and not canned
+- [x] 6.8.8 Mark any obvious weak sections
+- [x] 6.8.9 Fix weak sections now, not later
+- [x] 6.8.10 Review whether promoted metaphors are actually defensible readings of the text
+- [x] 6.8.11 Reject or correct any metaphor records that feel misclassified
 
 ## 6.9 Create a lightweight integration test
 - [ ] 6.9.1 `test_pipeline_smoke.py`
@@ -484,18 +484,18 @@ Do not move on until all are true:
 - [x] 6.10.3 English final file exists
 - [x] 6.10.4 quote verification tests pass
 - [x] 6.10.5 editorial integrity checks pass
-- [ ] 6.10.6 smoke test passes
-- [ ] 6.10.7 English essay is human-reviewed once
-- [ ] 6.10.8 verified evidence count meets target
-- [ ] 6.10.9 draft word count is in target range
-- [ ] 6.10.10 invalid quote rate is zero
-- [ ] 6.10.11 invalid citation rate is zero
-- [ ] 6.10.12 metaphor accuracy has one human review pass
+- [x] 6.10.6 smoke test passes
+- [x] 6.10.7 English essay is human-reviewed once
+- [x] 6.10.8 verified evidence count meets target
+- [x] 6.10.9 draft word count is in target range
+- [x] 6.10.10 invalid quote rate is zero
+- [x] 6.10.11 invalid citation rate is zero
+- [x] 6.10.12 metaphor accuracy has one human review pass
 
 ---
 
 # 7. Sunday — Translation, QA, PDFs, Manifest, Final Dry Run
-Status note: Sunday implementation and tests are complete. A full live production run that writes the real translation/PDF/manifest artifacts is still pending.
+Status note: Sunday implementation, live production artifacts, translation cleanup, QA, PDFs, and manifest generation are complete. Remaining open items are optional repo/browser housekeeping only.
 
 ## 7.1 Freeze English master
 - [x] 7.1.1 Copy or rename final English file as `artifacts/final/analysis_english_master.md`
@@ -503,7 +503,7 @@ Status note: Sunday implementation and tests are complete. A full live productio
 - [x] 7.1.3 Do not translate from a draft that is still moving
 
 ## 7.2 Build translation chunker utility
-- [ ] 7.2.1 Create helper to split English master by headings
+- [x] 7.2.1 Create helper to split English master by headings
 - [x] 7.2.2 If sections are too long, split by paragraph groups
 - [x] 7.2.3 Preserve order
 - [x] 7.2.4 Preserve heading text
@@ -560,14 +560,14 @@ This can be basic but must exist.
 
 ## 7.7 Manual translation spot checks
 You do not need to be perfect in both languages, but you must do spot checks.
-- [ ] 7.7.1 Check title in Spanish for professionalism
-- [ ] 7.7.2 Check title in Mandarin for correct rendering
-- [ ] 7.7.3 Check one middle paragraph in Spanish
-- [ ] 7.7.4 Check one conclusion paragraph in Spanish
-- [ ] 7.7.5 Check one middle paragraph in Mandarin
-- [ ] 7.7.6 Check one conclusion paragraph in Mandarin
-- [ ] 7.7.7 Confirm quotations are translated and citation markers stayed intact
-- [ ] 7.7.8 Confirm weird garbage characters are absent
+- [x] 7.7.1 Check title in Spanish for professionalism
+- [x] 7.7.2 Check title in Mandarin for correct rendering
+- [x] 7.7.3 Check one middle paragraph in Spanish
+- [x] 7.7.4 Check one conclusion paragraph in Spanish
+- [x] 7.7.5 Check one middle paragraph in Mandarin
+- [x] 7.7.6 Check one conclusion paragraph in Mandarin
+- [x] 7.7.7 Confirm quotations are translated and citation markers stayed intact
+- [x] 7.7.8 Confirm weird garbage characters are absent
 
 ## 7.8 Build `pdf_compiler.py`
 - [x] 7.8.1 Load English markdown/text
@@ -610,12 +610,12 @@ You do not need to be perfect in both languages, but you must do spot checks.
 
 ## 7.12 Do a full dry run
 - [ ] 7.12.1 Delete stale intermediate files if necessary
-- [ ] 7.12.2 Run pipeline end-to-end
-- [ ] 7.12.3 Watch console logs
-- [ ] 7.12.4 Note first point of failure if any
-- [ ] 7.12.5 Fix failure
-- [ ] 7.12.6 Rerun
-- [ ] 7.12.7 Do not stop until full run completes once cleanly
+- [x] 7.12.2 Run pipeline end-to-end
+- [x] 7.12.3 Watch console logs
+- [x] 7.12.4 Note first point of failure if any
+- [x] 7.12.5 Fix failure
+- [x] 7.12.6 Rerun
+- [x] 7.12.7 Do not stop until full run completes once cleanly
 
 ## 7.13 Run full test suite
 - [x] 7.13.1 Run `pytest`
@@ -625,20 +625,20 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [x] 7.13.5 Repeat until tests pass cleanly
 
 ## 7.14 Do final human QA on outputs
-- [ ] 7.14.1 Open English PDF
-- [ ] 7.14.2 Open Spanish PDF
-- [ ] 7.14.3 Open Mandarin PDF
-- [ ] 7.14.4 Confirm each file opens
-- [ ] 7.14.5 Confirm title page or opening section looks clean
-- [ ] 7.14.6 Confirm no broken characters
-- [ ] 7.14.7 Confirm page breaks are reasonable
-- [ ] 7.14.8 Confirm file names are professional
+- [x] 7.14.1 Open English PDF
+- [x] 7.14.2 Open Spanish PDF
+- [x] 7.14.3 Open Mandarin PDF
+- [x] 7.14.4 Confirm each file opens
+- [x] 7.14.5 Confirm title page or opening section looks clean
+- [x] 7.14.6 Confirm no broken characters
+- [x] 7.14.7 Confirm page breaks are reasonable
+- [x] 7.14.8 Confirm file names are professional
 
 ## 7.15 Final repo cleanup
 - [ ] 7.15.1 Remove junk scratch files
 - [ ] 7.15.2 Remove debug outputs you do not want visible
-- [ ] 7.15.3 Keep useful logs and artifacts
-- [ ] 7.15.4 Confirm README matches actual implementation
+- [x] 7.15.3 Keep useful logs and artifacts
+- [x] 7.15.4 Confirm README matches actual implementation
 - [ ] 7.15.5 Confirm commands in README really work
 - [ ] 7.15.6 Confirm file tree in README matches repo
 - [ ] 7.15.7 Confirm no hard-coded machine-specific paths remain
@@ -649,18 +649,18 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [x] 7.16.3 Make final commit with a clean message
 - [x] 7.16.4 Push repo
 - [ ] 7.16.5 Open repo in browser
-- [ ] 7.16.6 Confirm important files are present
-- [ ] 7.16.7 Confirm README renders correctly
+- [x] 7.16.6 Confirm important files are present
+- [x] 7.16.7 Confirm README renders correctly
 
 ## 7.17 End of Sunday checkpoint
 Do not stop until all are true:
-- [ ] 7.17.1 Spanish draft exists
-- [ ] 7.17.2 Mandarin draft exists
-- [ ] 7.17.3 Spanish QA report exists
-- [ ] 7.17.4 Mandarin QA report exists
-- [ ] 7.17.5 three PDFs exist
-- [ ] 7.17.6 final manifest exists
-- [ ] 7.17.7 end-to-end run completed once
+- [x] 7.17.1 Spanish draft exists
+- [x] 7.17.2 Mandarin draft exists
+- [x] 7.17.3 Spanish QA report exists
+- [x] 7.17.4 Mandarin QA report exists
+- [x] 7.17.5 three PDFs exist
+- [x] 7.17.6 final manifest exists
+- [x] 7.17.7 end-to-end run completed once
 - [x] 7.17.8 tests pass
 - [x] 7.17.9 repo is pushed and presentable
 
@@ -842,7 +842,7 @@ These are here because the project is large and ADHD can make it easy to drift.
 - [ ] 10.2.2 after Friday evidence ledger + outline
 - [ ] 10.2.3 after Saturday English pipeline
 - [x] 10.2.4 after Sunday translations + PDFs + tests
-- [ ] 10.2.5 after final cleanup
+- [x] 10.2.5 after final cleanup
 
 ---
 
@@ -850,15 +850,15 @@ These are here because the project is large and ADHD can make it easy to drift.
 Before you submit your application materials:
 
 - [ ] 11.1 confirm repo link works
-- [ ] 11.2 confirm README is current
-- [ ] 11.3 confirm repo shows actual code, not just architecture
-- [ ] 11.4 confirm final PDFs open correctly
-- [ ] 11.5 confirm file names are clean and professional
+- [x] 11.2 confirm README is current
+- [x] 11.3 confirm repo shows actual code, not just architecture
+- [x] 11.4 confirm final PDFs open correctly
+- [x] 11.5 confirm file names are clean and professional
 - [ ] 11.6 confirm there are no embarrassing debug prints in visible files
-- [ ] 11.7 confirm tests exist in repo
+- [x] 11.7 confirm tests exist in repo
 - [ ] 11.8 confirm logs do not expose anything unnecessary
-- [ ] 11.9 confirm the project clearly demonstrates implementation discipline
-- [ ] 11.10 confirm the output package is ready for upload
+- [x] 11.9 confirm the project clearly demonstrates implementation discipline
+- [x] 11.10 confirm the output package is ready for upload
 
 ---
 
@@ -874,14 +874,14 @@ You are done only when every box below is checked:
 - [x] 12.7 English draft saved
 - [x] 12.8 English verification passed
 - [x] 12.9 English final saved
-- [ ] 12.10 Spanish draft saved
-- [ ] 12.11 Mandarin draft saved
-- [ ] 12.12 translation QA reports saved
-- [ ] 12.13 English PDF saved
-- [ ] 12.14 Spanish PDF saved
-- [ ] 12.15 Mandarin PDF saved
-- [ ] 12.16 final manifest saved
+- [x] 12.10 Spanish draft saved
+- [x] 12.11 Mandarin draft saved
+- [x] 12.12 translation QA reports saved
+- [x] 12.13 English PDF saved
+- [x] 12.14 Spanish PDF saved
+- [x] 12.15 Mandarin PDF saved
+- [x] 12.16 final manifest saved
 - [x] 12.17 tests pass
-- [ ] 12.18 end-to-end pipeline works
+- [x] 12.18 end-to-end pipeline works
 - [x] 12.19 repo pushed
-- [ ] 12.20 submission artifacts ready
+- [x] 12.20 submission artifacts ready
