@@ -21,6 +21,7 @@ LOGGER = logging.getLogger(__name__)
 
 DOUBLE_QUOTE_RE = re.compile(r"[\"“](.+?)[\"”]", re.DOTALL)
 SINGLE_QUOTE_RE = re.compile(r"(?<!\w)['‘]([^'\n]{2,}?)['’](?!\w)")
+ANY_BRACKET_RE = re.compile(r"\[([^\]]+)\]")
 
 
 def load_draft_prompt(config: AppConfig) -> str:
@@ -130,20 +131,101 @@ def build_selection_scope_note(section_count: int) -> str:
 
 def normalize_section_claim(section_notes: str) -> str:
     normalized = collapse_spaces(section_notes).strip()
-    normalized = re.sub(r"^(argue|show|explain|demonstrate|trace|analyze)\s+that\s+", "", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(r"^(demonstrate|explore|analyze|show|explain|trace)\s+how\s+", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(
+        r"^(argue|show|explain|demonstrate|trace|analyze|examine|explore)\s+that\s+",
+        "",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(
+        r"^(demonstrate|explore|analyze|show|explain|trace|examine)\s+how\s+",
+        "",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(
+        r"^(conclude|close|end)\s+the\s+argument\s+by\s+showing\s+how\s+",
+        "",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(
+        r"^(conclude|close|end)\s+by\s+showing\s+how\s+",
+        "",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(r"^showing\s+how\s+", "", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"^how\s+", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"^that\s+", "", normalized, flags=re.IGNORECASE)
     return normalized.rstrip(".").strip()
 
 
+def promote_claim_to_clause(section_claim: str) -> str:
+    if not section_claim:
+        return ""
+    if re.match(r"^Fitzgerald\b", section_claim, flags=re.IGNORECASE):
+        return section_claim
+
+    lower_claim = section_claim.lower()
+    verbs = (
+        "establish",
+        "create",
+        "illustrate",
+        "portray",
+        "reveal",
+        "show",
+        "trace",
+        "explain",
+        "reflect",
+        "capture",
+        "turn",
+        "link",
+        "suggest",
+        "underscore",
+        "highlight",
+        "frame",
+        "define",
+    )
+    for verb in verbs:
+        marker = f" {verb} "
+        index = lower_claim.find(marker)
+        if index == -1:
+            continue
+
+        subject = section_claim[:index].strip()
+        remainder = section_claim[index + len(marker) :].strip()
+        if not subject or not remainder:
+            continue
+        if not re.search(r"\b(metaphor|metaphors|simile|similes|image|images|imagery|figure|figures)\b", subject, flags=re.IGNORECASE):
+            continue
+        return f"Fitzgerald uses {subject} to {verb} {remainder}"
+
+    return section_claim
+
+
 def build_metaphor_focus_lead(section_notes: str, *, evidence_count: int) -> str:
-    subject = "this metaphor" if evidence_count == 1 else "these metaphors"
-    build_verb = "builds" if evidence_count == 1 else "build"
-    verb = "shows" if evidence_count == 1 else "show"
-    normalized_claim = normalize_section_claim(section_notes)
+    normalized_claim = promote_claim_to_clause(normalize_section_claim(section_notes))
     if not normalized_claim:
-        return f"Together, {subject} {build_verb} one shared section claim."
-    return f"Together, {subject} {verb} how {normalized_claim}."
+        return "This cluster of images points to one shared idea."
+
+    if evidence_count == 1:
+        templates = (
+            "This image suggests that {claim}.",
+            "In this passage, the figurative language suggests that {claim}.",
+            "This metaphor points to one central idea: {claim}.",
+            "Read closely, this metaphor makes clear that {claim}.",
+        )
+    else:
+        templates = (
+            "Read together, these metaphors suggest that {claim}.",
+            "Seen side by side, these images make clear that {claim}.",
+            "This cluster of metaphors points to one larger idea: {claim}.",
+            "Across these passages, the figurative language suggests that {claim}.",
+        )
+
+    template_index = sum(ord(character) for character in normalized_claim) % len(templates)
+    return templates[template_index].format(claim=normalized_claim)
 
 
 def render_metaphor_focus_block(evidence_records: list[EvidenceRecord], *, section_notes: str) -> str:
@@ -288,6 +370,22 @@ def strip_unauthorized_quotes(text: str, *, evidence_records: list[EvidenceRecor
 
     cleaned = DOUBLE_QUOTE_RE.sub(replace_double, text)
     cleaned = SINGLE_QUOTE_RE.sub(replace_single, cleaned)
+    return cleaned
+
+
+def strip_invalid_bracket_markers(text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        marker = match.group(0)
+        if marker not in extract_invalid_bracket_markers(marker):
+            return marker
+        return match.group(1)
+
+    return ANY_BRACKET_RE.sub(replace, text)
+
+
+def repair_invalid_section_artifacts(text: str, *, evidence_records: list[EvidenceRecord]) -> str:
+    cleaned = strip_invalid_bracket_markers(text)
+    cleaned = strip_unauthorized_quotes(cleaned, evidence_records=evidence_records)
     return cleaned
 
 
@@ -587,18 +685,26 @@ def draft_section(
             transport_override=transport_override,
         )
     except LLMResponseValidationError as exc:
-        if "quoted text outside the allowed evidence set" in str(exc) and exc.response_text:
-            LOGGER.warning(
-                "Drafted section contained unauthorized quotation marks; stripping them deterministically: %s",
-                exc,
+        if exc.response_text:
+            repaired_text = repair_invalid_section_artifacts(
+                exc.response_text,
+                evidence_records=evidence_records,
             )
-            response_text = strip_unauthorized_quotes(exc.response_text, evidence_records=evidence_records)
-            response_validator(response_text)
-            section_text = validate_section_text(response_text, heading=heading, require_citation=require_citation)
-            if section_type == "body":
-                focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
-                return f"{focus_block}\n\n{section_text}".strip()
-            return section_text
+            if repaired_text != exc.response_text:
+                LOGGER.warning(
+                    "Drafted section failed validation; applying deterministic cleanup before retrying validation: %s",
+                    exc,
+                )
+                response_validator(repaired_text)
+                section_text = validate_section_text(
+                    repaired_text,
+                    heading=heading,
+                    require_citation=require_citation,
+                )
+                if section_type == "body":
+                    focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
+                    return f"{focus_block}\n\n{section_text}".strip()
+                return section_text
         if "Model returned empty content" not in str(exc):
             raise
         if section_type == "introduction":

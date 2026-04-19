@@ -6,7 +6,16 @@ from pathlib import Path
 import pytest
 
 from agent_gatsby.config import load_config
-from agent_gatsby.draft_english import build_section_response_validator, draft_english, strip_unauthorized_quotes
+from agent_gatsby.draft_english import (
+    build_metaphor_focus_lead,
+    build_section_response_validator,
+    draft_english,
+    normalize_section_claim,
+    promote_claim_to_clause,
+    repair_invalid_section_artifacts,
+    strip_invalid_bracket_markers,
+    strip_unauthorized_quotes,
+)
 from agent_gatsby.llm_client import LLMResponseValidationError
 from agent_gatsby.schemas import EvidenceRecord
 
@@ -278,9 +287,10 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert "## Introduction" in draft_text
     assert "## Desire at a Distance" in draft_text
     assert "## Material Decay and Social Vision" in draft_text
-    assert "Together, this metaphor shows how the green light turns Gatsby's longing into a visible, distant target." in draft_text
+    assert "Together," not in draft_text
+    assert "green light turns Gatsby's longing into a visible, distant target." in draft_text
     assert 'Metaphor text:\n> "green light" [1.2]' in draft_text
-    assert "Together, this metaphor shows how the valley of ashes turns social decay into a concrete landscape." in draft_text
+    assert "valley of ashes turns social decay into a concrete landscape." in draft_text
     assert 'Metaphor text:\n> "valley of ashes" [2.2]' in draft_text
     assert "[1.2]" in draft_text
     assert "[2.2]" in draft_text
@@ -424,3 +434,95 @@ def test_strip_unauthorized_quotes_preserves_allowed_metaphor_quote() -> None:
     assert '"green light"' in cleaned
     assert '"warm centre"' not in cleaned
     assert "warm centre" in cleaned
+
+
+def test_strip_invalid_bracket_markers_preserves_valid_citations_and_removes_invalid_ones() -> None:
+    text = 'This section keeps [1.2] but should strip [that] and [1.ly21] safely.'
+
+    cleaned = strip_invalid_bracket_markers(text)
+
+    assert "[1.2]" in cleaned
+    assert "[that]" not in cleaned
+    assert "[1.ly21]" not in cleaned
+    assert "that" in cleaned
+    assert "1.ly21" in cleaned
+
+
+def test_normalize_section_claim_strips_instructional_prefixes() -> None:
+    assert (
+        normalize_section_claim(
+            "Examine how metaphors of edges and unrefined spaces illustrate the narrator's sense of alienation."
+        )
+        == "metaphors of edges and unrefined spaces illustrate the narrator's sense of alienation"
+    )
+    assert (
+        normalize_section_claim(
+            "Conclude the argument by showing how sensory metaphors of light and texture create a dreamlike universe."
+        )
+        == "sensory metaphors of light and texture create a dreamlike universe"
+    )
+
+
+def test_promote_claim_to_clause_turns_fragment_into_fitzgerald_clause() -> None:
+    assert (
+        promote_claim_to_clause("metaphors of wealth and luxury create a false sense of solidity")
+        == "Fitzgerald uses metaphors of wealth and luxury to create a false sense of solidity"
+    )
+    assert (
+        promote_claim_to_clause("similes of buoyancy and detachment illustrate the ethereal existence of the upper class")
+        == "Fitzgerald uses similes of buoyancy and detachment to illustrate the ethereal existence of the upper class"
+    )
+
+
+def test_build_metaphor_focus_lead_varies_and_removes_instruction_leak_phrases() -> None:
+    lead = build_metaphor_focus_lead(
+        "Examine how metaphors of edges and unrefined spaces illustrate the narrator's sense of alienation and the raw nature of the social landscape.",
+        evidence_count=2,
+    )
+
+    assert not lead.startswith("Together,")
+    assert "Examine how" not in lead
+    assert (
+        "Fitzgerald uses metaphors of edges and unrefined spaces to illustrate the narrator's sense of alienation and the raw nature of the social landscape."
+        in lead
+    )
+
+    concluding_lead = build_metaphor_focus_lead(
+        "Conclude the argument by showing how sensory metaphors of light and texture create a sense of a vast, unreachable, and dreamlike universe.",
+        evidence_count=3,
+    )
+
+    assert "Conclude the argument" not in concluding_lead
+    assert (
+        "Fitzgerald uses sensory metaphors of light and texture to create a sense of a vast, unreachable, and dreamlike universe."
+        in concluding_lead
+    )
+
+
+def test_repair_invalid_section_artifacts_handles_mixed_bracket_and_quote_noise() -> None:
+    evidence_records = [
+        EvidenceRecord(
+            evidence_id="E001",
+            metaphor="green light",
+            quote="green light",
+            passage_id="1.2",
+            chapter=1,
+            interpretation="A recurring image that concentrates Gatsby's longing into a distant object.",
+            supporting_theme_tags=[],
+            status="verified",
+            source_candidate_id="C001",
+            source_type="candidate",
+        )
+    ]
+
+    cleaned = repair_invalid_section_artifacts(
+        'Nick returns to [that] image when the "green light" still matters [1.2], but he also calls it a "visible beacon" [1.ly21].',
+        evidence_records=evidence_records,
+    )
+
+    assert "[1.2]" in cleaned
+    assert "[that]" not in cleaned
+    assert "[1.ly21]" not in cleaned
+    assert '"green light"' in cleaned
+    assert '"visible beacon"' not in cleaned
+    assert "visible beacon" in cleaned

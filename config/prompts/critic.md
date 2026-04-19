@@ -18,7 +18,10 @@ Hard constraints:
 - Preserve the text-grounded scene context of each analytical claim.
 - Do not introduce comedy, sarcasm, or a recognizable imitation voice.
 - Preserve markdown headings exactly.
-- Preserve the short thematic lead-in sentence and `Metaphor text:` block at the start of each body section.
+- You may rewrite the short thematic lead-in sentence before each `Metaphor text:` block so it sounds natural and grammatically correct.
+- Preserve each `Metaphor text:` block exactly where it appears.
+- Smooth repetitive lead-in phrasing so the sections do not all begin the same way.
+- Remove obvious prompt-leak wording such as leftover instruction fragments like "Examine how" or "Conclude the argument by".
 - Return the full revised markdown document, not a summary or excerpt.
 - If you cannot make safe improvements, return the original markdown unchanged.
 - Never return an empty response.

@@ -315,6 +315,43 @@ def test_editorial_response_validator_rejects_changed_metaphor_text_block_invent
         )
 
 
+def test_editorial_response_validator_allows_lead_in_sentence_rewrite() -> None:
+    original_text = "\n".join(
+        [
+            "# Sample Essay",
+            "",
+            "## Body",
+            "",
+            "Together, these metaphors show how desire becomes visible.",
+            "",
+            "Metaphor text:",
+            '> "green light" [1.1]',
+            "",
+            'Gatsby\'s "green light" remains central [1.1].',
+            "",
+        ]
+    )
+    validator = build_editorial_response_validator(original_text)
+
+    revised_text = "\n".join(
+        [
+            "# Sample Essay",
+            "",
+            "## Body",
+            "",
+            "Seen side by side, these images make clear that Fitzgerald uses this image to make desire visible.",
+            "",
+            "Metaphor text:",
+            '> "green light" [1.1]',
+            "",
+            'Gatsby\'s "green light" remains central [1.1].',
+            "",
+        ]
+    )
+
+    validator(revised_text)
+
+
 def test_critique_and_edit_falls_back_to_verified_draft_when_editor_returns_empty(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_editorial_repo(repo_root))

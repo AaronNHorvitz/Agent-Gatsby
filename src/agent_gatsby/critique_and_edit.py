@@ -73,10 +73,12 @@ def build_editorial_user_prompt(draft_text: str) -> str:
     instructions = [
         "Revise the verified markdown draft below for clarity, cohesion, and stronger analytical flow.",
         "Preserve every markdown heading line exactly as written.",
-        "Preserve each short thematic lead-in sentence and each `Metaphor text:` block exactly where it appears.",
+        "You may rewrite the one-sentence thematic lead-in before each `Metaphor text:` block so it reads naturally and grammatically.",
+        "Preserve each `Metaphor text:` block exactly where it appears.",
         "Preserve every direct quotation exactly as written.",
         "Preserve every citation marker exactly as written.",
         "Do not add new evidence, quotations, headings, or citations.",
+        "Fix obvious prompt-leak phrasing in section lead-ins, such as leftover instruction words like 'Examine how' or 'Conclude the argument by'.",
         "If you cannot make safe improvements, return the original markdown unchanged.",
         "Never return an empty response.",
         "Return the full revised markdown document only.",
