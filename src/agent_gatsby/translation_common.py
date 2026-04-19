@@ -15,7 +15,7 @@ LOGGER = logging.getLogger(__name__)
 BLOCK_SPLIT_RE = re.compile(r"\n\s*\n")
 HEADING_RE = re.compile(r"(?m)^(#{1,6})\s+.+$")
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
-TRANSLATION_CITATION_PLACEHOLDER_RE = re.compile(r"__AG_CIT_(\d+)__")
+TRANSLATION_CITATION_PLACEHOLDER_RE = re.compile(r"AGCITTOKEN(\d{4})XYZ")
 STRAIGHT_QUOTE_SPAN_RE = re.compile(r'"[^"\n]+?"')
 CURLY_QUOTE_SPAN_RE = re.compile(r"“[^”\n]+?”")
 LOW_SINGLE_QUOTE_SPAN_RE = re.compile(r"‘[^’\n]+?’")
@@ -72,7 +72,7 @@ def mask_visible_citation_markers(text: str) -> tuple[str, list[str]]:
 
     def replace(match: re.Match[str]) -> str:
         original_markers.append(match.group(0))
-        return f"__AG_CIT_{len(original_markers)}__"
+        return f"AGCITTOKEN{len(original_markers):04d}XYZ"
 
     return VISIBLE_CITATION_RE.sub(replace, text), original_markers
 
@@ -82,14 +82,14 @@ def extract_translation_placeholders(text: str) -> list[str]:
 
 
 def restore_visible_citation_markers(text: str, original_markers: list[str]) -> str:
-    expected_placeholders = [f"__AG_CIT_{index}__" for index in range(1, len(original_markers) + 1)]
+    expected_placeholders = [f"AGCITTOKEN{index:04d}XYZ" for index in range(1, len(original_markers) + 1)]
     observed_placeholders = extract_translation_placeholders(text)
     if observed_placeholders != expected_placeholders:
         raise ValueError("Translated chunk changed the citation placeholder inventory")
 
     restored_text = text
     for index, marker in enumerate(original_markers, start=1):
-        restored_text = restored_text.replace(f"__AG_CIT_{index}__", marker)
+        restored_text = restored_text.replace(f"AGCITTOKEN{index:04d}XYZ", marker)
     return restored_text
 
 
@@ -135,7 +135,7 @@ def build_translation_user_prompt(chunk_text: str, *, chunk_index: int, total_ch
         f"Chunk {chunk_index} of {total_chunks}.",
         f"Translate this markdown chunk into {language_name}.",
         "Preserve markdown heading markers exactly.",
-        "Preserve placeholder tokens like __AG_CIT_1__ exactly and do not translate or alter them.",
+        "Preserve immutable machine tokens like AGCITTOKEN0001XYZ exactly and do not translate, retype, split, or alter them.",
         "Preserve quotation boundaries.",
         "Return translated markdown only.",
     ]
