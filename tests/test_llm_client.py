@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from agent_gatsby.config import load_config
-from agent_gatsby.llm_client import extract_message_text, invoke_text_completion
+from agent_gatsby.llm_client import NATIVE_OLLAMA_CHAT_TRANSPORT, extract_message_text, invoke_text_completion
 
 
 def write_llm_config(repo_root: Path) -> Path:
@@ -82,6 +83,20 @@ class FakeClient:
         self.chat = SimpleNamespace(completions=FakeCompletions(responses))
 
 
+class FakeHTTPResponse:
+    def __init__(self, payload: dict) -> None:
+        self.payload = payload
+
+    def read(self) -> bytes:
+        return json.dumps(self.payload).encode("utf-8")
+
+    def __enter__(self) -> "FakeHTTPResponse":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        return None
+
+
 def test_extract_message_text_joins_structured_chunks() -> None:
     response = fake_response(
         [
@@ -154,3 +169,41 @@ def test_invoke_text_completion_reports_reasoning_diagnostics_for_empty_content(
             user_prompt="user",
             response_validator=lambda text: None,
         )
+
+
+def test_invoke_text_completion_uses_native_ollama_chat_with_thinking_disabled(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_llm_config(repo_root))
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        return FakeHTTPResponse(
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": "Verified native response",
+                },
+                "done": True,
+                "done_reason": "stop",
+            }
+        )
+
+    monkeypatch.setattr("agent_gatsby.llm_client.urlopen", fake_urlopen)
+
+    response_text = invoke_text_completion(
+        config,
+        stage_name="draft_english",
+        system_prompt="system",
+        user_prompt="user",
+        response_validator=lambda text: None,
+        transport_override=NATIVE_OLLAMA_CHAT_TRANSPORT,
+    )
+
+    assert response_text == "Verified native response"
+    assert captured["url"] == "http://localhost:11434/api/chat"
+    assert captured["timeout"] == 1
+    assert captured["payload"]["think"] is False
+    assert captured["payload"]["model"] == "gemma4:26b"

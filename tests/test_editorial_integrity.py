@@ -157,10 +157,13 @@ drafting:
   section_drafts_dir: "artifacts/drafts/sections"
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
+  llm_transport: "ollama_native_chat"
   display_citation_format: "[{citation_number}]"
   citation_appendix_heading: "Citations"
   citation_text_title: "Citation Text"
   citation_text_output_path: "artifacts/final/citation_text.md"
+editorial:
+  llm_transport: "ollama_native_chat"
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
@@ -177,8 +180,10 @@ verification:
 def test_critique_and_edit_writes_final_file_and_preserves_integrity(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_editorial_repo(repo_root))
+    seen_transport_overrides: list[str | None] = []
 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
+        seen_transport_overrides.append(kwargs.get("transport_override"))
         revised = "\n".join(
             [
                 "# Metaphor and the Shape of Desire",
@@ -218,7 +223,8 @@ def test_critique_and_edit_writes_final_file_and_preserves_integrity(monkeypatch
     assert '*"valley of ashes"*' in final_text
     assert "[1]" in final_text
     assert "[2]" in final_text
-    assert "## Citations" not in final_text
+    assert "## Citations" in final_text
+    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1' in final_text
     assert "# An Analysis of Metaphors in The Great Gatsby" in final_text
     citation_text = citation_text_path.read_text(encoding="utf-8")
     assert "# Citation Text" in citation_text
@@ -226,6 +232,7 @@ def test_critique_and_edit_writes_final_file_and_preserves_integrity(monkeypatch
     assert "Chapter 1, Paragraph 1" in citation_text
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
     assert (repo_root / "artifacts/qa/citation_registry.json").exists()
+    assert seen_transport_overrides == ["ollama_native_chat"]
 
 
 def test_editorial_response_validator_rejects_changed_quotes_and_citations() -> None:
@@ -270,6 +277,44 @@ def test_editorial_response_validator_rejects_changed_quotes_and_citations() -> 
         )
 
 
+def test_editorial_response_validator_rejects_changed_metaphor_text_block_inventory() -> None:
+    original_text = "\n".join(
+        [
+            "# Sample Essay",
+            "",
+            "## Body",
+            "",
+            "Together, these metaphors show how desire becomes visible.",
+            "",
+            "Metaphor text:",
+            '> "green light" [1.1]',
+            "",
+            'Gatsby\'s "green light" remains central [1.1].',
+            "",
+        ]
+    )
+    validator = build_editorial_response_validator(original_text)
+
+    with pytest.raises(ValueError, match="metaphor-text block inventory"):
+        validator(
+            "\n".join(
+                [
+                    "# Sample Essay",
+                    "",
+                    "## Body",
+                    "",
+                    "Together, these metaphors show how desire becomes visible.",
+                    "",
+                    "Quoted evidence:",
+                    '> "green light" [1.1]',
+                    "",
+                    'Gatsby\'s "green light" remains central [1.1].',
+                    "",
+                ]
+            )
+        )
+
+
 def test_critique_and_edit_falls_back_to_verified_draft_when_editor_returns_empty(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_editorial_repo(repo_root))
@@ -281,6 +326,7 @@ def test_critique_and_edit_falls_back_to_verified_draft_when_editor_returns_empt
 
     final_text = critique_and_edit(config)
     assert 'Gatsby\'s *"green light"* turns longing into a visible object of desire [1].' in final_text
-    assert "## Citations" not in final_text
+    assert "## Citations" in final_text
+    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1' in final_text
     assert (repo_root / "artifacts/final/citation_text.md").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8").strip() == final_text.strip()

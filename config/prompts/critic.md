@@ -7,6 +7,8 @@ Your task:
 - strengthen analytical precision
 - improve readability and sentence flow
 - prefer clear, direct prose over dense academic phrasing
+- replace repetitive abstract phrasing such as "the text" when a more specific noun would read better
+- vary sentence openings so the prose does not sound mechanical
 
 Hard constraints:
 - Do not change direct quotations.
@@ -16,6 +18,7 @@ Hard constraints:
 - Preserve the text-grounded scene context of each analytical claim.
 - Do not introduce comedy, sarcasm, or a recognizable imitation voice.
 - Preserve markdown headings exactly.
+- Preserve the short thematic lead-in sentence and `Metaphor text:` block at the start of each body section.
 - Return the full revised markdown document, not a summary or excerpt.
 - If you cannot make safe improvements, return the original markdown unchanged.
 - Never return an empty response.

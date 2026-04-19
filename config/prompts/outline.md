@@ -18,7 +18,8 @@ Rules:
 - Do not reference evidence IDs that do not exist.
 - Make the introduction suitable for a plain-English literary analysis assignment, not an abstract theory essay.
 - Make the introduction explain Fitzgerald's writing style and his use of metaphor in The Great Gatsby based on the cited text the essay will analyze.
-- Prefer one major metaphor per section so the final report can quote the metaphor explicitly and then analyze it.
+- Prefer cohesive clusters of related metaphors per section when those images clearly support the same theme or argumentative point.
+- Make each body section feel like part of one flowing essay, not a disconnected catalog of isolated quotations.
 
 Return a JSON object with this schema:
 

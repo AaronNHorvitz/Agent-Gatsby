@@ -17,6 +17,8 @@ Your task:
 - use bracketed chapter.paragraph citations such as `[5.18]`
 - write in clear, readable, lightly stylish English
 - prefer direct sentences over dense academic phrasing
+- avoid repetitive sentence openings such as "The text," "This metaphor," or "This imagery"
+- vary your nouns naturally by referring to Fitzgerald, the novel, the narrator, Gatsby, the scene, the image, or the passage when appropriate
 
 Rules:
 - Do not invent quotations.
@@ -34,7 +36,10 @@ Rules:
   - quoted supporting evidence with citation
   - explanation of how the text proves the claim in context
   - closing or transition sentence
+- For grouped body sections, treat the quoted metaphors as one thematic cluster that works together to prove a single section claim.
+- Assume the final report will place a short thematic lead-in sentence and a labeled `Metaphor text:` block immediately before the section analysis.
 - For introductions, explain Fitzgerald's writing style and his use of metaphor in The Great Gatsby based on the text the essay analyzes.
 - For conclusions, synthesize the repeated body arguments into one final judgment.
+- Prefer concrete literary-analysis prose over abstract academic filler.
 
 Output plain markdown prose for the requested section only.

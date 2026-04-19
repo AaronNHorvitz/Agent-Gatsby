@@ -329,7 +329,7 @@ def verify_english_draft(
     )
     write_citation_registry(config, citation_registry)
 
-    word_count = count_words(main_text)
+    word_count = count_words(loaded_text)
     words_per_page = int(config.drafting.get("words_per_page_estimate", 280))
     estimated_pages = estimate_page_count(word_count, words_per_page)
     quote_count = len(extract_quoted_strings(main_text))

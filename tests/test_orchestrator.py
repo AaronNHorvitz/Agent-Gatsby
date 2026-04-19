@@ -216,17 +216,20 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
     assert (repo_root / "artifacts/evidence/evidence_ledger.json").exists()
     assert (repo_root / "artifacts/drafts/outline.json").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_draft.md").exists()
+    assert (repo_root / "artifacts/qa/english_draft_timing.json").exists()
     assert (repo_root / "artifacts/qa/english_verification_report.json").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").exists()
     final_text = (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8")
     assert "[1]" in final_text
-    assert "## Citations" not in final_text
+    assert "## Citations" in final_text
+    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1' in final_text
     assert (repo_root / "artifacts/final/citation_text.md").exists()
     assert (repo_root / "artifacts/qa/citation_registry.json").exists()
 
     log_text = (repo_root / "artifacts/logs/pipeline.log").read_text(encoding="utf-8")
     assert "Starting stage: ingest" in log_text
-    assert "Finished stage: critique_english" in log_text
+    assert "Finished stage: critique_english (" in log_text
+    assert "Total pipeline time:" in log_text
 
 
 def test_orchestrator_single_stage_run_builds_upstream_artifacts(tmp_path) -> None:

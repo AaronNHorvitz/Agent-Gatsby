@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 from agent_gatsby.config import load_config
-from agent_gatsby.plan_outline import plan_outline
+from agent_gatsby.plan_outline import plan_outline, select_outline_evidence_records
+from agent_gatsby.schemas import EvidenceRecord
 
 
 def write_outline_repo(repo_root: Path) -> Path:
@@ -98,6 +99,8 @@ outline:
   output_path: "artifacts/drafts/outline.json"
   minimum_section_count: 2
   maximum_section_count: 4
+  max_prompt_evidence_records: 2
+  llm_transport: "ollama_native_chat"
   fixed_title: "An Analysis of Metaphors in The Great Gatsby"
   require_intro: true
   require_conclusion: true
@@ -116,16 +119,21 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
         "body_first_guidance": False,
         "purpose_guidance": False,
         "style_guidance": False,
+        "grouped_section_guidance": False,
     }
+    seen_transport_overrides: list[str | None] = []
 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
         user_prompt = kwargs.get("user_prompt", "")
+        seen_transport_overrides.append(kwargs.get("transport_override"))
         if "Plan the body arguments first" in user_prompt:
             prompt_checks["body_first_guidance"] = True
         if "short 'purpose' field" in user_prompt:
             prompt_checks["purpose_guidance"] = True
         if "F. Scott Fitzgerald's writing style" in user_prompt:
             prompt_checks["style_guidance"] = True
+        if "cohesive clusters of related metaphors per body section" in user_prompt:
+            prompt_checks["grouped_section_guidance"] = True
         return json.dumps(
             {
                 "title": "Some Other Title",
@@ -167,6 +175,8 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
     assert prompt_checks["body_first_guidance"] is True
     assert prompt_checks["purpose_guidance"] is True
     assert prompt_checks["style_guidance"] is True
+    assert prompt_checks["grouped_section_guidance"] is True
+    assert seen_transport_overrides == ["ollama_native_chat"]
 
 
 def test_plan_outline_rejects_nonexistent_evidence_ids(monkeypatch, tmp_path) -> None:
@@ -203,3 +213,52 @@ def test_plan_outline_rejects_nonexistent_evidence_ids(monkeypatch, tmp_path) ->
         plan_outline(config)
 
     assert not (repo_root / "artifacts/drafts/outline.json").exists()
+
+
+def test_select_outline_evidence_records_limits_prompt_records_by_unique_passage_first(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_outline_repo(repo_root))
+    evidence_records = [
+        {
+            "evidence_id": "E001",
+            "metaphor": "green light",
+            "quote": "green light",
+            "passage_id": "1.1",
+            "chapter": 1,
+            "interpretation": "A recurring image that concentrates Gatsby's longing into a distant object.",
+            "supporting_theme_tags": ["desire"],
+            "status": "verified",
+            "source_candidate_id": "C001",
+            "source_type": "candidate",
+        },
+        {
+            "evidence_id": "E002",
+            "metaphor": "gesture",
+            "quote": "successful gestures",
+            "passage_id": "1.1",
+            "chapter": 1,
+            "interpretation": "A second record on the same passage.",
+            "supporting_theme_tags": [],
+            "status": "verified",
+            "source_candidate_id": "C002",
+            "source_type": "candidate",
+        },
+        {
+            "evidence_id": "E003",
+            "metaphor": "ashes",
+            "quote": "valley of ashes",
+            "passage_id": "2.1",
+            "chapter": 2,
+            "interpretation": "A different passage that should be kept for diversity.",
+            "supporting_theme_tags": ["decay"],
+            "status": "verified",
+            "source_candidate_id": "C003",
+            "source_type": "candidate",
+        },
+    ]
+    selected = select_outline_evidence_records(
+        config,
+        [EvidenceRecord.model_validate(item) for item in evidence_records],
+    )
+
+    assert [record.evidence_id for record in selected] == ["E001", "E003"]

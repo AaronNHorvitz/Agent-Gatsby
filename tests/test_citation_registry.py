@@ -90,14 +90,16 @@ def test_render_final_report_and_citation_text_document_use_note_numbers_and_exa
         body_text,
         registry,
         title_override="An Analysis of Metaphors in The Great Gatsby",
+        appendix_heading="Citations",
     )
     citation_text = render_citation_text_document(registry, title="Citation Text")
 
     assert "# An Analysis of Metaphors in The Great Gatsby" in rendered_report
     assert "_Citation note:" not in rendered_report
-    assert "## Citations" not in rendered_report
+    assert "## Citations" in rendered_report
     assert "### Introduction" in rendered_report
     assert '*"green light"* matters here [1].' in rendered_report
+    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 2' in rendered_report
     assert "# Citation Text" in citation_text
     assert "## [1]" in citation_text
     assert "Chapter 1, Paragraph 2" in citation_text

@@ -150,6 +150,11 @@ Gatsby's "green light" turns longing into a visible object of desire [1.1].
 ## Material Decay and Social Vision
 
 The "valley of ashes" gives decay a physical landscape [2.1].
+
+## Citations
+
+1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1.
+2. F. Scott Fitzgerald, *The Great Gatsby*, ch. 2, para. 1.
 """.strip() + "\n"
     config = load_config(write_verification_repo(repo_root, draft_text=draft_text))
 

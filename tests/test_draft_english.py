@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from agent_gatsby.config import load_config
-from agent_gatsby.draft_english import build_section_response_validator, draft_english
+from agent_gatsby.draft_english import build_section_response_validator, draft_english, strip_unauthorized_quotes
 from agent_gatsby.llm_client import LLMResponseValidationError
 from agent_gatsby.schemas import EvidenceRecord
 
@@ -98,11 +98,13 @@ def write_draft_repo(repo_root: Path) -> Path:
             {
                 "section_id": "S1",
                 "heading": "Desire at a Distance",
+                "purpose": "Argue that the green light turns Gatsby's longing into a visible, distant target.",
                 "evidence_ids": ["E001"],
             },
             {
                 "section_id": "S2",
                 "heading": "Material Decay and Social Vision",
+                "purpose": "Argue that the valley of ashes turns social decay into a concrete landscape.",
                 "evidence_ids": ["E002"],
             },
         ],
@@ -179,6 +181,8 @@ drafting:
   section_drafts_dir: "artifacts/drafts/sections"
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
+  llm_transport: "ollama_native_chat"
+  timing_output_path: "artifacts/qa/english_draft_timing.json"
   target_word_count_min: 2800
   target_word_count_max: 3200
   estimated_page_target: 10
@@ -210,13 +214,17 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
         "context_payload": False,
         "scene_guidance": False,
         "body_structure": False,
+        "cluster_guidance": False,
         "intro_style": False,
         "body_argument_context": False,
+        "anti_text_repetition": False,
     }
     call_order: list[str] = []
+    seen_transport_overrides: list[str | None] = []
 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
         user_prompt = kwargs.get("user_prompt", "")
+        seen_transport_overrides.append(kwargs.get("transport_override"))
         if "Overall essay target: about 2800-3200 words; roughly 10 pages at about 280 words per page." in user_prompt:
             prompt_checks["overall_target"] = True
         if "Target section length:" in user_prompt:
@@ -227,10 +235,14 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
             prompt_checks["scene_guidance"] = True
         if "opening claim, quoted supporting evidence with citation" in user_prompt:
             prompt_checks["body_structure"] = True
+        if "Treat the provided metaphors as one thematic cluster" in user_prompt:
+            prompt_checks["cluster_guidance"] = True
         if "F. Scott Fitzgerald's writing style" in user_prompt:
             prompt_checks["intro_style"] = True
         if "Completed body arguments:" in user_prompt:
             prompt_checks["body_argument_context"] = True
+        if 'Do not overuse empty sentence openings like "The text," "This metaphor," or "This imagery."' in user_prompt:
+            prompt_checks["anti_text_repetition"] = True
         if "Section type: introduction" in user_prompt:
             call_order.append("introduction")
             return (
@@ -262,11 +274,13 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert (repo_root / "artifacts/drafts/analysis_english_draft.md").exists()
     assert (repo_root / "artifacts/drafts/sections/S1.md").exists()
     assert (repo_root / "artifacts/drafts/sections/S2.md").exists()
-    assert "_This report analyzes 2 selected metaphors" in draft_text
+    assert "_This report organizes selected metaphors into 2 thematic sections" in draft_text
     assert "## Introduction" in draft_text
     assert "## Desire at a Distance" in draft_text
     assert "## Material Decay and Social Vision" in draft_text
+    assert "Together, this metaphor shows how the green light turns Gatsby's longing into a visible, distant target." in draft_text
     assert 'Metaphor text:\n> "green light" [1.2]' in draft_text
+    assert "Together, this metaphor shows how the valley of ashes turns social decay into a concrete landscape." in draft_text
     assert 'Metaphor text:\n> "valley of ashes" [2.2]' in draft_text
     assert "[1.2]" in draft_text
     assert "[2.2]" in draft_text
@@ -275,9 +289,18 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert prompt_checks["context_payload"] is True
     assert prompt_checks["scene_guidance"] is True
     assert prompt_checks["body_structure"] is True
+    assert prompt_checks["cluster_guidance"] is True
     assert prompt_checks["intro_style"] is True
     assert prompt_checks["body_argument_context"] is True
+    assert prompt_checks["anti_text_repetition"] is True
     assert call_order == ["body:S1", "body:S2", "introduction", "conclusion"]
+    assert all(value == "ollama_native_chat" for value in seen_transport_overrides)
+    timing_report = json.loads((repo_root / "artifacts/qa/english_draft_timing.json").read_text(encoding="utf-8"))
+    assert timing_report["stage"] == "draft_english"
+    assert timing_report["transport"] == "ollama_native_chat"
+    assert timing_report["section_count"] == 2
+    assert len(timing_report["sections"]) == 4
+    assert timing_report["total_elapsed_seconds"] >= 0
 
 
 def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp_path) -> None:
@@ -316,6 +339,43 @@ def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp
     assert any("Section type: introduction" in prompt for prompt in call_log)
 
 
+def test_draft_english_retries_body_section_with_compact_prompt(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    call_log: list[str] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        call_log.append(user_prompt)
+        if "Compact retry mode: body argument only." in user_prompt:
+            return (
+                'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2]. '
+                'That exact image proves the claim because the scene gives Gatsby\'s longing a concrete object the reader can picture [1.2]. '
+                'The section closes by preparing the essay to move toward broader social decay.'
+            )
+        if "Section heading: Desire at a Distance" in user_prompt:
+            raise LLMResponseValidationError(
+                "Model returned empty content (finish_reason=length, reasoning_len=22)",
+                "",
+            )
+        if "Section type: introduction" in user_prompt:
+            return (
+                "Fitzgerald writes in a style that turns emotion into visible imagery. "
+                "The introduction summarizes the body arguments already drafted."
+            )
+        if "Section heading: Material Decay and Social Vision" in user_prompt:
+            return 'This section argues that the "valley of ashes" gives decay a physical landscape [2.2].'
+        return "The conclusion gathers the essay's claims into a final judgment."
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+
+    draft_text = draft_english(config)
+
+    assert 'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2].' in draft_text
+    assert any("Compact retry mode: body argument only." in prompt for prompt in call_log)
+    assert any('"cited_passage_text": "Gatsby reached toward the green light at the end of the dock."' in prompt for prompt in call_log)
+
+
 def test_section_response_validator_rejects_paraphrase_quotes_and_bad_locators() -> None:
     evidence_records = [
         EvidenceRecord(
@@ -338,3 +398,29 @@ def test_section_response_validator_rejects_paraphrase_quotes_and_bad_locators()
 
     with pytest.raises(ValueError, match="citations outside the allowed evidence set"):
         validator('Gatsby\'s "green light" marks desire [9.9].')
+
+
+def test_strip_unauthorized_quotes_preserves_allowed_metaphor_quote() -> None:
+    evidence_records = [
+        EvidenceRecord(
+            evidence_id="E001",
+            metaphor="green light",
+            quote="green light",
+            passage_id="1.2",
+            chapter=1,
+            interpretation="A recurring image that concentrates Gatsby's longing into a distant object.",
+            supporting_theme_tags=[],
+            status="verified",
+            source_candidate_id="C001",
+            source_type="candidate",
+        )
+    ]
+
+    cleaned = strip_unauthorized_quotes(
+        'Nick treats the "green light" as meaningful, but he also contrasts East Egg with the "warm centre" of home [1.2].',
+        evidence_records=evidence_records,
+    )
+
+    assert '"green light"' in cleaned
+    assert '"warm centre"' not in cleaned
+    assert "warm centre" in cleaned

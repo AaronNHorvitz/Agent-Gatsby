@@ -28,6 +28,7 @@ from agent_gatsby.verify_citations import (
 LOGGER = logging.getLogger(__name__)
 
 HEADING_RE = re.compile(r"^#{1,6}\s+.+$", re.MULTILINE)
+METAPHOR_TEXT_RE = re.compile(r"^Metaphor text:$", re.MULTILINE)
 
 
 def load_critic_prompt(config: AppConfig) -> str:
@@ -42,6 +43,7 @@ def build_editorial_response_validator(original_text: str):
     original_citations = Counter(extract_citation_markers(original_text))
     original_quotes = Counter(extract_quoted_strings(original_text))
     original_headings = extract_heading_inventory(original_text)
+    original_metaphor_block_count = len(METAPHOR_TEXT_RE.findall(original_text))
 
     def validator(response_text: str) -> None:
         revised_text = response_text.strip()
@@ -60,6 +62,10 @@ def build_editorial_response_validator(original_text: str):
         if revised_headings != original_headings:
             raise ValueError("Editorial revision changed the markdown heading structure")
 
+        revised_metaphor_block_count = len(METAPHOR_TEXT_RE.findall(revised_text))
+        if revised_metaphor_block_count != original_metaphor_block_count:
+            raise ValueError("Editorial revision changed the metaphor-text block inventory")
+
     return validator
 
 
@@ -67,6 +73,7 @@ def build_editorial_user_prompt(draft_text: str) -> str:
     instructions = [
         "Revise the verified markdown draft below for clarity, cohesion, and stronger analytical flow.",
         "Preserve every markdown heading line exactly as written.",
+        "Preserve each short thematic lead-in sentence and each `Metaphor text:` block exactly where it appears.",
         "Preserve every direct quotation exactly as written.",
         "Preserve every citation marker exactly as written.",
         "Do not add new evidence, quotations, headings, or citations.",
@@ -91,6 +98,11 @@ def critique_and_edit(
 ) -> str:
     loaded_draft = draft_text or load_english_draft(config)
     loaded_index = load_passage_index(config)
+    transport_override = (
+        str(config.editorial.get("llm_transport", "")).strip()
+        or str(config.drafting.get("llm_transport", "")).strip()
+        or None
+    )
     try:
         revised_text = invoke_text_completion(
             config,
@@ -99,6 +111,7 @@ def critique_and_edit(
             user_prompt=build_editorial_user_prompt(loaded_draft),
             output_path=str(config.final_draft_output_path),
             response_validator=build_editorial_response_validator(loaded_draft),
+            transport_override=transport_override,
         ).strip()
     except LLMResponseValidationError as exc:
         LOGGER.warning(
@@ -122,6 +135,7 @@ def critique_and_edit(
         revised_text,
         citation_registry,
         title_override=str(config.outline.get("fixed_title", "")).strip() or None,
+        appendix_heading=str(config.drafting.get("citation_appendix_heading", "Citations")),
     )
     citation_text = render_citation_text_document(
         citation_registry,

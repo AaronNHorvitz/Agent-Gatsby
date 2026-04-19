@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -183,8 +184,10 @@ def resolve_stage_sequence(requested_stage: str, config: AppConfig) -> list[str]
 def run_stage(stage_name: str, config: AppConfig, context: StageContext) -> None:
     registry = get_stage_registry()
     LOGGER.info("Starting stage: %s", stage_name)
+    started_at = time.perf_counter()
     registry[stage_name](config, context)
-    LOGGER.info("Finished stage: %s", stage_name)
+    elapsed_seconds = round(time.perf_counter() - started_at, 3)
+    LOGGER.info("Finished stage: %s (%.3f seconds)", stage_name, elapsed_seconds)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -195,12 +198,15 @@ def main(argv: list[str] | None = None) -> int:
         config = load_config(args.config)
         configure_logging(config)
         stages = resolve_stage_sequence(args.run, config)
+        pipeline_started_at = time.perf_counter()
 
         context: StageContext = {}
         for stage_name in stages:
             run_stage(stage_name, config, context)
 
+        total_elapsed_seconds = round(time.perf_counter() - pipeline_started_at, 3)
         LOGGER.info("Completed requested pipeline stages: %s", ", ".join(stages))
+        LOGGER.info("Total pipeline time: %.3f seconds", total_elapsed_seconds)
         return 0
     except Exception as exc:
         if logging.getLogger().handlers:

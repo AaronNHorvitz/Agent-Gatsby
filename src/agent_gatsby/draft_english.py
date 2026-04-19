@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from pathlib import Path
 
 from agent_gatsby.citation_registry import build_context_payload, extract_citation_passage_ids, extract_invalid_bracket_markers
@@ -122,16 +123,34 @@ def build_overall_word_target_guidance(config: AppConfig) -> str | None:
 
 def build_selection_scope_note(section_count: int) -> str:
     return (
-        f"_This report analyzes {section_count} selected metaphors to fit an approximately ten-page assignment requirement. "
-        "The analysis could be expanded with additional metaphors if a longer study were desired._"
+        f"_This report organizes selected metaphors into {section_count} thematic sections to fit an approximately ten-page assignment requirement. "
+        "The analysis could be expanded with additional metaphor clusters if a longer study were desired._"
     )
 
 
-def render_metaphor_focus_block(evidence_records: list[EvidenceRecord]) -> str:
+def normalize_section_claim(section_notes: str) -> str:
+    normalized = collapse_spaces(section_notes).strip()
+    normalized = re.sub(r"^(argue|show|explain|demonstrate|trace|analyze)\s+that\s+", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"^(demonstrate|explore|analyze|show|explain|trace)\s+how\s+", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"^how\s+", "", normalized, flags=re.IGNORECASE)
+    return normalized.rstrip(".").strip()
+
+
+def build_metaphor_focus_lead(section_notes: str, *, evidence_count: int) -> str:
+    subject = "this metaphor" if evidence_count == 1 else "these metaphors"
+    build_verb = "builds" if evidence_count == 1 else "build"
+    verb = "shows" if evidence_count == 1 else "show"
+    normalized_claim = normalize_section_claim(section_notes)
+    if not normalized_claim:
+        return f"Together, {subject} {build_verb} one shared section claim."
+    return f"Together, {subject} {verb} how {normalized_claim}."
+
+
+def render_metaphor_focus_block(evidence_records: list[EvidenceRecord], *, section_notes: str) -> str:
     if not evidence_records:
         return ""
 
-    lines = ["Metaphor text:"]
+    lines = [build_metaphor_focus_lead(section_notes, evidence_count=len(evidence_records)), "", "Metaphor text:"]
     for record in evidence_records:
         lines.append(f'> "{record.quote}" [{record.passage_id}]')
     return "\n".join(lines)
@@ -172,6 +191,32 @@ def render_completed_body_context(section_texts: list[tuple[str, str]]) -> str:
         }
         for heading, text in section_texts
     ]
+    return json.dumps(payload, indent=2, ensure_ascii=False)
+
+
+def render_body_retry_evidence_summary(
+    evidence_records: list[EvidenceRecord],
+    *,
+    passage_index: PassageIndex,
+) -> str:
+    payload = []
+    for record in evidence_records:
+        context_payload = build_context_payload(
+            passage_index,
+            passage_id=record.passage_id,
+            count_before=1,
+            count_after=1,
+        )
+        payload.append(
+            {
+                "evidence_id": record.evidence_id,
+                "metaphor": record.metaphor,
+                "quote": record.quote,
+                "passage_id": record.passage_id,
+                "interpretation": record.interpretation,
+                "cited_passage_text": context_payload["cited_passage"]["text"],
+            }
+        )
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
@@ -224,6 +269,26 @@ def extract_quoted_strings(text: str) -> list[str]:
             if candidate:
                 quotes.append(candidate)
     return quotes
+
+
+def strip_unauthorized_quotes(text: str, *, evidence_records: list[EvidenceRecord]) -> str:
+    allowed_quotes = {normalize_validator_text(record.quote) for record in evidence_records}
+
+    def replace_double(match: re.Match[str]) -> str:
+        candidate = collapse_spaces(match.group(1)).strip()
+        if normalize_validator_text(candidate) in allowed_quotes:
+            return match.group(0)
+        return candidate
+
+    def replace_single(match: re.Match[str]) -> str:
+        candidate = collapse_spaces(match.group(1)).strip()
+        if normalize_validator_text(candidate) in allowed_quotes:
+            return match.group(0)
+        return candidate
+
+    cleaned = DOUBLE_QUOTE_RE.sub(replace_double, text)
+    cleaned = SINGLE_QUOTE_RE.sub(replace_single, cleaned)
+    return cleaned
 
 
 def build_section_response_validator(
@@ -294,6 +359,9 @@ def build_draft_user_prompt(
         "Explain why the metaphor makes sense in the surrounding paragraphs and how it clarifies character, setting, or theme in that moment.",
         "Only connect a metaphor to later developments in the novel when that claim is supported by the provided evidence.",
         "Use clear, readable English rather than dense academic jargon.",
+        'Do not overuse empty sentence openings like "The text," "This metaphor," or "This imagery."',
+        "Vary your phrasing by referring naturally to Fitzgerald, the novel, the narrator, Gatsby, the scene, the image, or the passage when appropriate.",
+        "Prefer concrete literary-analysis prose over abstract academic filler.",
         "Treat the surrounding context as paraphrase-only background unless the exact words also appear in a provided quote field.",
         "If you use a direct quotation, keep it exact and preserve its locator exactly as given.",
         "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
@@ -314,6 +382,9 @@ def build_draft_user_prompt(
             "Write this introduction after the body arguments already exist."
         )
         instructions.append(
+            "Write 4 substantial paragraphs rather than one compressed block."
+        )
+        instructions.append(
             "Open with a clear statement about F. Scott Fitzgerald's writing style in The Great Gatsby."
         )
         instructions.append(
@@ -330,6 +401,7 @@ def build_draft_user_prompt(
     if section_type == "conclusion":
         instructions.append("Write this conclusion after the body arguments already exist.")
         instructions.append("Keep the conclusion short, direct, and easy to read.")
+        instructions.append("Write 3 substantial paragraphs rather than one compressed block.")
         instructions.append("Synthesize the body arguments into one closing judgment about Fitzgerald's use of metaphor.")
     if section_type == "body":
         instructions.append(
@@ -337,11 +409,26 @@ def build_draft_user_prompt(
             "analysis of how the text proves the claim in scene context, and a closing or transition sentence."
         )
         instructions.append(
+            "Treat the provided metaphors as one thematic cluster rather than as separate mini-sections."
+        )
+        instructions.append(
             "The opening sentence should make an arguable point, not just announce the topic."
         )
         instructions.append("Use at least one bracketed chapter.paragraph citation from the provided evidence.")
         instructions.append(
             "Assume the exact metaphor text will be shown immediately before your analysis, so do not waste the opening sentence restating it."
+        )
+        instructions.append(
+            "The final report will place a short thematic lead-in sentence before the `Metaphor text:` block, so make the analysis deepen that shared theme rather than reintroduce it."
+        )
+        instructions.append(
+            "Develop the section across at least 4 substantial paragraphs so the grouped metaphors can build one cohesive argument."
+        )
+        instructions.append(
+            "Do not compress the section into one or two dense paragraphs; expand the close reading so each major image gets clear explanation in scene context."
+        )
+        instructions.append(
+            "Address every quotation shown in the section's `Metaphor text:` block at least once, and give each major image its own paragraph of explanation."
         )
     instructions.append(
         "The only allowed locator markers for this section are: "
@@ -373,11 +460,12 @@ def build_intro_retry_user_prompt(
         f"Section heading: {heading}",
         f"Section notes: {section_notes.strip()}",
         "Write markdown prose only for this section body.",
-        "Write 3 short paragraphs in clear, readable English.",
+        "Write 4 substantial paragraphs in clear, readable English.",
         "Do not repeat the section heading.",
         "Do not include notes, self-critique, drafting commentary, or word-count checks.",
         "Use only the completed body arguments provided below.",
         "Do not use any direct quotations or quotation marks in this introduction; paraphrase the evidence instead.",
+        'Do not open multiple sentences with "The text" or similar abstract filler.',
         "Explain F. Scott Fitzgerald's writing style in The Great Gatsby and how he uses metaphor, based on the body arguments already drafted.",
         "Briefly explain what happens in the story, how the text uses metaphor as a literary device, and why this selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable.",
         "End with a transition sentence leading into the first body section.",
@@ -394,6 +482,52 @@ def build_intro_retry_user_prompt(
         instructions.append(section_word_target)
     return "\n".join(instructions) + "\n\nCompleted body arguments:\n" + render_completed_body_context(
         completed_body_sections
+    )
+
+
+def build_body_retry_user_prompt(
+    config: AppConfig,
+    outline: OutlinePlan,
+    *,
+    heading: str,
+    section_notes: str,
+    evidence_records: list[EvidenceRecord],
+    passage_index: PassageIndex,
+) -> str:
+    instructions = [
+        "Compact retry mode: body argument only.",
+        f"Essay title: {outline.title}",
+        f"Thesis: {outline.thesis}",
+        f"Section heading: {heading}",
+        f"Section notes: {section_notes.strip()}",
+        "Write markdown prose only for this section body.",
+        "Write 4 substantial paragraphs in clear, readable English.",
+        "Do not repeat the section heading.",
+        "Do not include notes, self-critique, drafting commentary, or word-count checks.",
+        "Use only the evidence summary provided below.",
+        "Build a compact argument chain: opening claim, exact quoted evidence with citation, explanation of how the scene context supports the claim, and a short closing or transition sentence.",
+        "Treat the provided metaphors as one thematic cluster rather than as separate mini-sections.",
+        "Address every quotation in the evidence summary at least once.",
+        'Do not overuse abstract openings such as "The text" or "This metaphor."',
+        "Use at least one exact quote from the provided evidence.",
+        "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
+        "Do not shorten, trim, or partially quote any provided quote string.",
+        "The only allowed locator markers for this section are: "
+        + ", ".join(f"[{record.passage_id}]" for record in evidence_records),
+    ]
+    overall_word_target = build_overall_word_target_guidance(config)
+    if overall_word_target:
+        instructions.append(overall_word_target)
+    section_word_target = build_section_word_target_guidance(
+        config,
+        outline=outline,
+        section_type="body",
+    )
+    if section_word_target:
+        instructions.append(section_word_target)
+    return "\n".join(instructions) + "\n\nEvidence summary:\n" + render_body_retry_evidence_summary(
+        evidence_records,
+        passage_index=passage_index,
     )
 
 
@@ -428,6 +562,7 @@ def draft_section(
     require_citation: bool,
     completed_body_sections: list[tuple[str, str]] | None = None,
 ) -> str:
+    transport_override = str(config.drafting.get("llm_transport", "")).strip() or None
     response_validator = build_section_response_validator(
         evidence_records,
         require_citation=require_citation,
@@ -449,31 +584,69 @@ def draft_section(
             ),
             output_path=output_path,
             response_validator=response_validator,
+            transport_override=transport_override,
         )
     except LLMResponseValidationError as exc:
-        if section_type != "introduction" or "Model returned empty content" not in str(exc):
+        if "quoted text outside the allowed evidence set" in str(exc) and exc.response_text:
+            LOGGER.warning(
+                "Drafted section contained unauthorized quotation marks; stripping them deterministically: %s",
+                exc,
+            )
+            response_text = strip_unauthorized_quotes(exc.response_text, evidence_records=evidence_records)
+            response_validator(response_text)
+            section_text = validate_section_text(response_text, heading=heading, require_citation=require_citation)
+            if section_type == "body":
+                focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
+                return f"{focus_block}\n\n{section_text}".strip()
+            return section_text
+        if "Model returned empty content" not in str(exc):
             raise
-        LOGGER.warning(
-            "Introduction draft returned empty content; retrying with compact intro prompt: %s",
-            exc,
-        )
-        response_text = invoke_text_completion(
-            config,
-            stage_name="draft_english",
-            system_prompt=load_draft_prompt(config),
-            user_prompt=build_intro_retry_user_prompt(
+        if section_type == "introduction":
+            LOGGER.warning(
+                "Introduction draft returned empty content; retrying with compact intro prompt: %s",
+                exc,
+            )
+            response_text = invoke_text_completion(
                 config,
-                outline,
-                heading=heading,
-                section_notes=section_notes,
-                completed_body_sections=completed_body_sections or [],
-            ),
-            output_path=output_path,
-            response_validator=response_validator,
-        )
+                stage_name="draft_english",
+                system_prompt=load_draft_prompt(config),
+                user_prompt=build_intro_retry_user_prompt(
+                    config,
+                    outline,
+                    heading=heading,
+                    section_notes=section_notes,
+                    completed_body_sections=completed_body_sections or [],
+                ),
+                output_path=output_path,
+                response_validator=response_validator,
+                transport_override=transport_override,
+            )
+        elif section_type == "body":
+            LOGGER.warning(
+                "Body section draft returned empty content; retrying with compact body prompt: %s",
+                exc,
+            )
+            response_text = invoke_text_completion(
+                config,
+                stage_name="draft_english",
+                system_prompt=load_draft_prompt(config),
+                user_prompt=build_body_retry_user_prompt(
+                    config,
+                    outline,
+                    heading=heading,
+                    section_notes=section_notes,
+                    evidence_records=evidence_records,
+                    passage_index=passage_index,
+                ),
+                output_path=output_path,
+                response_validator=response_validator,
+                transport_override=transport_override,
+            )
+        else:
+            raise
     section_text = validate_section_text(response_text, heading=heading, require_citation=require_citation)
     if section_type == "body":
-        focus_block = render_metaphor_focus_block(evidence_records)
+        focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
         return f"{focus_block}\n\n{section_text}".strip()
     return section_text
 
@@ -522,6 +695,19 @@ def write_english_draft(config: AppConfig, draft_text: str) -> None:
     LOGGER.info("Wrote English draft to %s", output_path)
 
 
+def draft_timing_output_path(config: AppConfig) -> Path:
+    return config.resolve_repo_path(
+        str(config.drafting.get("timing_output_path", "artifacts/qa/english_draft_timing.json"))
+    )
+
+
+def write_draft_timing_report(config: AppConfig, payload: dict[str, object]) -> None:
+    output_path = draft_timing_output_path(config)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    LOGGER.info("Wrote English draft timing report to %s", output_path)
+
+
 def draft_english(
     config: AppConfig,
     *,
@@ -529,6 +715,7 @@ def draft_english(
     evidence_records: list[EvidenceRecord] | None = None,
     passage_index: PassageIndex | None = None,
 ) -> str:
+    draft_started_at = time.perf_counter()
     loaded_outline = outline or load_outline(config)
     loaded_records = evidence_records or load_evidence_records(config)
     loaded_index = passage_index or load_passage_index(config)
@@ -536,8 +723,10 @@ def draft_english(
     outline_records = gather_outline_evidence(loaded_outline, evidence_lookup)
 
     section_texts: list[tuple[str, str]] = []
+    section_timings: list[dict[str, object]] = []
     for section in loaded_outline.sections:
         section_records = gather_section_evidence(section, evidence_lookup)
+        section_started_at = time.perf_counter()
         section_text = draft_section(
             config,
             outline=loaded_outline,
@@ -556,7 +745,16 @@ def draft_english(
             text=section_text,
         )
         section_texts.append((section.heading, section_text))
+        section_timings.append(
+            {
+                "section_id": section.section_id,
+                "section_type": "body",
+                "heading": section.heading,
+                "elapsed_seconds": round(time.perf_counter() - section_started_at, 3),
+            }
+        )
 
+    introduction_started_at = time.perf_counter()
     introduction_text = draft_section(
         config,
         outline=loaded_outline,
@@ -575,7 +773,16 @@ def draft_english(
         heading="Introduction",
         text=introduction_text,
     )
+    section_timings.append(
+        {
+            "section_id": "00_introduction",
+            "section_type": "introduction",
+            "heading": "Introduction",
+            "elapsed_seconds": round(time.perf_counter() - introduction_started_at, 3),
+        }
+    )
 
+    conclusion_started_at = time.perf_counter()
     conclusion_text = draft_section(
         config,
         outline=loaded_outline,
@@ -593,6 +800,14 @@ def draft_english(
         filename="99_conclusion.md",
         heading="Conclusion",
         text=conclusion_text,
+    )
+    section_timings.append(
+        {
+            "section_id": "99_conclusion",
+            "section_type": "conclusion",
+            "heading": "Conclusion",
+            "elapsed_seconds": round(time.perf_counter() - conclusion_started_at, 3),
+        }
     )
 
     draft_text = compose_full_draft(
@@ -620,5 +835,23 @@ def draft_english(
         LOGGER.warning("English draft is below target word count: %d < %d", word_count, minimum_words)
     if maximum_words > 0 and word_count > maximum_words:
         LOGGER.warning("English draft is above target word count: %d > %d", word_count, maximum_words)
+
+    total_elapsed_seconds = round(time.perf_counter() - draft_started_at, 3)
+    write_draft_timing_report(
+        config,
+        {
+            "stage": "draft_english",
+            "title": loaded_outline.title,
+            "section_count": len(loaded_outline.sections),
+            "word_count": word_count,
+            "estimated_pages": estimated_pages,
+            "total_elapsed_seconds": total_elapsed_seconds,
+            "transport": str(config.drafting.get("llm_transport", "")).strip()
+            or str(config.models.get("provider", "")).strip()
+            or "openai_compatible",
+            "sections": section_timings,
+        },
+    )
+    LOGGER.info("Completed English report draft in %.3f seconds", total_elapsed_seconds)
 
     return draft_text

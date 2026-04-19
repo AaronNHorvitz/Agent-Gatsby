@@ -77,6 +77,38 @@ def load_outline(source: AppConfig | str | Path) -> OutlinePlan:
     return OutlinePlan.model_validate(data)
 
 
+def select_outline_evidence_records(config: AppConfig, evidence_records: list[EvidenceRecord]) -> list[EvidenceRecord]:
+    max_records = int(config.outline.get("max_prompt_evidence_records", 0))
+    if max_records <= 0 or len(evidence_records) <= max_records:
+        return evidence_records
+
+    selected: list[EvidenceRecord] = []
+    seen_passage_ids: set[str] = set()
+    for record in evidence_records:
+        if record.passage_id in seen_passage_ids:
+            continue
+        selected.append(record)
+        seen_passage_ids.add(record.passage_id)
+        if len(selected) >= max_records:
+            break
+
+    if len(selected) < max_records:
+        seen_evidence_ids = {record.evidence_id for record in selected}
+        for record in evidence_records:
+            if record.evidence_id in seen_evidence_ids:
+                continue
+            selected.append(record)
+            if len(selected) >= max_records:
+                break
+
+    LOGGER.info(
+        "Trimmed outline prompt evidence set from %d to %d records",
+        len(evidence_records),
+        len(selected),
+    )
+    return selected
+
+
 def build_outline_user_prompt(config: AppConfig, evidence_records: list[EvidenceRecord]) -> str:
     minimum_sections = int(config.outline.get("minimum_section_count", 0))
     maximum_sections = int(config.outline.get("maximum_section_count", 0))
@@ -92,7 +124,8 @@ def build_outline_user_prompt(config: AppConfig, evidence_records: list[Evidence
         "This outline should support a reader-friendly English report rather than an abstract technical artifact.",
         "Plan the body arguments first, then make the introduction and conclusion summarize those body arguments.",
         "The introduction should explain F. Scott Fitzgerald's writing style in The Great Gatsby and how he uses metaphor, based only on the evidence in the sections that follow.",
-        "Prefer one main metaphor per body section, with section headings that clearly name the metaphor or image being analyzed.",
+        "Prefer cohesive clusters of related metaphors per body section when those images clearly support the same theme or argumentative point.",
+        "Make each body section feel like part of one flowing essay, not a disconnected catalog of isolated quotations.",
         "Each body section must include a short 'purpose' field that states the argumentative claim the section will prove.",
         "Order the body sections so the argument builds clearly from one metaphor to the next.",
     ]
@@ -174,13 +207,15 @@ def plan_outline(
     evidence_records: list[EvidenceRecord] | None = None,
 ) -> OutlinePlan:
     loaded_records = evidence_records or load_evidence_records(config)
+    prompt_records = select_outline_evidence_records(config, loaded_records)
     response_text = invoke_text_completion(
         config,
         stage_name="plan_outline",
         system_prompt=load_outline_prompt(config),
-        user_prompt=build_outline_user_prompt(config, loaded_records),
+        user_prompt=build_outline_user_prompt(config, prompt_records),
         output_path=str(config.outline_output_path),
         response_validator=validate_outline_response,
+        transport_override=str(config.outline.get("llm_transport", "")).strip() or None,
     )
     outline = parse_outline_response(response_text)
     fixed_title = str(config.outline.get("fixed_title", "")).strip()

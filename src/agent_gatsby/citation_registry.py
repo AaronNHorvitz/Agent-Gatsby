@@ -199,6 +199,13 @@ def render_text_with_display_citations(text: str, registry: list[CitationRegistr
     return CANONICAL_CITATION_RE.sub(replace, text)
 
 
+def build_short_excerpt(text: str, *, max_words: int = 14) -> str:
+    words = text.split()
+    if len(words) <= max_words:
+        return " ".join(words)
+    return " ".join(words[:max_words]).rstrip(" ,;:") + "..."
+
+
 def italicize_quoted_text(text: str) -> str:
     italicized = STRAIGHT_DOUBLE_QUOTE_RE.sub(r'*"\1"*', text)
     return CURLY_DOUBLE_QUOTE_RE.sub(r"*“\1”*", italicized)
@@ -221,17 +228,38 @@ def normalize_report_title(text: str, *, title_override: str | None) -> str:
     return f"# {title_override}\n\n{text.strip()}"
 
 
+def render_citations_section(
+    registry: list[CitationRegistryEntry],
+    *,
+    heading: str,
+) -> str:
+    if not registry:
+        return ""
+
+    parts = [f"## {heading}", ""]
+    for entry in registry:
+        excerpt = build_short_excerpt(entry.exact_passage_text)
+        parts.append(
+            f"{entry.citation_number}. F. Scott Fitzgerald, *The Great Gatsby*, ch. {entry.chapter}, para. {entry.paragraph}, cited passage beginning \"{excerpt}\"."
+        )
+    return "\n".join(parts).strip()
+
+
 def render_final_report(
     body_text: str,
     registry: list[CitationRegistryEntry],
     *,
     title_override: str | None = None,
+    appendix_heading: str = "Citations",
 ) -> str:
     rendered_body = strip_legacy_citation_note(body_text.strip())
     rendered_body = normalize_report_title(rendered_body, title_override=title_override)
     rendered_body = render_text_with_display_citations(rendered_body, registry).strip()
     rendered_body = italicize_quoted_text(rendered_body)
     rendered_body = shrink_body_headings(rendered_body)
+    citations_section = render_citations_section(registry, heading=appendix_heading)
+    if citations_section:
+        rendered_body = rendered_body.strip() + "\n\n" + citations_section
     return rendered_body.strip() + "\n"
 
 

@@ -100,8 +100,10 @@ evidence_ledger:
 
 outline:
   output_path: "artifacts/drafts/outline.json"
-  minimum_section_count: 4
-  maximum_section_count: 7
+  minimum_section_count: 6
+  maximum_section_count: 6
+  max_prompt_evidence_records: 24
+  llm_transport: "ollama_native_chat"
   fixed_title: "An Analysis of Metaphors in The Great Gatsby"
   require_intro: true
   require_conclusion: true
@@ -113,10 +115,12 @@ drafting:
   section_drafts_dir: "artifacts/drafts/sections"
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
-  target_word_count_min: 2800
-  target_word_count_max: 3200
+  llm_transport: "ollama_native_chat"
+  timing_output_path: "artifacts/qa/english_draft_timing.json"
+  target_word_count_min: 5600
+  target_word_count_max: 6200
   estimated_page_target: 10
-  words_per_page_estimate: 280
+  words_per_page_estimate: 500
   write_section_by_section: true
   max_evidence_per_section: 4
   citation_format: "[{passage_id}]"
@@ -143,6 +147,7 @@ verification:
   require_all_citations_to_resolve: true
 
 editorial:
+  llm_transport: "ollama_native_chat"
   preserve_quotes: true
   preserve_citations: true
   forbid_new_evidence: true
