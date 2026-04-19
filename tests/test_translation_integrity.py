@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agent_gatsby.config import load_config
+from agent_gatsby.llm_client import LLMResponseValidationError
 from agent_gatsby.translate_mandarin import translate_mandarin
 from agent_gatsby.translate_spanish import translate_spanish
 from agent_gatsby.translation_common import extract_visible_citation_markers, split_markdown_into_chunks
@@ -128,3 +129,25 @@ def test_translate_mandarin_writes_output(monkeypatch, tmp_path) -> None:
 
     assert config.mandarin_translation_output_path.exists()
     assert translated_text.startswith("# An Analysis")
+
+
+def test_translate_spanish_falls_back_to_fragment_stitching_when_placeholders_drift(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    calls: list[str] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs["user_prompt"]
+        calls.append(user_prompt)
+        if "English markdown chunk:" in user_prompt:
+            raise LLMResponseValidationError("Translated chunk changed the citation placeholder inventory", "")
+        return user_prompt.split("English markdown fragment:\n\n", maxsplit=1)[1]
+
+    monkeypatch.setattr("agent_gatsby.translation_common.invoke_text_completion", fake_invoke_text_completion)
+
+    translated_text = translate_spanish(config)
+
+    assert config.spanish_translation_output_path.exists()
+    assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
+    assert any("English markdown chunk:" in call for call in calls)
+    assert any("English markdown fragment:" in call for call in calls)

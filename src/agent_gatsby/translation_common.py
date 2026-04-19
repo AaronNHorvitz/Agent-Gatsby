@@ -8,12 +8,14 @@ import logging
 import re
 
 from agent_gatsby.config import AppConfig
-from agent_gatsby.llm_client import invoke_text_completion
+from agent_gatsby.llm_client import LLMResponseValidationError, invoke_text_completion
 
 LOGGER = logging.getLogger(__name__)
 
 BLOCK_SPLIT_RE = re.compile(r"\n\s*\n")
 HEADING_RE = re.compile(r"(?m)^(#{1,6})\s+.+$")
+HEADING_LINE_RE = re.compile(r"^(#{1,6}\s+)(.*)$")
+BLOCKQUOTE_LINE_RE = re.compile(r"^(\s*>\s?)(.*)$")
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
 TRANSLATION_CITATION_PLACEHOLDER_RE = re.compile(r"AGCITTOKEN(\d{4})XYZ")
 STRAIGHT_QUOTE_SPAN_RE = re.compile(r'"[^"\n]+?"')
@@ -142,6 +144,16 @@ def build_translation_user_prompt(chunk_text: str, *, chunk_index: int, total_ch
     return "\n".join(instructions) + "\n\nEnglish markdown chunk:\n\n" + chunk_text
 
 
+def build_fragment_user_prompt(fragment_text: str, *, language_name: str) -> str:
+    instructions = [
+        f"Translate this markdown fragment into {language_name}.",
+        "Do not add commentary or extra lines.",
+        "Preserve any inline markdown emphasis markers like * and _ when they appear in the fragment.",
+        "Return the translated fragment only.",
+    ]
+    return "\n".join(instructions) + "\n\nEnglish markdown fragment:\n\n" + fragment_text
+
+
 def validate_translation_chunk(source_chunk: str, translated_chunk: str) -> None:
     stripped = translated_chunk.strip()
     if not stripped:
@@ -166,10 +178,139 @@ def validate_placeholder_chunk(source_chunk: str, translated_chunk: str) -> None
         raise ValueError("Translated chunk changed the citation placeholder inventory")
 
 
+def validate_translated_fragment(translated_text: str) -> None:
+    if not translated_text.strip():
+        raise ValueError("Translated fragment is empty")
+
+    if extract_visible_citation_markers(translated_text):
+        raise ValueError("Translated fragment unexpectedly introduced citation markers")
+
+    if extract_translation_placeholders(translated_text):
+        raise ValueError("Translated fragment unexpectedly introduced citation placeholders")
+
+
 def write_translation_output(output_path, text: str, *, language_name: str) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(text.strip() + "\n", encoding="utf-8")
     LOGGER.info("Wrote %s translation to %s", language_name, output_path)
+
+
+def translate_fragment(
+    config: AppConfig,
+    *,
+    stage_name: str,
+    system_prompt: str,
+    output_path,
+    model_name: str,
+    language_name: str,
+    fragment_text: str,
+    transport_override: str | None,
+) -> str:
+    if not fragment_text.strip():
+        return fragment_text
+
+    leading = fragment_text[: len(fragment_text) - len(fragment_text.lstrip())]
+    trailing = fragment_text[len(fragment_text.rstrip()) :]
+    core = fragment_text.strip()
+    if not core:
+        return fragment_text
+
+    translated_core = invoke_text_completion(
+        config,
+        stage_name=stage_name,
+        system_prompt=system_prompt,
+        user_prompt=build_fragment_user_prompt(core, language_name=language_name),
+        output_path=str(output_path),
+        model_name=model_name,
+        response_validator=validate_translated_fragment,
+        transport_override=transport_override,
+    ).strip()
+    return leading + translated_core + trailing
+
+
+def translate_text_preserving_citations(
+    config: AppConfig,
+    *,
+    stage_name: str,
+    system_prompt: str,
+    output_path,
+    model_name: str,
+    language_name: str,
+    text: str,
+    transport_override: str | None,
+) -> str:
+    if not text:
+        return text
+
+    parts = re.split(f"({VISIBLE_CITATION_RE.pattern})", text)
+    translated_parts: list[str] = []
+    for part in parts:
+        if not part:
+            continue
+        if VISIBLE_CITATION_RE.fullmatch(part):
+            translated_parts.append(part)
+            continue
+        translated_parts.append(
+            translate_fragment(
+                config,
+                stage_name=stage_name,
+                system_prompt=system_prompt,
+                output_path=output_path,
+                model_name=model_name,
+                language_name=language_name,
+                fragment_text=part,
+                transport_override=transport_override,
+            )
+        )
+    return "".join(translated_parts)
+
+
+def translate_chunk_with_marker_stitching(
+    config: AppConfig,
+    *,
+    stage_name: str,
+    system_prompt: str,
+    output_path,
+    model_name: str,
+    language_name: str,
+    chunk_text: str,
+    transport_override: str | None,
+) -> str:
+    translated_blocks: list[str] = []
+    for block in paragraph_blocks(chunk_text):
+        translated_lines: list[str] = []
+        for line in block.splitlines():
+            if not line.strip():
+                translated_lines.append(line)
+                continue
+
+            prefix = ""
+            body = line
+            heading_match = HEADING_LINE_RE.match(line)
+            if heading_match:
+                prefix = heading_match.group(1)
+                body = heading_match.group(2)
+            else:
+                blockquote_match = BLOCKQUOTE_LINE_RE.match(line)
+                if blockquote_match:
+                    prefix = blockquote_match.group(1)
+                    body = blockquote_match.group(2)
+
+            translated_lines.append(
+                prefix
+                + translate_text_preserving_citations(
+                    config,
+                    stage_name=stage_name,
+                    system_prompt=system_prompt,
+                    output_path=output_path,
+                    model_name=model_name,
+                    language_name=language_name,
+                    text=body,
+                    transport_override=transport_override,
+                )
+            )
+        translated_blocks.append("\n".join(translated_lines))
+    return "\n\n".join(translated_blocks).strip()
 
 
 def translate_document(
@@ -193,9 +334,11 @@ def translate_document(
     )
 
     translated_chunks: list[str] = []
+    target_model_name = config.model_name_for(model_key)
     for index, chunk in enumerate(chunks, start=1):
         masked_chunk, original_markers = mask_visible_citation_markers(chunk)
-        translated_chunk = invoke_text_completion(
+        try:
+            translated_chunk = invoke_text_completion(
                 config,
                 stage_name=stage_name,
                 system_prompt=system_prompt,
@@ -206,11 +349,32 @@ def translate_document(
                     language_name=language_name,
                 ),
                 output_path=str(output_path),
-                model_name=config.model_name_for(model_key),
+                model_name=target_model_name,
                 response_validator=lambda text, source_chunk=masked_chunk: validate_placeholder_chunk(source_chunk, text),
                 transport_override=transport_override,
             ).strip()
-        translated_chunks.append(restore_visible_citation_markers(translated_chunk, original_markers))
+            translated_chunks.append(restore_visible_citation_markers(translated_chunk, original_markers))
+        except LLMResponseValidationError as exc:
+            if "citation placeholder inventory" not in str(exc):
+                raise
+            LOGGER.warning(
+                "Chunk-level translation failed placeholder preservation for %s chunk %d/%d; falling back to citation-safe fragment stitching",
+                stage_name,
+                index,
+                len(chunks),
+            )
+            translated_chunks.append(
+                translate_chunk_with_marker_stitching(
+                    config,
+                    stage_name=stage_name,
+                    system_prompt=system_prompt,
+                    output_path=output_path,
+                    model_name=target_model_name,
+                    language_name=language_name,
+                    chunk_text=chunk,
+                    transport_override=transport_override,
+                )
+            )
 
     translated_text = "\n\n".join(translated_chunks).strip() + "\n"
     validate_translation_chunk(master_text, translated_text)
