@@ -457,9 +457,12 @@ def build_draft_user_prompt(
         "Explain why the metaphor makes sense in the surrounding paragraphs and how it clarifies character, setting, or theme in that moment.",
         "Only connect a metaphor to later developments in the novel when that claim is supported by the provided evidence.",
         "Use clear, readable English rather than dense academic jargon.",
+        "Move quickly from claim to evidence to explanation.",
+        "Prefer shorter topic sentences and direct academic prose over lush setup.",
         'Do not overuse empty sentence openings like "The text," "This metaphor," or "This imagery."',
         "Vary your phrasing by referring naturally to Fitzgerald, the novel, the narrator, Gatsby, the scene, the image, or the passage when appropriate.",
         "Prefer concrete literary-analysis prose over abstract academic filler.",
+        "Cut decorative phrasing when it slows the argument.",
         "Treat the surrounding context as paraphrase-only background unless the exact words also appear in a provided quote field.",
         "If you use a direct quotation, keep it exact and preserve its locator exactly as given.",
         "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
@@ -492,6 +495,7 @@ def build_draft_user_prompt(
             "Explain in plain English what the story is about, why these selected metaphors were chosen for an approximately ten-page analysis, "
             "and how the body sections will prove the essay's argument."
         )
+        instructions.append("Keep the introduction direct and readable rather than ornate.")
         instructions.append(
             "End with a transition sentence that leads naturally into the first body section."
         )
@@ -501,6 +505,7 @@ def build_draft_user_prompt(
         instructions.append("Keep the conclusion short, direct, and easy to read.")
         instructions.append("Write 3 substantial paragraphs rather than one compressed block.")
         instructions.append("Synthesize the body arguments into one closing judgment about Fitzgerald's use of metaphor.")
+        instructions.append("Avoid decorative recap; close with a concise final judgment.")
     if section_type == "body":
         instructions.append(
             "Structure this section as a compact argument chain: opening claim, quoted supporting evidence with citation, "
@@ -520,13 +525,13 @@ def build_draft_user_prompt(
             "The final report will place a short thematic lead-in sentence before the `Metaphor text:` block, so make the analysis deepen that shared theme rather than reintroduce it."
         )
         instructions.append(
-            "Develop the section across at least 4 substantial paragraphs so the grouped metaphors can build one cohesive argument."
+            "Develop the section across 3 or 4 purposeful paragraphs so the grouped metaphors can build one cohesive argument."
         )
         instructions.append(
-            "Do not compress the section into one or two dense paragraphs; expand the close reading so each major image gets clear explanation in scene context."
+            "Do not collapse the section into one dense block, but keep the argument moving briskly."
         )
         instructions.append(
-            "Address every quotation shown in the section's `Metaphor text:` block at least once, and give each major image its own paragraph of explanation."
+            "Address every quotation shown in the section's `Metaphor text:` block at least once, but combine related images when that keeps the analysis direct and readable."
         )
     instructions.append(
         "The only allowed locator markers for this section are: "
@@ -564,6 +569,7 @@ def build_intro_retry_user_prompt(
         "Use only the completed body arguments provided below.",
         "Do not use any direct quotations or quotation marks in this introduction; paraphrase the evidence instead.",
         'Do not open multiple sentences with "The text" or similar abstract filler.',
+        "Keep the prose direct and lightly academic rather than ornamental.",
         "Explain F. Scott Fitzgerald's writing style in The Great Gatsby and how he uses metaphor, based on the body arguments already drafted.",
         "Briefly explain what happens in the story, how the text uses metaphor as a literary device, and why this selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable.",
         "End with a transition sentence leading into the first body section.",
@@ -607,6 +613,8 @@ def build_body_retry_user_prompt(
         "Treat the provided metaphors as one thematic cluster rather than as separate mini-sections.",
         "Address every quotation in the evidence summary at least once.",
         'Do not overuse abstract openings such as "The text" or "This metaphor."',
+        "Keep the prose direct, lightly academic, and faster-moving than a full literary close-reading seminar.",
+        "Combine related images when that keeps the section concise and readable.",
         "Use at least one exact quote from the provided evidence.",
         "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
         "Do not shorten, trim, or partially quote any provided quote string.",

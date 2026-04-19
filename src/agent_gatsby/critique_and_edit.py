@@ -75,6 +75,8 @@ def build_editorial_user_prompt(draft_text: str) -> str:
         "Preserve every markdown heading line exactly as written.",
         "You may rewrite the one-sentence thematic lead-in before each `Metaphor text:` block so it reads naturally and grammatically.",
         "Preserve each `Metaphor text:` block exactly where it appears.",
+        "Tighten bloated explanation when the draft repeats the same analytical point.",
+        "Prefer direct academic prose and a clear claim-evidence-analysis rhythm.",
         "Preserve every direct quotation exactly as written.",
         "Preserve every citation marker exactly as written.",
         "Do not add new evidence, quotations, headings, or citations.",

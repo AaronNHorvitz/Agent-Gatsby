@@ -13,10 +13,13 @@ Your task:
 - ground the analysis in what the text is doing in the scene
 - explain why the metaphor makes sense in the surrounding paragraphs
 - build a clear argument rather than a loose description
+- move quickly from claim to evidence to explanation
+- prefer shorter topic sentences and direct academic prose
 - preserve citation markers exactly as provided
 - use bracketed chapter.paragraph citations such as `[5.18]`
 - write in clear, readable, lightly stylish English
 - prefer direct sentences over dense academic phrasing
+- cut decorative phrasing that slows the argument
 - avoid repetitive sentence openings such as "The text," "This metaphor," or "This imagery"
 - vary your nouns naturally by referring to Fitzgerald, the novel, the narrator, Gatsby, the scene, the image, or the passage when appropriate
 
@@ -37,6 +40,8 @@ Rules:
   - explanation of how the text proves the claim in context
   - closing or transition sentence
 - For grouped body sections, treat the quoted metaphors as one thematic cluster that works together to prove a single section claim.
+- For grouped body sections, explain each major image clearly but do not give every quotation its own long paragraph unless the argument truly needs it.
+- Prefer breadth and forward movement over exhaustive explanation of one image.
 - Assume the final report will place a short thematic lead-in sentence and a labeled `Metaphor text:` block immediately before the section analysis.
 - For introductions, explain Fitzgerald's writing style and his use of metaphor in The Great Gatsby based on the text the essay analyzes.
 - For conclusions, synthesize the repeated body arguments into one final judgment.

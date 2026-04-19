@@ -227,6 +227,8 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
         "intro_style": False,
         "body_argument_context": False,
         "anti_text_repetition": False,
+        "direct_style_guidance": False,
+        "breadth_guidance": False,
     }
     call_order: list[str] = []
     seen_transport_overrides: list[str | None] = []
@@ -252,6 +254,10 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
             prompt_checks["body_argument_context"] = True
         if 'Do not overuse empty sentence openings like "The text," "This metaphor," or "This imagery."' in user_prompt:
             prompt_checks["anti_text_repetition"] = True
+        if "Move quickly from claim to evidence to explanation." in user_prompt:
+            prompt_checks["direct_style_guidance"] = True
+        if "Address every quotation shown in the section's `Metaphor text:` block at least once, but combine related images" in user_prompt:
+            prompt_checks["breadth_guidance"] = True
         if "Section type: introduction" in user_prompt:
             call_order.append("introduction")
             return (
@@ -303,6 +309,8 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert prompt_checks["intro_style"] is True
     assert prompt_checks["body_argument_context"] is True
     assert prompt_checks["anti_text_repetition"] is True
+    assert prompt_checks["direct_style_guidance"] is True
+    assert prompt_checks["breadth_guidance"] is True
     assert call_order == ["body:S1", "body:S2", "introduction", "conclusion"]
     assert all(value == "ollama_native_chat" for value in seen_transport_overrides)
     timing_report = json.loads((repo_root / "artifacts/qa/english_draft_timing.json").read_text(encoding="utf-8"))

@@ -77,29 +77,42 @@ def load_outline(source: AppConfig | str | Path) -> OutlinePlan:
     return OutlinePlan.model_validate(data)
 
 
+def round_robin_records_by_chapter(records: list[EvidenceRecord]) -> list[EvidenceRecord]:
+    chapter_buckets: dict[int, list[EvidenceRecord]] = {}
+    for record in records:
+        chapter_buckets.setdefault(record.chapter, []).append(record)
+
+    ordered: list[EvidenceRecord] = []
+    chapter_order = sorted(chapter_buckets)
+    while any(chapter_buckets.values()):
+        for chapter in chapter_order:
+            bucket = chapter_buckets[chapter]
+            if bucket:
+                ordered.append(bucket.pop(0))
+    return ordered
+
+
 def select_outline_evidence_records(config: AppConfig, evidence_records: list[EvidenceRecord]) -> list[EvidenceRecord]:
     max_records = int(config.outline.get("max_prompt_evidence_records", 0))
     if max_records <= 0 or len(evidence_records) <= max_records:
         return evidence_records
 
-    selected: list[EvidenceRecord] = []
+    unique_passage_records: list[EvidenceRecord] = []
     seen_passage_ids: set[str] = set()
     for record in evidence_records:
         if record.passage_id in seen_passage_ids:
             continue
-        selected.append(record)
+        unique_passage_records.append(record)
         seen_passage_ids.add(record.passage_id)
-        if len(selected) >= max_records:
-            break
+
+    selected = round_robin_records_by_chapter(unique_passage_records)
 
     if len(selected) < max_records:
         seen_evidence_ids = {record.evidence_id for record in selected}
-        for record in evidence_records:
-            if record.evidence_id in seen_evidence_ids:
-                continue
-            selected.append(record)
-            if len(selected) >= max_records:
-                break
+        remaining_records = [record for record in evidence_records if record.evidence_id not in seen_evidence_ids]
+        selected.extend(round_robin_records_by_chapter(remaining_records))
+
+    selected = selected[:max_records]
 
     LOGGER.info(
         "Trimmed outline prompt evidence set from %d to %d records",
@@ -128,6 +141,9 @@ def build_outline_user_prompt(config: AppConfig, evidence_records: list[Evidence
         "Make each body section feel like part of one flowing essay, not a disconnected catalog of isolated quotations.",
         "Each body section must include a short 'purpose' field that states the argumentative claim the section will prove.",
         "Order the body sections so the argument builds clearly from one metaphor to the next.",
+        "Prefer an outline that spans multiple chapters across the novel when the verified ledger supports that breadth.",
+        "Do not build the full essay from opening-chapter evidence alone if later chapters provide strong metaphors for the same thesis.",
+        "Favor argumentative coverage across the novel over repeated close reading of one early scene.",
     ]
     if fixed_title:
         instructions.append(f'Use this exact essay title: "{fixed_title}".')

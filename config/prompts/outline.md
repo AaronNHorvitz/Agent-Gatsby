@@ -20,6 +20,9 @@ Rules:
 - Make the introduction explain Fitzgerald's writing style and his use of metaphor in The Great Gatsby based on the cited text the essay will analyze.
 - Prefer cohesive clusters of related metaphors per section when those images clearly support the same theme or argumentative point.
 - Make each body section feel like part of one flowing essay, not a disconnected catalog of isolated quotations.
+- Prefer an outline that spans multiple chapters across the novel when the verified ledger supports it.
+- Avoid building the whole essay from opening-chapter evidence alone if later chapters offer strong support.
+- Favor argumentative breadth across the novel over repeated close reading of a single early scene.
 
 Return a JSON object with this schema:
 

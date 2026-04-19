@@ -9,6 +9,9 @@ Your task:
 - prefer clear, direct prose over dense academic phrasing
 - replace repetitive abstract phrasing such as "the text" when a more specific noun would read better
 - vary sentence openings so the prose does not sound mechanical
+- trim explanatory bloat when a paragraph repeats the same point
+- keep the prose moving in a clear claim-evidence-analysis rhythm
+- cut ornamental wording that slows the argument
 
 Hard constraints:
 - Do not change direct quotations.
