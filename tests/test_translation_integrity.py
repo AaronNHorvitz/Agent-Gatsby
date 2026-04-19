@@ -23,6 +23,10 @@ Gatsby reaches for *"the green light"* [1].
 ### Conclusion
 
 Nick returns to the dream and its distance [1].
+
+## Citations
+
+1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "In my younger and more vulnerable years my father gave me some advice...".
 """
     (repo_root / "artifacts/drafts/analysis_english_final.md").write_text(english_final, encoding="utf-8")
 
@@ -113,6 +117,8 @@ def test_translate_spanish_freezes_master_and_preserves_citations(monkeypatch, t
     assert config.english_master_output_path.exists()
     assert config.spanish_translation_output_path.exists()
     assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
+    assert "## Citas" in translated_text
+    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, cap. 1, párr. 1, pasaje citado que comienza con "In my younger and more vulnerable years my father gave me some advice...".' in translated_text
     assert len(prompts) >= 2
 
 
@@ -129,6 +135,7 @@ def test_translate_mandarin_writes_output(monkeypatch, tmp_path) -> None:
 
     assert config.mandarin_translation_output_path.exists()
     assert translated_text.startswith("# An Analysis")
+    assert "## 引文" in translated_text
 
 
 def test_translate_spanish_falls_back_to_fragment_stitching_when_placeholders_drift(monkeypatch, tmp_path) -> None:

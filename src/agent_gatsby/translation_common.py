@@ -16,6 +16,7 @@ BLOCK_SPLIT_RE = re.compile(r"\n\s*\n")
 HEADING_RE = re.compile(r"(?m)^(#{1,6})\s+.+$")
 HEADING_LINE_RE = re.compile(r"^(#{1,6}\s+)(.*)$")
 BLOCKQUOTE_LINE_RE = re.compile(r"^(\s*>\s?)(.*)$")
+NUMBERED_LIST_LINE_RE = re.compile(r"^\d+\.\s+")
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
 TRANSLATION_CITATION_PLACEHOLDER_RE = re.compile(r"AGCITTOKEN(\d{4})XYZ")
 STRAIGHT_QUOTE_SPAN_RE = re.compile(r'"[^"\n]+?"')
@@ -23,6 +24,10 @@ CURLY_QUOTE_SPAN_RE = re.compile(r"“[^”\n]+?”")
 LOW_SINGLE_QUOTE_SPAN_RE = re.compile(r"‘[^’\n]+?’")
 CJK_CORNER_QUOTE_SPAN_RE = re.compile(r"「[^」\n]+?」")
 CJK_WHITE_CORNER_QUOTE_SPAN_RE = re.compile(r"『[^』\n]+?』")
+CITATIONS_SECTION_RE = re.compile(r"(?m)^## Citations\s*$")
+ENGLISH_CITATION_ENTRY_RE = re.compile(
+    r'^(\d+)\.\s+F\. Scott Fitzgerald, \*The Great Gatsby\*, ch\. (\d+), para\. (\d+), cited passage beginning "(.+)"\.$'
+)
 
 
 def paragraph_blocks(text: str) -> list[str]:
@@ -104,6 +109,56 @@ def count_quote_spans(text: str) -> int:
         CJK_WHITE_CORNER_QUOTE_SPAN_RE,
     )
     return sum(len(pattern.findall(text)) for pattern in patterns)
+
+
+def count_protected_quote_spans(text: str) -> int:
+    total = 0
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith(">") or NUMBERED_LIST_LINE_RE.match(stripped):
+            total += count_quote_spans(line)
+    return total
+
+
+def split_body_and_citations(text: str) -> tuple[str, str]:
+    match = CITATIONS_SECTION_RE.search(text)
+    if not match:
+        return text.strip(), ""
+    return text[: match.start()].strip(), text[match.start() :].strip()
+
+
+def render_translated_citations_section(citations_text: str, *, language_name: str) -> str:
+    if not citations_text.strip():
+        return ""
+
+    heading = "## Citations"
+    line_template = '{number}. F. Scott Fitzgerald, *The Great Gatsby*, ch. {chapter}, para. {paragraph}, cited passage beginning "{excerpt}".'
+    if language_name == "Spanish":
+        heading = "## Citas"
+        line_template = '{number}. F. Scott Fitzgerald, *The Great Gatsby*, cap. {chapter}, párr. {paragraph}, pasaje citado que comienza con "{excerpt}".'
+    elif language_name == "Simplified Chinese":
+        heading = "## 引文"
+        line_template = '{number}. F. Scott Fitzgerald, *The Great Gatsby*, 第{chapter}章，第{paragraph}段，引文开头为"{excerpt}"。'
+
+    rendered_lines = [heading]
+    for line in citations_text.splitlines()[1:]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = ENGLISH_CITATION_ENTRY_RE.fullmatch(stripped)
+        if not match:
+            rendered_lines.append(stripped)
+            continue
+        number, chapter, paragraph, excerpt = match.groups()
+        rendered_lines.append(
+            line_template.format(
+                number=number,
+                chapter=chapter,
+                paragraph=paragraph,
+                excerpt=excerpt,
+            )
+        )
+    return "\n".join(rendered_lines).strip()
 
 
 def freeze_english_master(config: AppConfig) -> str:
@@ -324,8 +379,9 @@ def translate_document(
     source_text: str | None = None,
 ) -> str:
     master_text = source_text or load_english_master(config)
+    body_text, citations_text = split_body_and_citations(master_text)
     max_chunk_chars = int(config.translation.get("max_chunk_chars", 5000))
-    chunks = split_markdown_into_chunks(master_text, max_chars=max_chunk_chars)
+    chunks = split_markdown_into_chunks(body_text, max_chars=max_chunk_chars)
     system_prompt = load_translation_prompt(config, prompt_key)
     transport_override = (
         str(config.translation.get("llm_transport", "")).strip()
@@ -376,7 +432,11 @@ def translate_document(
                 )
             )
 
-    translated_text = "\n\n".join(translated_chunks).strip() + "\n"
+    translated_text = "\n\n".join(translated_chunks).strip()
+    translated_citations = render_translated_citations_section(citations_text, language_name=language_name)
+    if translated_citations:
+        translated_text = translated_text + "\n\n" + translated_citations
+    translated_text = translated_text.strip() + "\n"
     validate_translation_chunk(master_text, translated_text)
     write_translation_output(output_path, translated_text, language_name=language_name)
     return translated_text

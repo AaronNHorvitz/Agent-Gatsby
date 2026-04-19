@@ -11,7 +11,7 @@ from pathlib import Path
 from agent_gatsby.config import AppConfig
 from agent_gatsby.data_ingest import utc_now_iso
 from agent_gatsby.translation_common import (
-    count_quote_spans,
+    count_protected_quote_spans,
     extract_heading_levels,
     extract_visible_citation_markers,
     load_english_master,
@@ -36,8 +36,8 @@ def build_translation_qa_report(
     translated_headings = extract_heading_levels(translated_text)
     english_citations = extract_visible_citation_markers(english_master)
     translated_citations = extract_visible_citation_markers(translated_text)
-    english_quote_spans = count_quote_spans(english_master)
-    translated_quote_spans = count_quote_spans(translated_text)
+    english_quote_spans = count_protected_quote_spans(english_master)
+    translated_quote_spans = count_protected_quote_spans(translated_text)
 
     heading_count_match = len(english_headings) == len(translated_headings)
     section_order_match = english_headings == translated_headings

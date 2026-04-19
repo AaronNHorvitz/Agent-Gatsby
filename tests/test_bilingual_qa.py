@@ -32,3 +32,17 @@ def test_build_translation_qa_report_flags_changed_citations() -> None:
 
     assert report["citation_count_match"] is False
     assert report["major_issues"]
+
+
+def test_build_translation_qa_report_ignores_extra_body_quotes_when_protected_quotes_match() -> None:
+    english = '# Title\n\n> *"hello"* [1]\n\nBody text.\n\n## Citations\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "hello".\n'
+    translated = '# Titulo\n\n> *“hola”* [1]\n\nEl ensayo llama esto “importante” en el cuerpo.\n\n## Citas\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, cap. 1, párr. 1, pasaje citado que comienza con "hello".\n'
+
+    report = build_translation_qa_report(
+        language="spanish",
+        english_master=english,
+        translated_text=translated,
+    )
+
+    assert report["quote_marker_count_match"] is True
+    assert report["major_issues"] == []
