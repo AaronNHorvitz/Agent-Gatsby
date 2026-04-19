@@ -8,11 +8,11 @@
 
 **Product Name:** Agent Gatsby  
 **Document Type:** Product Requirements Document (PRD)  
-**Version:** 1.0  
-**Status:** Draft / Execution-Ready  
+**Version:** 1.1
+**Status:** Implemented / Finalized
 **Primary Owner:** Aaron Horvitz  
-**Target Completion:** Sunday night, April 19  
-**Buffer Date:** Monday, April 20  
+**Target Completion:** Completed Sunday night, April 19
+**Buffer Date:** Monday, April 20 (submission buffer)
 **Primary Delivery Artifacts:**
 - English literary analysis PDF
 - Spanish translation PDF
@@ -990,7 +990,7 @@ Prefer bounded, verifiable stages over a single elegant but fragile prompt chain
 - The Spanish and Mandarin outputs fully translate the essay, including quoted content, while preserving citation markers and quotation boundaries.
 - Exact quote verification applies to the English master only. Translated outputs are promoted through structural QA plus human spot checks.
 - The weekend MVP will not attempt to train a custom metaphor classifier or create a labeled metaphor dataset. Metaphor identification remains heuristic and requires a human review pass before final submission.
-- The current build targets are roughly 15-20 verified evidence records and an English draft of about 2800-3200 words, using about 280 words per page as an estimated planning heuristic.
+- The implemented build now includes a verified evidence ledger, a frozen English master, Spanish and Mandarin translations, green structural QA, three rendered PDFs, and a final manifest.
 - PDF styling remains intentionally plain and professional: title, headings, readable margins, page numbers, and Unicode-safe fonts without decorative layout.
 - Manual evidence overrides are allowed only as a tiny explicit fallback in the verified evidence ledger, and every override must be logged.
 - Minimum translation QA for v1 is heading parity, citation parity, section order parity, quote-marker parity, non-empty output checks, and manual intro/middle/conclusion spot checks.

@@ -64,6 +64,12 @@ This repository does **not** optimize for maximal autonomy or novelty. It optimi
 - **explicit evidence grounding**
 - **high-quality final artifacts**
 
+### Shipped Status
+- locked source, source manifest, and deterministic passage index are present
+- verified English draft, final master, citation registry, and citation text artifacts are present
+- Spanish and Mandarin translations are present with green structural QA reports
+- three rendered PDFs and a final manifest are present in the repository outputs
+
 ---
 
 ## 2. Why This Architecture Exists
@@ -309,10 +315,10 @@ The evidence ledger is the bridge between raw text and final analysis. It is the
 ### Why this matters
 The final essay should be written from a ledger of evidence, not from unconstrained recollection.
 
-### Current build targets
-- aim for roughly 15-20 verified evidence records before freezing the English master
-- spread evidence across multiple chapters instead of clustering only in early passages
-- require one human review of promoted metaphor records because v1 does not use a trained metaphor classifier
+### Current repository state
+- the evidence ledger, outline, and frozen English master are all generated through the tracked pipeline stages
+- the final submission package includes English, Spanish, and Mandarin document artifacts plus deterministic PDFs
+- human review remains part of the process for final literary judgment, especially around figurative-language classification and translation polish
 
 ### Example output artifact
 `artifacts/evidence/evidence_ledger.json`
@@ -1099,10 +1105,10 @@ python -m agent_gatsby.orchestrator --config config/config.yaml --run all
 
 ## 19.5 Run only specific stages
 ```bash
-python -m agent_gatsby.orchestrator --run ingest
-python -m agent_gatsby.orchestrator --run extract_metaphors
-python -m agent_gatsby.orchestrator --run draft_english
-python -m agent_gatsby.orchestrator --run render_pdfs
+python -m agent_gatsby.orchestrator --config config/config.yaml --run ingest
+python -m agent_gatsby.orchestrator --config config/config.yaml --run extract_metaphors
+python -m agent_gatsby.orchestrator --config config/config.yaml --run draft_english
+python -m agent_gatsby.orchestrator --config config/config.yaml --run render_pdfs
 ```
 
 ## 19.6 Build the English report from the CLI
@@ -1129,21 +1135,21 @@ The verification report now includes:
 
 ## 19.7 Recommended execution order
 ```bash
-python -m agent_gatsby.orchestrator --run ingest
-python -m agent_gatsby.orchestrator --run normalize
-python -m agent_gatsby.orchestrator --run index
-python -m agent_gatsby.orchestrator --run extract_metaphors
-python -m agent_gatsby.orchestrator --run build_evidence_ledger
-python -m agent_gatsby.orchestrator --run plan_outline
-python -m agent_gatsby.orchestrator --run draft_english
-python -m agent_gatsby.orchestrator --run verify_english
-python -m agent_gatsby.orchestrator --run critique_english
-python -m agent_gatsby.orchestrator --run translate_spanish
-python -m agent_gatsby.orchestrator --run qa_spanish
-python -m agent_gatsby.orchestrator --run translate_mandarin
-python -m agent_gatsby.orchestrator --run qa_mandarin
-python -m agent_gatsby.orchestrator --run render_pdfs
-python -m agent_gatsby.orchestrator --run write_manifest
+python -m agent_gatsby.orchestrator --config config/config.yaml --run ingest
+python -m agent_gatsby.orchestrator --config config/config.yaml --run normalize
+python -m agent_gatsby.orchestrator --config config/config.yaml --run index
+python -m agent_gatsby.orchestrator --config config/config.yaml --run extract_metaphors
+python -m agent_gatsby.orchestrator --config config/config.yaml --run build_evidence_ledger
+python -m agent_gatsby.orchestrator --config config/config.yaml --run plan_outline
+python -m agent_gatsby.orchestrator --config config/config.yaml --run draft_english
+python -m agent_gatsby.orchestrator --config config/config.yaml --run verify_english
+python -m agent_gatsby.orchestrator --config config/config.yaml --run critique_english
+python -m agent_gatsby.orchestrator --config config/config.yaml --run translate_spanish
+python -m agent_gatsby.orchestrator --config config/config.yaml --run qa_spanish
+python -m agent_gatsby.orchestrator --config config/config.yaml --run translate_mandarin
+python -m agent_gatsby.orchestrator --config config/config.yaml --run qa_mandarin
+python -m agent_gatsby.orchestrator --config config/config.yaml --run render_pdfs
+python -m agent_gatsby.orchestrator --config config/config.yaml --run write_manifest
 ```
 
 ---
