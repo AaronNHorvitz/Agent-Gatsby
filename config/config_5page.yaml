@@ -1,0 +1,207 @@
+project:
+  name: Agent Gatsby
+  version: 0.1.0
+  environment: local
+  description: Local, citation-verified literary analysis and translation pipeline
+run:
+  run_id: agent_gatsby_5page_live_sample
+  timezone: America/Chicago
+  fail_fast: true
+  overwrite_outputs: true
+  save_intermediate_artifacts: true
+paths:
+  repo_root: .
+  config_dir: config
+  source_dir: data/source
+  normalized_dir: data/normalized
+  artifacts_dir: artifacts
+  manifests_dir: artifacts/manifests
+  evidence_dir: artifacts/evidence
+  drafts_dir: artifacts/drafts
+  final_dir: artifacts/final
+  translations_dir: artifacts/translations
+  qa_dir: artifacts/qa
+  logs_dir: artifacts/logs
+  outputs_dir: outputs
+  fonts_dir: fonts
+source:
+  file_path: data/source/gatsby_source.txt
+  normalized_output_path: data/normalized/gatsby_locked.txt
+  manifest_output_path: artifacts/manifests/source_manifest.json
+  encoding: utf-8
+  preserve_chapter_markers: true
+  collapse_excessive_blank_lines: true
+  strip_leading_trailing_whitespace: true
+logging:
+  level: INFO
+  log_to_console: true
+  log_to_file: true
+  file_path: artifacts/logs/pipeline.log
+  include_timestamps: true
+  include_stage_names: true
+models:
+  provider: ollama_openai_compatible
+  endpoint: http://localhost:11434/v1
+  api_key: ollama
+  primary_reasoner: gemma4:26b
+  final_critic: gemma4:26b
+  translator_es: gemma4:26b
+  translator_zh: gemma4:26b
+  timeout_seconds: 180
+  max_retries: 2
+  retry_backoff_seconds: 3
+llm_defaults:
+  temperature: 0.2
+  top_p: 0.9
+  max_tokens: 4096
+  response_format: text
+prompts:
+  extractor_prompt_path: config/prompts/extractor.md
+  ledger_prompt_path: config/prompts/ledger.md
+  outline_prompt_path: config/prompts/outline.md
+  draft_prompt_path: config/prompts/draft.md
+  critic_prompt_path: config/prompts/critic.md
+  translator_es_prompt_path: config/prompts/translator_es.md
+  translator_zh_prompt_path: config/prompts/translator_zh.md
+  qa_prompt_path: config/prompts/translation_qa.md
+indexing:
+  output_path: artifacts/manifests/passage_index.json
+  chapter_pattern: ^Chapter\s+[IVXLC0-9]+
+  paragraph_split_strategy: blank_line
+  remove_empty_paragraphs: true
+  passage_id_format: '{chapter}.{paragraph}'
+extraction:
+  output_path: artifacts/evidence/metaphor_candidates.json
+  raw_debug_output_path: artifacts/evidence/metaphor_candidates_raw.txt
+  minimum_candidate_count: 8
+  maximum_candidate_count: 25
+  require_json_output: true
+  include_confidence_scores: true
+  include_exact_quote_strings: true
+evidence_ledger:
+  output_path: artifacts/evidence/evidence_ledger.json
+  rejected_output_path: artifacts/evidence/rejected_candidates.json
+  target_verified_record_count: 15
+  require_exact_quote_match: true
+  reject_missing_passage_ids: true
+  reject_empty_rationales: true
+  minimum_quote_length: 8
+  status_for_verified_entries: verified
+outline:
+  output_path: artifacts/drafts/outline.json
+  minimum_section_count: 4
+  maximum_section_count: 7
+  fixed_title: An Analysis of Metaphors in The Great Gatsby
+  require_intro: true
+  require_conclusion: true
+  require_thesis: true
+  require_evidence_ids_per_section: true
+drafting:
+  output_path: artifacts/drafts/analysis_english_draft.md
+  section_drafts_dir: artifacts/drafts/sections
+  final_output_path: artifacts/drafts/analysis_english_final.md
+  master_output_path: artifacts/final/analysis_english_master.md
+  target_word_count_min: 1300
+  target_word_count_max: 1600
+  estimated_page_target: 5
+  words_per_page_estimate: 280
+  write_section_by_section: true
+  max_evidence_per_section: 4
+  citation_format: '[{passage_id}]'
+  display_citation_format: '[{citation_number}]'
+  citation_appendix_heading: Citations
+  citation_text_title: Citation Text
+  citation_text_output_path: artifacts/final/citation_text.md
+  context_window_paragraphs_before: 1
+  context_window_paragraphs_after: 1
+  preserve_direct_quotes: true
+  forbid_invented_citations: true
+  forbid_invented_quotes: true
+  target_tone: formal academic literary analysis
+verification:
+  output_path: artifacts/qa/english_verification_report.json
+  citation_registry_output_path: artifacts/qa/citation_registry.json
+  fail_on_quote_mismatch: true
+  fail_on_invalid_citation: true
+  invalid_quote_rate_threshold: 0.0
+  invalid_citation_rate_threshold: 0.0
+  unsupported_claim_ratio_threshold: 0.1
+  normalize_curly_quotes_for_matching: true
+  require_all_citations_to_resolve: true
+editorial:
+  preserve_quotes: true
+  preserve_citations: true
+  forbid_new_evidence: true
+  improve_transitions: true
+  improve_topic_sentences: true
+  improve_conclusion: true
+translation:
+  split_strategy: heading_then_paragraph_group
+  max_chunk_chars: 5000
+  preserve_headings: true
+  preserve_citations: true
+  preserve_quote_markers: true
+  use_frozen_english_master_only: true
+translation_outputs:
+  spanish_output_path: artifacts/translations/analysis_spanish_draft.md
+  mandarin_output_path: artifacts/translations/analysis_mandarin_draft.md
+  spanish_qa_report_path: artifacts/qa/spanish_qa_report.json
+  mandarin_qa_report_path: artifacts/qa/mandarin_qa_report.json
+  mandarin_script: simplified
+translation_qa:
+  compare_heading_counts: true
+  compare_citation_counts: true
+  compare_quote_marker_counts: true
+  fail_on_major_structural_mismatch: false
+  save_reports: true
+pdf:
+  enabled: true
+  page_size: A4
+  margin_left_mm: 25
+  margin_right_mm: 25
+  margin_top_mm: 25
+  margin_bottom_mm: 25
+  default_font_size: 12
+  heading_font_size: 16
+  title_font_size: 18
+  line_height: 7
+  english_font_regular: NotoSerif-Regular.ttf
+  english_font_bold: NotoSerif-Bold.ttf
+  spanish_font_regular: NotoSerif-Regular.ttf
+  spanish_font_bold: NotoSerif-Bold.ttf
+  mandarin_font_regular: NotoSansSC-Regular.ttf
+  english_pdf_path: outputs/Gatsby_Analysis_English.pdf
+  spanish_pdf_path: outputs/Gatsby_Analysis_Spanish.pdf
+  mandarin_pdf_path: outputs/Gatsby_Analysis_Mandarin.pdf
+manifest:
+  output_path: outputs/final_manifest.json
+  include_source_hash: true
+  include_model_names: true
+  include_config_snapshot: true
+  include_output_file_paths: true
+  include_qa_reports: true
+testing:
+  run_unit_tests: true
+  run_smoke_test: true
+  tests_dir: tests
+  pytest_command: pytest -q
+orchestration:
+  supported_stages:
+  - ingest
+  - normalize
+  - index
+  - extract_metaphors
+  - build_evidence_ledger
+  - plan_outline
+  - draft_english
+  - verify_english
+  - critique_english
+  - freeze_english
+  - translate_spanish
+  - qa_spanish
+  - translate_mandarin
+  - qa_mandarin
+  - render_pdfs
+  - write_manifest
+  allow_single_stage_runs: true
+  allow_full_run: true
