@@ -66,11 +66,11 @@ This is the version you must finish first before adding anything fancy.
 - [x] 2.1.9 `src/agent_gatsby/draft_english.py`
 - [x] 2.1.10 `src/agent_gatsby/verify_citations.py`
 - [x] 2.1.11 `src/agent_gatsby/critique_and_edit.py`
-- [ ] 2.1.12 `src/agent_gatsby/translate_spanish.py`
-- [ ] 2.1.13 `src/agent_gatsby/translate_mandarin.py`
-- [ ] 2.1.14 `src/agent_gatsby/bilingual_qa.py`
-- [ ] 2.1.15 `src/agent_gatsby/pdf_compiler.py`
-- [ ] 2.1.16 `src/agent_gatsby/manifest_writer.py`
+- [x] 2.1.12 `src/agent_gatsby/translate_spanish.py`
+- [x] 2.1.13 `src/agent_gatsby/translate_mandarin.py`
+- [x] 2.1.14 `src/agent_gatsby/bilingual_qa.py`
+- [x] 2.1.15 `src/agent_gatsby/pdf_compiler.py`
+- [x] 2.1.16 `src/agent_gatsby/manifest_writer.py`
 - [x] 2.1.17 `tests/`
 - [x] 2.1.18 `requirements.txt`
 - [x] 2.1.19 `README.md`
@@ -495,66 +495,68 @@ Do not move on until all are true:
 ---
 
 # 7. Sunday — Translation, QA, PDFs, Manifest, Final Dry Run
+Status note: Sunday implementation and tests are complete. A full live production run that writes the real translation/PDF/manifest artifacts is still pending.
+
 ## 7.1 Freeze English master
-- [ ] 7.1.1 Copy or rename final English file as `artifacts/final/analysis_english_master.md`
-- [ ] 7.1.2 Treat this file as immutable
-- [ ] 7.1.3 Do not translate from a draft that is still moving
+- [x] 7.1.1 Copy or rename final English file as `artifacts/final/analysis_english_master.md`
+- [x] 7.1.2 Treat this file as immutable
+- [x] 7.1.3 Do not translate from a draft that is still moving
 
 ## 7.2 Build translation chunker utility
 - [ ] 7.2.1 Create helper to split English master by headings
-- [ ] 7.2.2 If sections are too long, split by paragraph groups
-- [ ] 7.2.3 Preserve order
-- [ ] 7.2.4 Preserve heading text
-- [ ] 7.2.5 Preserve citation markers
-- [ ] 7.2.6 Preserve quotation boundaries while translating quoted content
+- [x] 7.2.2 If sections are too long, split by paragraph groups
+- [x] 7.2.3 Preserve order
+- [x] 7.2.4 Preserve heading text
+- [x] 7.2.5 Preserve citation markers
+- [x] 7.2.6 Preserve quotation boundaries while translating quoted content
 - [ ] 7.2.7 Save chunk metadata if helpful
 
 ## 7.3 Build `translate_spanish.py`
-- [ ] 7.3.1 Load English master
-- [ ] 7.3.2 Split into chunks
+- [x] 7.3.1 Load English master
+- [x] 7.3.2 Split into chunks
 - [ ] 7.3.3 For each chunk:
-  - [ ] 7.3.3.1 call LLM
-  - [ ] 7.3.3.2 preserve heading structure
-  - [ ] 7.3.3.3 preserve citation markers
-  - [ ] 7.3.3.4 translate quoted content and preserve quotation boundaries
+  - [x] 7.3.3.1 call LLM
+  - [x] 7.3.3.2 preserve heading structure
+  - [x] 7.3.3.3 preserve citation markers
+  - [x] 7.3.3.4 translate quoted content and preserve quotation boundaries
   - [ ] 7.3.3.5 save raw chunk output if needed
-- [ ] 7.3.4 Reassemble final Spanish markdown
-- [ ] 7.3.5 Save to `artifacts/translations/analysis_spanish_draft.md`
+- [x] 7.3.4 Reassemble final Spanish markdown
+- [x] 7.3.5 Save to `artifacts/translations/analysis_spanish_draft.md`
 
 ## 7.4 Build `translate_mandarin.py`
-- [ ] 7.4.1 Load English master
-- [ ] 7.4.2 Split into chunks
+- [x] 7.4.1 Load English master
+- [x] 7.4.2 Split into chunks
 - [ ] 7.4.3 For each chunk:
-  - [ ] 7.4.3.1 call LLM
-  - [ ] 7.4.3.2 require Simplified Chinese
-  - [ ] 7.4.3.3 preserve heading structure
-  - [ ] 7.4.3.4 preserve citation markers
-  - [ ] 7.4.3.5 translate quoted content and preserve quotation boundaries
-- [ ] 7.4.4 Reassemble final Mandarin markdown
-- [ ] 7.4.5 Save to `artifacts/translations/analysis_mandarin_draft.md`
+  - [x] 7.4.3.1 call LLM
+  - [x] 7.4.3.2 require Simplified Chinese
+  - [x] 7.4.3.3 preserve heading structure
+  - [x] 7.4.3.4 preserve citation markers
+  - [x] 7.4.3.5 translate quoted content and preserve quotation boundaries
+- [x] 7.4.4 Reassemble final Mandarin markdown
+- [x] 7.4.5 Save to `artifacts/translations/analysis_mandarin_draft.md`
 
 ## 7.5 Build `bilingual_qa.py`
 This can be basic but must exist.
-- [ ] 7.5.1 Load English master
-- [ ] 7.5.2 Load Spanish draft
-- [ ] 7.5.3 Load Mandarin draft
-- [ ] 7.5.4 Confirm both translation files are non-empty
-- [ ] 7.5.5 Count headings in English vs Spanish
-- [ ] 7.5.6 Count headings in English vs Mandarin
-- [ ] 7.5.7 Count citation markers in each file
-- [ ] 7.5.8 Count quote markers / quotation boundaries in each file
-- [ ] 7.5.9 Compare section order in each file
-- [ ] 7.5.10 Flag mismatches
-- [ ] 7.5.11 Save `artifacts/qa/spanish_qa_report.json`
-- [ ] 7.5.12 Save `artifacts/qa/mandarin_qa_report.json`
+- [x] 7.5.1 Load English master
+- [x] 7.5.2 Load Spanish draft
+- [x] 7.5.3 Load Mandarin draft
+- [x] 7.5.4 Confirm both translation files are non-empty
+- [x] 7.5.5 Count headings in English vs Spanish
+- [x] 7.5.6 Count headings in English vs Mandarin
+- [x] 7.5.7 Count citation markers in each file
+- [x] 7.5.8 Count quote markers / quotation boundaries in each file
+- [x] 7.5.9 Compare section order in each file
+- [x] 7.5.10 Flag mismatches
+- [x] 7.5.11 Save `artifacts/qa/spanish_qa_report.json`
+- [x] 7.5.12 Save `artifacts/qa/mandarin_qa_report.json`
 
 ## 7.6 Create tests for translation integrity
-- [ ] 7.6.1 `test_translation_integrity.py`
+- [x] 7.6.1 `test_translation_integrity.py`
   - [ ] 7.6.1.1 verify heading counts match
-  - [ ] 7.6.1.2 verify section order matches English
-  - [ ] 7.6.1.3 verify citation markers survive
-  - [ ] 7.6.1.4 verify quote-marker counts survive
-  - [ ] 7.6.1.5 verify translation files are non-empty
+  - [x] 7.6.1.2 verify section order matches English
+  - [x] 7.6.1.3 verify citation markers survive
+  - [x] 7.6.1.4 verify quote-marker counts survive
+  - [x] 7.6.1.5 verify translation files are non-empty
 
 ## 7.7 Manual translation spot checks
 You do not need to be perfect in both languages, but you must do spot checks.
@@ -568,34 +570,34 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [ ] 7.7.8 Confirm weird garbage characters are absent
 
 ## 7.8 Build `pdf_compiler.py`
-- [ ] 7.8.1 Load English markdown/text
-- [ ] 7.8.2 Load Spanish markdown/text
-- [ ] 7.8.3 Load Mandarin markdown/text
-- [ ] 7.8.4 Configure page size
-- [ ] 7.8.5 Configure margins
-- [ ] 7.8.6 Keep layout plain and professional
-- [ ] 7.8.7 Configure default font for English/Spanish
-- [ ] 7.8.8 Configure CJK-capable font for Mandarin
-- [ ] 7.8.9 Add page numbers
-- [ ] 7.8.10 Render English PDF
-- [ ] 7.8.11 Render Spanish PDF
-- [ ] 7.8.12 Render Mandarin PDF
-- [ ] 7.8.13 Save all three files in `outputs/`
+- [x] 7.8.1 Load English markdown/text
+- [x] 7.8.2 Load Spanish markdown/text
+- [x] 7.8.3 Load Mandarin markdown/text
+- [x] 7.8.4 Configure page size
+- [x] 7.8.5 Configure margins
+- [x] 7.8.6 Keep layout plain and professional
+- [x] 7.8.7 Configure default font for English/Spanish
+- [x] 7.8.8 Configure CJK-capable font for Mandarin
+- [x] 7.8.9 Add page numbers
+- [x] 7.8.10 Render English PDF
+- [x] 7.8.11 Render Spanish PDF
+- [x] 7.8.12 Render Mandarin PDF
+- [x] 7.8.13 Save all three files in `outputs/`
 
 ## 7.9 Add PDF tests
-- [ ] 7.9.1 `test_pdf_unicode.py`
-  - [ ] 7.9.1.1 verify PDF files are created
-  - [ ] 7.9.1.2 verify file size > 0
-  - [ ] 7.9.1.3 verify Mandarin PDF renders without Unicode exception
+- [x] 7.9.1 `test_pdf_unicode.py`
+  - [x] 7.9.1.1 verify PDF files are created
+  - [x] 7.9.1.2 verify file size > 0
+  - [x] 7.9.1.3 verify Mandarin PDF renders without Unicode exception
 
 ## 7.10 Build `manifest_writer.py`
-- [ ] 7.10.1 Collect source hash
-- [ ] 7.10.2 Collect model name
-- [ ] 7.10.3 Collect config path
-- [ ] 7.10.4 Collect generated artifact paths
-- [ ] 7.10.5 Collect QA report paths
-- [ ] 7.10.6 Collect timestamp
-- [ ] 7.10.7 Save to `outputs/final_manifest.json`
+- [x] 7.10.1 Collect source hash
+- [x] 7.10.2 Collect model name
+- [x] 7.10.3 Collect config path
+- [x] 7.10.4 Collect generated artifact paths
+- [x] 7.10.5 Collect QA report paths
+- [x] 7.10.6 Collect timestamp
+- [x] 7.10.7 Save to `outputs/final_manifest.json`
 
 ## 7.11 Wire everything into `orchestrator.py`
 - [x] 7.11.1 Add stage registry
@@ -616,11 +618,11 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [ ] 7.12.7 Do not stop until full run completes once cleanly
 
 ## 7.13 Run full test suite
-- [ ] 7.13.1 Run `pytest`
-- [ ] 7.13.2 Read failures carefully
-- [ ] 7.13.3 Fix failing tests
-- [ ] 7.13.4 Re-run `pytest`
-- [ ] 7.13.5 Repeat until tests pass cleanly
+- [x] 7.13.1 Run `pytest`
+- [x] 7.13.2 Read failures carefully
+- [x] 7.13.3 Fix failing tests
+- [x] 7.13.4 Re-run `pytest`
+- [x] 7.13.5 Repeat until tests pass cleanly
 
 ## 7.14 Do final human QA on outputs
 - [ ] 7.14.1 Open English PDF
@@ -642,10 +644,10 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [ ] 7.15.7 Confirm no hard-coded machine-specific paths remain
 
 ## 7.16 Final Git tasks
-- [ ] 7.16.1 `git status`
-- [ ] 7.16.2 Inspect all changed files
-- [ ] 7.16.3 Make final commit with a clean message
-- [ ] 7.16.4 Push repo
+- [x] 7.16.1 `git status`
+- [x] 7.16.2 Inspect all changed files
+- [x] 7.16.3 Make final commit with a clean message
+- [x] 7.16.4 Push repo
 - [ ] 7.16.5 Open repo in browser
 - [ ] 7.16.6 Confirm important files are present
 - [ ] 7.16.7 Confirm README renders correctly
@@ -659,8 +661,8 @@ Do not stop until all are true:
 - [ ] 7.17.5 three PDFs exist
 - [ ] 7.17.6 final manifest exists
 - [ ] 7.17.7 end-to-end run completed once
-- [ ] 7.17.8 tests pass
-- [ ] 7.17.9 repo is pushed and presentable
+- [x] 7.17.8 tests pass
+- [x] 7.17.9 repo is pushed and presentable
 
 ---
 
@@ -740,36 +742,36 @@ Do not stop until all are true:
 - [x] 8.10.4 write final English file
 
 ## 8.11 `src/agent_gatsby/translate_spanish.py`
-- [ ] 8.11.1 chunk English master
-- [ ] 8.11.2 translate each chunk
-- [ ] 8.11.3 reassemble file
-- [ ] 8.11.4 save markdown
+- [x] 8.11.1 chunk English master
+- [x] 8.11.2 translate each chunk
+- [x] 8.11.3 reassemble file
+- [x] 8.11.4 save markdown
 
 ## 8.12 `src/agent_gatsby/translate_mandarin.py`
-- [ ] 8.12.1 chunk English master
-- [ ] 8.12.2 translate each chunk
-- [ ] 8.12.3 force Simplified Chinese
-- [ ] 8.12.4 reassemble file
-- [ ] 8.12.5 save markdown
+- [x] 8.12.1 chunk English master
+- [x] 8.12.2 translate each chunk
+- [x] 8.12.3 force Simplified Chinese
+- [x] 8.12.4 reassemble file
+- [x] 8.12.5 save markdown
 
 ## 8.13 `src/agent_gatsby/bilingual_qa.py`
-- [ ] 8.13.1 compare heading counts
-- [ ] 8.13.2 compare citation counts
-- [ ] 8.13.3 compare quote markers
-- [ ] 8.13.4 write reports
+- [x] 8.13.1 compare heading counts
+- [x] 8.13.2 compare citation counts
+- [x] 8.13.3 compare quote markers
+- [x] 8.13.4 write reports
 
 ## 8.14 `src/agent_gatsby/pdf_compiler.py`
-- [ ] 8.14.1 load text files
-- [ ] 8.14.2 set fonts
-- [ ] 8.14.3 render pages
-- [ ] 8.14.4 save PDFs
-- [ ] 8.14.5 catch Unicode errors
+- [x] 8.14.1 load text files
+- [x] 8.14.2 set fonts
+- [x] 8.14.3 render pages
+- [x] 8.14.4 save PDFs
+- [x] 8.14.5 catch Unicode errors
 
 ## 8.15 `src/agent_gatsby/manifest_writer.py`
-- [ ] 8.15.1 gather hashes
-- [ ] 8.15.2 gather outputs
-- [ ] 8.15.3 gather model info
-- [ ] 8.15.4 write manifest JSON
+- [x] 8.15.1 gather hashes
+- [x] 8.15.2 gather outputs
+- [x] 8.15.3 gather model info
+- [x] 8.15.4 write manifest JSON
 
 ---
 
@@ -839,7 +841,7 @@ These are here because the project is large and ADHD can make it easy to drift.
 - [ ] 10.2.1 after Thursday foundation
 - [ ] 10.2.2 after Friday evidence ledger + outline
 - [ ] 10.2.3 after Saturday English pipeline
-- [ ] 10.2.4 after Sunday translations + PDFs + tests
+- [x] 10.2.4 after Sunday translations + PDFs + tests
 - [ ] 10.2.5 after final cleanup
 
 ---
@@ -879,7 +881,7 @@ You are done only when every box below is checked:
 - [ ] 12.14 Spanish PDF saved
 - [ ] 12.15 Mandarin PDF saved
 - [ ] 12.16 final manifest saved
-- [ ] 12.17 tests pass
+- [x] 12.17 tests pass
 - [ ] 12.18 end-to-end pipeline works
-- [ ] 12.19 repo pushed
+- [x] 12.19 repo pushed
 - [ ] 12.20 submission artifacts ready
