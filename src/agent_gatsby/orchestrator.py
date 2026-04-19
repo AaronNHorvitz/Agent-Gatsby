@@ -11,7 +11,7 @@ from collections.abc import Callable
 from typing import Any
 
 from agent_gatsby.build_evidence_ledger import build_evidence_ledger
-from agent_gatsby.bilingual_qa import qa_mandarin, qa_spanish
+from agent_gatsby.bilingual_qa import qa_mandarin, qa_spanish, translation_report_is_renderable
 from agent_gatsby.config import AppConfig, load_config
 from agent_gatsby.critique_and_edit import critique_and_edit
 from agent_gatsby.data_ingest import ingest_source
@@ -204,6 +204,19 @@ def stage_render_pdfs(config: AppConfig, context: StageContext) -> None:
         stage_translate_spanish(config, context)
     if "mandarin_translation" not in context and not config.mandarin_translation_output_path.exists():
         stage_translate_mandarin(config, context)
+    if "spanish_qa_report" not in context:
+        stage_qa_spanish(config, context)
+    if "mandarin_qa_report" not in context:
+        stage_qa_mandarin(config, context)
+
+    if not translation_report_is_renderable(context["spanish_qa_report"]):
+        raise ValueError(
+            "Cannot render PDFs: Spanish translation failed required structural QA for the body/citations package"
+        )
+    if not translation_report_is_renderable(context["mandarin_qa_report"]):
+        raise ValueError(
+            "Cannot render PDFs: Mandarin translation failed required structural QA for the body/citations package"
+        )
 
     context["pdf_outputs"] = render_pdfs(config)
 
@@ -213,7 +226,11 @@ def stage_write_manifest(config: AppConfig, context: StageContext) -> None:
         stage_qa_spanish(config, context)
     if "mandarin_qa_report" not in context and not config.mandarin_qa_report_path.exists():
         stage_qa_mandarin(config, context)
-    if "pdf_outputs" not in context and not config.english_pdf_output_path.exists():
+    if "pdf_outputs" not in context and not (
+        config.english_pdf_output_path.exists()
+        and config.spanish_pdf_output_path.exists()
+        and config.mandarin_pdf_output_path.exists()
+    ):
         stage_render_pdfs(config, context)
 
     context["final_manifest"] = write_manifest(config)

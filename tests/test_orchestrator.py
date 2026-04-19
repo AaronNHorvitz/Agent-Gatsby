@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agent_gatsby.orchestrator import main
+import pytest
+
+from agent_gatsby.config import load_config
+from agent_gatsby.orchestrator import main, stage_render_pdfs
 
 
 def write_test_repo(repo_root: Path) -> Path:
@@ -14,7 +17,9 @@ def write_test_repo(repo_root: Path) -> Path:
     (repo_root / "config/prompts/draft.md").write_text("Output markdown only.\n", encoding="utf-8")
     (repo_root / "config/prompts/critic.md").write_text("Output revised markdown only.\n", encoding="utf-8")
     (repo_root / "config/prompts/translator_es.md").write_text("Output translated markdown only.\n", encoding="utf-8")
+    (repo_root / "config/prompts/translator_es_cleanup.md").write_text("Output cleaned Spanish markdown only.\n", encoding="utf-8")
     (repo_root / "config/prompts/translator_zh.md").write_text("Output translated markdown only.\n", encoding="utf-8")
+    (repo_root / "config/prompts/translator_zh_cleanup.md").write_text("Output cleaned Chinese markdown only.\n", encoding="utf-8")
     (repo_root / "config/prompts/translation_qa.md").write_text("Output JSON only.\n", encoding="utf-8")
 
     source_text = (
@@ -81,7 +86,9 @@ prompts:
   draft_prompt_path: "config/prompts/draft.md"
   critic_prompt_path: "config/prompts/critic.md"
   translator_es_prompt_path: "config/prompts/translator_es.md"
+  translator_es_cleanup_prompt_path: "config/prompts/translator_es_cleanup.md"
   translator_zh_prompt_path: "config/prompts/translator_zh.md"
+  translator_zh_cleanup_prompt_path: "config/prompts/translator_zh_cleanup.md"
   qa_prompt_path: "config/prompts/translation_qa.md"
 indexing:
   output_path: "artifacts/manifests/passage_index.json"
@@ -135,6 +142,7 @@ verification:
   require_all_citations_to_resolve: true
 translation:
   max_chunk_chars: 5000
+  post_edit_body: true
 translation_outputs:
   spanish_output_path: "artifacts/translations/analysis_spanish_draft.md"
   mandarin_output_path: "artifacts/translations/analysis_mandarin_draft.md"
@@ -222,9 +230,13 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
                     'The novel closes by showing how the "green light" remains a durable sign of desire even as it recedes [1.1].',
                 ]
             )
-        if stage_name in {"translate_spanish", "translate_mandarin"}:
+        if stage_name in {"translate_spanish", "translate_mandarin", "translate_spanish_cleanup", "translate_mandarin_cleanup"}:
             user_prompt = kwargs.get("user_prompt", "")
-            return user_prompt.split("English markdown chunk:\n\n", maxsplit=1)[1]
+            if "English markdown chunk:\n\n" in user_prompt:
+                return user_prompt.split("English markdown chunk:\n\n", maxsplit=1)[1]
+            if "Existing translated markdown chunk:\n\n" in user_prompt:
+                return user_prompt.split("Existing translated markdown chunk:\n\n", maxsplit=1)[1]
+            return user_prompt.split("Existing translated markdown fragment:\n\n", maxsplit=1)[1]
         return json.dumps(
             [
                 {
@@ -313,3 +325,58 @@ def test_orchestrator_single_stage_run_builds_upstream_artifacts(tmp_path) -> No
     passage_index_path = repo_root / "artifacts/manifests/passage_index.json"
     assert passage_index_path.exists()
     assert '"passage_id": "2.1"' in passage_index_path.read_text(encoding="utf-8")
+
+
+def test_stage_render_pdfs_requires_structurally_renderable_translation_reports(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_test_repo(repo_root))
+    render_called = False
+
+    def fake_stage_qa_spanish(config, context):
+        context["spanish_qa_report"] = {
+            "non_empty_translation": True,
+            "heading_count_match": True,
+            "section_order_match": True,
+            "citation_count_match": True,
+            "quote_marker_count_match": True,
+            "citations_section_present": True,
+            "english_citation_entry_count": 1,
+            "translated_citation_entry_count": 0,
+            "citation_entry_count_match": False,
+            "citations_heading_without_entries": True,
+        }
+
+    def fake_stage_qa_mandarin(config, context):
+        context["mandarin_qa_report"] = {
+            "non_empty_translation": True,
+            "heading_count_match": True,
+            "section_order_match": True,
+            "citation_count_match": True,
+            "quote_marker_count_match": True,
+            "citations_section_present": True,
+            "english_citation_entry_count": 1,
+            "translated_citation_entry_count": 1,
+            "citation_entry_count_match": True,
+            "citations_heading_without_entries": False,
+        }
+
+    def fake_render_pdfs(config):
+        nonlocal render_called
+        render_called = True
+        return []
+
+    monkeypatch.setattr("agent_gatsby.orchestrator.stage_qa_spanish", fake_stage_qa_spanish)
+    monkeypatch.setattr("agent_gatsby.orchestrator.stage_qa_mandarin", fake_stage_qa_mandarin)
+    monkeypatch.setattr("agent_gatsby.orchestrator.render_pdfs", fake_render_pdfs)
+
+    with pytest.raises(ValueError, match="Spanish translation failed required structural QA"):
+        stage_render_pdfs(
+            config,
+            {
+                "english_master": "# Title\n",
+                "spanish_translation": "# Titulo\n",
+                "mandarin_translation": "# 标题\n",
+            },
+        )
+
+    assert render_called is False

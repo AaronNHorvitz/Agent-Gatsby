@@ -17,6 +17,7 @@ def translate_mandarin(
         config,
         stage_name="translate_mandarin",
         prompt_key="translator_zh_prompt_path",
+        cleanup_prompt_key="translator_zh_cleanup_prompt_path",
         model_key="translator_zh",
         output_path=config.mandarin_translation_output_path,
         language_name="Simplified Chinese",

@@ -5,6 +5,7 @@ Deterministic PDF rendering for Agent Gatsby.
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,6 +16,9 @@ from agent_gatsby.config import AppConfig
 from agent_gatsby.translation_common import load_english_master
 
 LOGGER = logging.getLogger(__name__)
+
+NUMBERED_LIST_LINE_RE = re.compile(r"^\d+\.\s+")
+CITATION_SECTION_HEADINGS = {"Citations", "Citas", "引文"}
 
 FONT_HINTS = {
     "NotoSerif-Regular.ttf": "Noto Serif",
@@ -35,6 +39,20 @@ def strip_markdown_formatting(text: str) -> str:
     cleaned = text.replace("**", "").replace("__", "")
     cleaned = cleaned.replace("*", "").replace("_", "")
     return cleaned.strip()
+
+
+def is_numbered_list_block(lines: list[str]) -> bool:
+    non_empty_lines = [line.strip() for line in lines if line.strip()]
+    return bool(non_empty_lines) and all(NUMBERED_LIST_LINE_RE.match(line) for line in non_empty_lines)
+
+
+def is_label_plus_blockquote_block(lines: list[str]) -> bool:
+    if len(lines) < 2:
+        return False
+    if lines[0].lstrip().startswith(">"):
+        return False
+    trailing_lines = [line for line in lines[1:] if line.strip()]
+    return bool(trailing_lines) and all(line.lstrip().startswith(">") for line in trailing_lines)
 
 
 def resolve_font_path(config: AppConfig, font_name: str) -> Path:
@@ -89,7 +107,29 @@ def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str) -> No
     body_font_size = float(config.pdf.get("default_font_size", 12))
     heading_font_size = float(config.pdf.get("heading_font_size", 16))
     title_font_size = float(config.pdf.get("title_font_size", 18))
+    paragraph_spacing = float(config.pdf.get("paragraph_spacing", line_height))
+    title_spacing_after = float(config.pdf.get("title_spacing_after", line_height * 2))
+    heading_spacing_before = float(config.pdf.get("heading_spacing_before", line_height * 2))
+    heading_spacing_after = float(config.pdf.get("heading_spacing_after", line_height * 2))
+    citation_entry_spacing = float(config.pdf.get("citation_entry_spacing", 0))
     blockquote_indent = 8
+
+    def render_paragraph(paragraph_text: str) -> None:
+        pdf.set_font("Body", size=body_font_size)
+        pdf.multi_cell(0, line_height, paragraph_text, align="L")
+        pdf.ln(paragraph_spacing)
+
+    def render_blockquote(quote_lines: list[str]) -> None:
+        quote_text = "\n".join(quote_lines)
+        pdf.set_font("Body", size=body_font_size)
+        pdf.set_x(pdf.l_margin + blockquote_indent)
+        pdf.multi_cell(
+            pdf.w - pdf.l_margin - pdf.r_margin - blockquote_indent,
+            line_height,
+            quote_text,
+            align="L",
+        )
+        pdf.ln(paragraph_spacing)
 
     blocks = [block.strip() for block in text.split("\n\n") if block.strip()]
     for block in blocks:
@@ -98,30 +138,50 @@ def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str) -> No
 
         if first_line.startswith("# "):
             pdf.set_font(pdf.heading_font_family, size=title_font_size)
-            pdf.multi_cell(0, line_height + 1, strip_markdown_formatting(first_line[2:].strip()))
-            pdf.ln(1)
-            continue
+            pdf.multi_cell(0, line_height + 1, strip_markdown_formatting(first_line[2:].strip()), align="L")
+            pdf.ln(title_spacing_after)
+            lines = lines[1:]
+            if not lines:
+                continue
+            first_line = lines[0].strip()
 
         if first_line.startswith("## ") or first_line.startswith("### "):
             heading_text = first_line.lstrip("#").strip()
+            if heading_text in CITATION_SECTION_HEADINGS and pdf.page_no() > 0:
+                pdf.add_page()
+            else:
+                pdf.ln(heading_spacing_before)
             pdf.set_font(pdf.heading_font_family, size=heading_font_size)
-            pdf.multi_cell(0, line_height, strip_markdown_formatting(heading_text))
-            pdf.ln(1)
-            continue
+            pdf.multi_cell(0, line_height, strip_markdown_formatting(heading_text), align="L")
+            pdf.ln(heading_spacing_after)
+            lines = lines[1:]
+            if not lines:
+                continue
+            first_line = lines[0].strip()
 
         if all(line.lstrip().startswith(">") for line in lines):
             quote_lines = [strip_markdown_formatting(line.lstrip()[1:].strip()) for line in lines]
-            quote_text = "\n".join(quote_lines)
+            render_blockquote(quote_lines)
+            continue
+
+        if is_label_plus_blockquote_block(lines):
+            render_paragraph(strip_markdown_formatting(lines[0].strip()))
+            quote_lines = [strip_markdown_formatting(line.lstrip()[1:].strip()) for line in lines[1:] if line.strip()]
+            render_blockquote(quote_lines)
+            continue
+
+        if is_numbered_list_block(lines):
             pdf.set_font("Body", size=body_font_size)
-            pdf.set_x(pdf.l_margin + blockquote_indent)
-            pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin - blockquote_indent, line_height, quote_text)
-            pdf.ln(1)
+            for line in lines:
+                stripped_line = line.strip()
+                if not stripped_line:
+                    continue
+                pdf.multi_cell(0, line_height, strip_markdown_formatting(stripped_line), align="L")
+                pdf.ln(citation_entry_spacing)
             continue
 
         paragraph_text = strip_markdown_formatting(" ".join(line.strip() for line in lines))
-        pdf.set_font("Body", size=body_font_size)
-        pdf.multi_cell(0, line_height, paragraph_text)
-        pdf.ln(1)
+        render_paragraph(paragraph_text)
 
 
 def render_pdf_document(

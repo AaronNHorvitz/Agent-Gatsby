@@ -17,6 +17,7 @@ HEADING_RE = re.compile(r"(?m)^(#{1,6})\s+.+$")
 HEADING_LINE_RE = re.compile(r"^(#{1,6}\s+)(.*)$")
 BLOCKQUOTE_LINE_RE = re.compile(r"^(\s*>\s?)(.*)$")
 NUMBERED_LIST_LINE_RE = re.compile(r"^\d+\.\s+")
+NUMBERED_CITATION_ENTRY_RE = re.compile(r"(?m)^\d+\.\s+")
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
 TRANSLATION_CITATION_PLACEHOLDER_RE = re.compile(r"AGCITTOKEN(\d{4})XYZ")
 STRAIGHT_QUOTE_SPAN_RE = re.compile(r'"[^"\n]+?"')
@@ -25,9 +26,18 @@ LOW_SINGLE_QUOTE_SPAN_RE = re.compile(r"‘[^’\n]+?’")
 CJK_CORNER_QUOTE_SPAN_RE = re.compile(r"「[^」\n]+?」")
 CJK_WHITE_CORNER_QUOTE_SPAN_RE = re.compile(r"『[^』\n]+?』")
 CITATIONS_SECTION_RE = re.compile(r"(?m)^## Citations\s*$")
-ENGLISH_CITATION_ENTRY_RE = re.compile(
-    r'^(\d+)\.\s+F\. Scott Fitzgerald, \*The Great Gatsby\*, ch\. (\d+), para\. (\d+), cited passage beginning "(.+)"\.$'
-)
+TRANSLATED_CITATIONS_SECTION_RE = re.compile(r"(?m)^##\s+(?:Citations|Citas|引文)\s*$")
+ENGLISH_MULTIWORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*(?:\s+[a-z][A-Za-z'’.-]*){2,}")
+CITATION_GLUE_RE = re.compile(r"(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])(?=[A-Za-zÁ-ÿ一-龯])")
+MANDARIN_NORMALIZATION_MAP = {
+    "菲茨平": "菲茨杰拉德",
+    "菲茨格拉德": "菲茨杰拉德",
+    "《了了不起的盖茨比》": "《了不起的盖茨比》",
+    "T·J·艾克堡医生": "T. J. 艾克尔堡医生",
+    "T·J·艾克堡": "T. J. 艾克尔堡",
+    "盖失比": "盖茨比",
+    "盖茨模": "盖茨比",
+}
 
 
 def paragraph_blocks(text: str) -> list[str]:
@@ -111,6 +121,20 @@ def count_quote_spans(text: str) -> int:
     return sum(len(pattern.findall(text)) for pattern in patterns)
 
 
+def extract_quote_spans(text: str) -> list[str]:
+    patterns = (
+        STRAIGHT_QUOTE_SPAN_RE,
+        CURLY_QUOTE_SPAN_RE,
+        LOW_SINGLE_QUOTE_SPAN_RE,
+        CJK_CORNER_QUOTE_SPAN_RE,
+        CJK_WHITE_CORNER_QUOTE_SPAN_RE,
+    )
+    spans: list[str] = []
+    for pattern in patterns:
+        spans.extend(match.group(0) for match in pattern.finditer(text))
+    return spans
+
+
 def count_protected_quote_spans(text: str) -> int:
     total = 0
     for line in text.splitlines():
@@ -127,38 +151,49 @@ def split_body_and_citations(text: str) -> tuple[str, str]:
     return text[: match.start()].strip(), text[match.start() :].strip()
 
 
+def split_translated_output_and_citations(text: str) -> tuple[str, str]:
+    match = TRANSLATED_CITATIONS_SECTION_RE.search(text)
+    if not match:
+        return text.strip(), ""
+    return text[: match.start()].strip(), text[match.start() :].strip()
+
+
+def count_numbered_citation_entries(text: str) -> int:
+    return len(NUMBERED_CITATION_ENTRY_RE.findall(text))
+
+
 def render_translated_citations_section(citations_text: str, *, language_name: str) -> str:
     if not citations_text.strip():
         return ""
 
     heading = "## Citations"
-    line_template = '{number}. F. Scott Fitzgerald, *The Great Gatsby*, ch. {chapter}, para. {paragraph}, cited passage beginning "{excerpt}".'
     if language_name == "Spanish":
         heading = "## Citas"
-        line_template = '{number}. F. Scott Fitzgerald, *The Great Gatsby*, cap. {chapter}, párr. {paragraph}, pasaje citado que comienza con "{excerpt}".'
     elif language_name == "Simplified Chinese":
         heading = "## 引文"
-        line_template = '{number}. F. Scott Fitzgerald, *The Great Gatsby*, 第{chapter}章，第{paragraph}段，引文开头为"{excerpt}"。'
 
     rendered_lines = [heading]
     for line in citations_text.splitlines()[1:]:
         stripped = line.strip()
         if not stripped:
             continue
-        match = ENGLISH_CITATION_ENTRY_RE.fullmatch(stripped)
-        if not match:
-            rendered_lines.append(stripped)
-            continue
-        number, chapter, paragraph, excerpt = match.groups()
-        rendered_lines.append(
-            line_template.format(
-                number=number,
-                chapter=chapter,
-                paragraph=paragraph,
-                excerpt=excerpt,
-            )
-        )
+        rendered_lines.append(stripped)
     return "\n".join(rendered_lines).strip()
+
+
+def validate_citations_section_parity(english_master: str, translated_text: str) -> None:
+    _, english_citations_section = split_body_and_citations(english_master)
+    _, translated_citations_section = split_translated_output_and_citations(translated_text)
+
+    english_entries = count_numbered_citation_entries(english_citations_section)
+    translated_entries = count_numbered_citation_entries(translated_citations_section)
+
+    if bool(english_citations_section.strip()) != bool(translated_citations_section.strip()):
+        raise ValueError("Translated output changed citations section presence")
+    if translated_citations_section.strip() and translated_entries == 0:
+        raise ValueError("Translated output kept the citations heading but dropped the citation entries")
+    if english_entries != translated_entries:
+        raise ValueError("Translated output changed the citation entry count")
 
 
 def freeze_english_master(config: AppConfig) -> str:
@@ -209,6 +244,31 @@ def build_fragment_user_prompt(fragment_text: str, *, language_name: str) -> str
     return "\n".join(instructions) + "\n\nEnglish markdown fragment:\n\n" + fragment_text
 
 
+def build_translation_cleanup_user_prompt(chunk_text: str, *, chunk_index: int, total_chunks: int, language_name: str) -> str:
+    instructions = [
+        f"Chunk {chunk_index} of {total_chunks}.",
+        f"Revise this existing {language_name} markdown chunk into polished academic {language_name}.",
+        "The text is already translated, but it may contain leftover English, literal phrasing, inconsistent proper nouns, or awkward citation punctuation.",
+        "Preserve markdown heading markers exactly.",
+        "Preserve immutable machine tokens like AGCITTOKEN0001XYZ exactly and do not translate, retype, split, or alter them.",
+        "Preserve quotation boundaries.",
+        "Keep all direct quotations consistently translated into the target language unless the content is only a proper noun.",
+        "Return revised markdown only.",
+    ]
+    return "\n".join(instructions) + "\n\nExisting translated markdown chunk:\n\n" + chunk_text
+
+
+def build_cleanup_fragment_user_prompt(fragment_text: str, *, language_name: str) -> str:
+    instructions = [
+        f"Revise this existing {language_name} markdown fragment into polished academic {language_name}.",
+        "Do not add commentary or extra lines.",
+        "Preserve any inline markdown emphasis markers like * and _ when they appear in the fragment.",
+        "Keep any direct quotations in the target language.",
+        "Return the revised fragment only.",
+    ]
+    return "\n".join(instructions) + "\n\nExisting translated markdown fragment:\n\n" + fragment_text
+
+
 def validate_translation_chunk(source_chunk: str, translated_chunk: str) -> None:
     stripped = translated_chunk.strip()
     if not stripped:
@@ -244,10 +304,78 @@ def validate_translated_fragment(translated_text: str) -> None:
         raise ValueError("Translated fragment unexpectedly introduced citation placeholders")
 
 
+def normalize_translated_body(text: str, *, language_name: str) -> str:
+    normalized = CITATION_GLUE_RE.sub(r"\1 ", text)
+    if language_name == "Simplified Chinese":
+        for source, target in MANDARIN_NORMALIZATION_MAP.items():
+            normalized = normalized.replace(source, target)
+    return normalized
+
+
 def write_translation_output(output_path, text: str, *, language_name: str) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(text.strip() + "\n", encoding="utf-8")
     LOGGER.info("Wrote %s translation to %s", language_name, output_path)
+
+
+def post_edit_translated_body(
+    config: AppConfig,
+    *,
+    stage_name: str,
+    system_prompt: str,
+    output_path,
+    model_name: str,
+    language_name: str,
+    translated_body: str,
+    transport_override: str | None,
+) -> str:
+    chunks = split_markdown_into_chunks(
+        translated_body,
+        max_chars=int(config.translation.get("max_chunk_chars", 5000)),
+    )
+    revised_chunks: list[str] = []
+    for index, chunk in enumerate(chunks, start=1):
+        masked_chunk, original_markers = mask_visible_citation_markers(chunk)
+        try:
+            revised_chunk = invoke_text_completion(
+                config,
+                stage_name=f"{stage_name}_cleanup",
+                system_prompt=system_prompt,
+                user_prompt=build_translation_cleanup_user_prompt(
+                    masked_chunk,
+                    chunk_index=index,
+                    total_chunks=len(chunks),
+                    language_name=language_name,
+                ),
+                output_path=str(output_path),
+                model_name=model_name,
+                response_validator=lambda text, source_chunk=masked_chunk: validate_placeholder_chunk(source_chunk, text),
+                transport_override=transport_override,
+            ).strip()
+            revised_chunks.append(restore_visible_citation_markers(revised_chunk, original_markers))
+        except LLMResponseValidationError as exc:
+            if "citation placeholder inventory" not in str(exc):
+                raise
+            LOGGER.warning(
+                "Post-edit cleanup failed placeholder preservation for %s chunk %d/%d; falling back to fragment-safe cleanup",
+                stage_name,
+                index,
+                len(chunks),
+            )
+            revised_chunks.append(
+                cleanup_chunk_with_marker_stitching(
+                    config,
+                    stage_name=stage_name,
+                    system_prompt=system_prompt,
+                    output_path=output_path,
+                    model_name=model_name,
+                    language_name=language_name,
+                    chunk_text=chunk,
+                    transport_override=transport_override,
+                )
+            )
+
+    return normalize_translated_body("\n\n".join(revised_chunks).strip(), language_name=language_name)
 
 
 def translate_fragment(
@@ -281,6 +409,39 @@ def translate_fragment(
         transport_override=transport_override,
     ).strip()
     return leading + translated_core + trailing
+
+
+def cleanup_fragment(
+    config: AppConfig,
+    *,
+    stage_name: str,
+    system_prompt: str,
+    output_path,
+    model_name: str,
+    language_name: str,
+    fragment_text: str,
+    transport_override: str | None,
+) -> str:
+    if not fragment_text.strip():
+        return fragment_text
+
+    leading = fragment_text[: len(fragment_text) - len(fragment_text.lstrip())]
+    trailing = fragment_text[len(fragment_text.rstrip()) :]
+    core = fragment_text.strip()
+    if not core:
+        return fragment_text
+
+    cleaned_core = invoke_text_completion(
+        config,
+        stage_name=f"{stage_name}_cleanup",
+        system_prompt=system_prompt,
+        user_prompt=build_cleanup_fragment_user_prompt(core, language_name=language_name),
+        output_path=str(output_path),
+        model_name=model_name,
+        response_validator=validate_translated_fragment,
+        transport_override=transport_override,
+    ).strip()
+    return leading + cleaned_core + trailing
 
 
 def translate_text_preserving_citations(
@@ -318,6 +479,43 @@ def translate_text_preserving_citations(
             )
         )
     return "".join(translated_parts)
+
+
+def cleanup_text_preserving_citations(
+    config: AppConfig,
+    *,
+    stage_name: str,
+    system_prompt: str,
+    output_path,
+    model_name: str,
+    language_name: str,
+    text: str,
+    transport_override: str | None,
+) -> str:
+    if not text:
+        return text
+
+    parts = re.split(f"({VISIBLE_CITATION_RE.pattern})", text)
+    cleaned_parts: list[str] = []
+    for part in parts:
+        if not part:
+            continue
+        if VISIBLE_CITATION_RE.fullmatch(part):
+            cleaned_parts.append(part)
+            continue
+        cleaned_parts.append(
+            cleanup_fragment(
+                config,
+                stage_name=stage_name,
+                system_prompt=system_prompt,
+                output_path=output_path,
+                model_name=model_name,
+                language_name=language_name,
+                fragment_text=part,
+                transport_override=transport_override,
+            )
+        )
+    return "".join(cleaned_parts)
 
 
 def translate_chunk_with_marker_stitching(
@@ -368,11 +566,60 @@ def translate_chunk_with_marker_stitching(
     return "\n\n".join(translated_blocks).strip()
 
 
+def cleanup_chunk_with_marker_stitching(
+    config: AppConfig,
+    *,
+    stage_name: str,
+    system_prompt: str,
+    output_path,
+    model_name: str,
+    language_name: str,
+    chunk_text: str,
+    transport_override: str | None,
+) -> str:
+    cleaned_blocks: list[str] = []
+    for block in paragraph_blocks(chunk_text):
+        cleaned_lines: list[str] = []
+        for line in block.splitlines():
+            if not line.strip():
+                cleaned_lines.append(line)
+                continue
+
+            prefix = ""
+            body = line
+            heading_match = HEADING_LINE_RE.match(line)
+            if heading_match:
+                prefix = heading_match.group(1)
+                body = heading_match.group(2)
+            else:
+                blockquote_match = BLOCKQUOTE_LINE_RE.match(line)
+                if blockquote_match:
+                    prefix = blockquote_match.group(1)
+                    body = blockquote_match.group(2)
+
+            cleaned_lines.append(
+                prefix
+                + cleanup_text_preserving_citations(
+                    config,
+                    stage_name=stage_name,
+                    system_prompt=system_prompt,
+                    output_path=output_path,
+                    model_name=model_name,
+                    language_name=language_name,
+                    text=body,
+                    transport_override=transport_override,
+                )
+            )
+        cleaned_blocks.append("\n".join(cleaned_lines))
+    return "\n\n".join(cleaned_blocks).strip()
+
+
 def translate_document(
     config: AppConfig,
     *,
     stage_name: str,
     prompt_key: str,
+    cleanup_prompt_key: str | None,
     model_key: str,
     output_path,
     language_name: str,
@@ -383,6 +630,7 @@ def translate_document(
     max_chunk_chars = int(config.translation.get("max_chunk_chars", 5000))
     chunks = split_markdown_into_chunks(body_text, max_chars=max_chunk_chars)
     system_prompt = load_translation_prompt(config, prompt_key)
+    cleanup_prompt = load_translation_prompt(config, cleanup_prompt_key) if cleanup_prompt_key else system_prompt
     transport_override = (
         str(config.translation.get("llm_transport", "")).strip()
         or str(config.drafting.get("llm_transport", "")).strip()
@@ -432,11 +680,27 @@ def translate_document(
                 )
             )
 
-    translated_text = "\n\n".join(translated_chunks).strip()
+    translated_body = "\n\n".join(translated_chunks).strip()
+    if bool(config.translation.get("post_edit_body", True)):
+        translated_body = post_edit_translated_body(
+            config,
+            stage_name=stage_name,
+            system_prompt=cleanup_prompt,
+            output_path=output_path,
+            model_name=target_model_name,
+            language_name=language_name,
+            translated_body=translated_body,
+            transport_override=transport_override,
+        )
+    else:
+        translated_body = normalize_translated_body(translated_body, language_name=language_name)
+
     translated_citations = render_translated_citations_section(citations_text, language_name=language_name)
+    translated_text = translated_body
     if translated_citations:
         translated_text = translated_text + "\n\n" + translated_citations
     translated_text = translated_text.strip() + "\n"
     validate_translation_chunk(master_text, translated_text)
+    validate_citations_section_parity(master_text, translated_text)
     write_translation_output(output_path, translated_text, language_name=language_name)
     return translated_text

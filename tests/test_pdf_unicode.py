@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from agent_gatsby.config import load_config
-from agent_gatsby.pdf_compiler import render_pdfs, resolve_font_path
+from agent_gatsby.pdf_compiler import render_markdown_blocks, render_pdfs, resolve_font_path
 
 
 def write_pdf_repo(repo_root: Path) -> Path:
@@ -67,10 +67,15 @@ pdf:
   margin_right_mm: 25
   margin_top_mm: 25
   margin_bottom_mm: 25
-  default_font_size: 12
-  heading_font_size: 16
-  title_font_size: 18
-  line_height: 7
+  default_font_size: 9
+  heading_font_size: 13
+  title_font_size: 15
+  line_height: 5.5
+  paragraph_spacing: 3
+  title_spacing_after: 6
+  heading_spacing_before: 6
+  heading_spacing_after: 6
+  citation_entry_spacing: 0
   english_font_regular: "NotoSerif-Regular.ttf"
   english_font_bold: "NotoSerif-Bold.ttf"
   spanish_font_regular: "NotoSerif-Regular.ttf"
@@ -99,3 +104,95 @@ def test_render_pdfs_creates_three_outputs(tmp_path) -> None:
     for path in output_paths:
         assert path.exists()
         assert path.stat().st_size > 0
+
+
+class FakePDF:
+    def __init__(self) -> None:
+        self.page_font_family = "Body"
+        self.heading_font_family = "BodyBold"
+        self.l_margin = 25
+        self.r_margin = 25
+        self.w = 210
+        self.page_count = 1
+        self.font_calls: list[tuple[str, float]] = []
+        self.multi_cell_calls: list[str] = []
+        self.ln_calls: list[float] = []
+        self.x_positions: list[float] = []
+        self.add_page_calls = 0
+
+    def set_font(self, family: str, size: float, style: str = "") -> None:
+        self.font_calls.append((family or style, size))
+
+    def multi_cell(self, w: float, h: float, text: str, align: str = "J") -> None:
+        self.multi_cell_calls.append(text)
+
+    def ln(self, h: float | None = None) -> None:
+        self.ln_calls.append(0.0 if h is None else float(h))
+
+    def set_x(self, value: float) -> None:
+        self.x_positions.append(value)
+
+    def add_page(self) -> None:
+        self.add_page_calls += 1
+        self.page_count += 1
+
+    def page_no(self) -> int:
+        return self.page_count
+
+
+def test_render_markdown_blocks_keeps_citations_on_separate_lines_and_adds_spacing(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_pdf_repo(repo_root))
+    pdf = FakePDF()
+    text = """# Title
+
+### Introduction
+
+Metaphor text:
+> *"Quoted one"* [1]
+> *"Quoted two"* [2]
+
+First paragraph.
+
+Second paragraph.
+
+## Citations
+
+1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "Alpha".
+2. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 2, cited passage beginning "Beta".
+"""
+
+    render_markdown_blocks(pdf, config, text)
+
+    assert "Metaphor text:" in pdf.multi_cell_calls
+    assert '"Quoted one" [1]\n"Quoted two" [2]' in pdf.multi_cell_calls
+    assert "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\"." in pdf.multi_cell_calls
+    assert "2. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 2, cited passage beginning \"Beta\"." in pdf.multi_cell_calls
+    assert all(
+        "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\". 2." not in call
+        for call in pdf.multi_cell_calls
+    )
+    assert 3.0 in pdf.ln_calls
+    assert 6.0 in pdf.ln_calls
+    assert 0.0 in pdf.ln_calls
+    assert pdf.add_page_calls == 1
+
+
+def test_render_markdown_blocks_keeps_heading_followed_immediately_by_citation_entries(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_pdf_repo(repo_root))
+    pdf = FakePDF()
+    text = """# Title
+
+Body paragraph.
+
+## Citas
+1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "Alpha".
+2. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 2, cited passage beginning "Beta".
+"""
+
+    render_markdown_blocks(pdf, config, text)
+
+    assert "Citas" in pdf.multi_cell_calls
+    assert "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\"." in pdf.multi_cell_calls
+    assert "2. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 2, cited passage beginning \"Beta\"." in pdf.multi_cell_calls

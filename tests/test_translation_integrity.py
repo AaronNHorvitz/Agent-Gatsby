@@ -13,7 +13,9 @@ def write_translation_repo(repo_root: Path) -> Path:
     (repo_root / "config/prompts").mkdir(parents=True)
     (repo_root / "artifacts/drafts").mkdir(parents=True)
     (repo_root / "config/prompts/translator_es.md").write_text("Translate to Spanish.\n", encoding="utf-8")
+    (repo_root / "config/prompts/translator_es_cleanup.md").write_text("Clean up Spanish.\n", encoding="utf-8")
     (repo_root / "config/prompts/translator_zh.md").write_text("Translate to Simplified Chinese.\n", encoding="utf-8")
+    (repo_root / "config/prompts/translator_zh_cleanup.md").write_text("Clean up Simplified Chinese.\n", encoding="utf-8")
     english_final = """# An Analysis of Metaphors in The Great Gatsby
 
 ### Introduction
@@ -70,12 +72,15 @@ llm_defaults:
   max_tokens: 512
 prompts:
   translator_es_prompt_path: "config/prompts/translator_es.md"
+  translator_es_cleanup_prompt_path: "config/prompts/translator_es_cleanup.md"
   translator_zh_prompt_path: "config/prompts/translator_zh.md"
+  translator_zh_cleanup_prompt_path: "config/prompts/translator_zh_cleanup.md"
 drafting:
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
 translation:
   max_chunk_chars: 80
+  post_edit_body: true
   preserve_headings: true
   preserve_citations: true
 translation_outputs:
@@ -88,7 +93,15 @@ translation_outputs:
 
 
 def extract_chunk_from_prompt(user_prompt: str) -> str:
-    return user_prompt.split("English markdown chunk:\n\n", maxsplit=1)[1]
+    if "English markdown chunk:\n\n" in user_prompt:
+        return user_prompt.split("English markdown chunk:\n\n", maxsplit=1)[1]
+    if "Existing translated markdown chunk:\n\n" in user_prompt:
+        return user_prompt.split("Existing translated markdown chunk:\n\n", maxsplit=1)[1]
+    if "Existing translated markdown fragment:\n\n" in user_prompt:
+        return user_prompt.split("Existing translated markdown fragment:\n\n", maxsplit=1)[1]
+    if "English markdown fragment:\n\n" in user_prompt:
+        return user_prompt.split("English markdown fragment:\n\n", maxsplit=1)[1]
+    raise AssertionError(f"Unexpected prompt shape: {user_prompt}")
 
 
 def test_split_markdown_into_chunks_preserves_block_boundaries() -> None:
@@ -118,8 +131,8 @@ def test_translate_spanish_freezes_master_and_preserves_citations(monkeypatch, t
     assert config.spanish_translation_output_path.exists()
     assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
     assert "## Citas" in translated_text
-    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, cap. 1, párr. 1, pasaje citado que comienza con "In my younger and more vulnerable years my father gave me some advice...".' in translated_text
-    assert len(prompts) >= 2
+    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "In my younger and more vulnerable years my father gave me some advice...".' in translated_text
+    assert any("Existing translated markdown chunk:" in prompt for prompt in prompts)
 
 
 def test_translate_mandarin_writes_output(monkeypatch, tmp_path) -> None:
@@ -148,7 +161,7 @@ def test_translate_spanish_falls_back_to_fragment_stitching_when_placeholders_dr
         calls.append(user_prompt)
         if "English markdown chunk:" in user_prompt:
             raise LLMResponseValidationError("Translated chunk changed the citation placeholder inventory", "")
-        return user_prompt.split("English markdown fragment:\n\n", maxsplit=1)[1]
+        return extract_chunk_from_prompt(user_prompt)
 
     monkeypatch.setattr("agent_gatsby.translation_common.invoke_text_completion", fake_invoke_text_completion)
 
@@ -158,3 +171,26 @@ def test_translate_spanish_falls_back_to_fragment_stitching_when_placeholders_dr
     assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
     assert any("English markdown chunk:" in call for call in calls)
     assert any("English markdown fragment:" in call for call in calls)
+    assert any("Existing translated markdown chunk:" in call for call in calls)
+
+
+def test_translate_spanish_uses_fragment_safe_cleanup_when_cleanup_chunk_placeholders_drift(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    calls: list[str] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs["user_prompt"]
+        calls.append(user_prompt)
+        if "Existing translated markdown chunk:" in user_prompt:
+            raise LLMResponseValidationError("Translated chunk changed the citation placeholder inventory", "")
+        return extract_chunk_from_prompt(user_prompt)
+
+    monkeypatch.setattr("agent_gatsby.translation_common.invoke_text_completion", fake_invoke_text_completion)
+
+    translated_text = translate_spanish(config)
+
+    assert config.spanish_translation_output_path.exists()
+    assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
+    assert any("Existing translated markdown chunk:" in call for call in calls)
+    assert any("Existing translated markdown fragment:" in call for call in calls)

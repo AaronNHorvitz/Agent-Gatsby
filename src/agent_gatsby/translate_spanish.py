@@ -17,6 +17,7 @@ def translate_spanish(
         config,
         stage_name="translate_spanish",
         prompt_key="translator_es_prompt_path",
+        cleanup_prompt_key="translator_es_cleanup_prompt_path",
         model_key="translator_es",
         output_path=config.spanish_translation_output_path,
         language_name="Spanish",
