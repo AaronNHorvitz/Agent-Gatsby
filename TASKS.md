@@ -12,6 +12,25 @@ Build, test, debug, and package a working local AI pipeline that:
 
 **Current Status:** Weekend sprint completed. The core pipeline, frozen English master, translations, QA reports, PDFs, manifest, and submission packaging are in shipped state.
 
+## Current Snapshot
+- `Status:` shipped
+- `Primary result:` a local AI pipeline that produces a cited English analysis, Spanish and Mandarin translations, three PDFs, QA artifacts, and a final manifest
+- `Implementation signal:` evidence-first drafting, quote and citation verification, translation QA, deterministic PDF rendering, and final artifact audits
+- `Current outputs:` `outputs/Gatsby_Analysis_English.pdf`, `outputs/Gatsby_Analysis_Spanish.pdf`, `outputs/Gatsby_Analysis_Mandarin.pdf`, and `outputs/final_manifest.json`
+- `Remaining work:` only optional hardening and presentation cleanup, not missing core functionality
+
+## Implemented Capabilities
+- locked source text with manifest and hash tracking
+- deterministic passage indexing and evidence ledger generation
+- English drafting, verification, and frozen master promotion
+- Spanish and Mandarin translation from the frozen English master
+- structural QA and final PDF audit gates before promotion
+- deterministic PDF rendering with Unicode-safe font configuration
+- unit tests, smoke checks, logs, and explicit run artifacts on disk
+
+## Historical Work Log
+The detailed checklist below is the actual weekend execution log retained for reviewability.
+
 ---
 
 # 0. Ground Rules for the Weekend

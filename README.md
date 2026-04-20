@@ -7,7 +7,22 @@ Agent Gatsby is a local-first AI pipeline built for Treasury's supplemental *Gre
 2. translate that essay into Spanish
 3. translate that essay into Mandarin (Simplified Chinese)
 
-The point of this repository is not just to generate an essay. It is to show the underlying job requirement in code: the ability to implement AI solutions in a real test environment with explicit validation, deterministic artifacts, and failure gates.
+This repository is meant to demonstrate more than prompt writing. It shows the underlying job requirement in code: implementing an AI solution in a real local test environment with explicit validation, deterministic artifacts, and failure gates.
+
+What this repo proves:
+- local AI execution with no hosted inference dependency in the reference path
+- evidence-first drafting instead of one-shot generation
+- quote, citation, translation, and final-artifact validation before promotion
+- deterministic PDF packaging and explicit run artifacts on disk
+- production-minded controls around auditability, recoverability, and scope
+
+Current shipped outputs:
+- `outputs/Gatsby_Analysis_English.pdf`
+- `outputs/Gatsby_Analysis_Spanish.pdf`
+- `outputs/Gatsby_Analysis_Mandarin.pdf`
+- `outputs/final_manifest.json`
+
+For the compressed weekend execution record, see `SPRINTBOARD.md`.
 
 In its current reference configuration, the repo runs against a local Ollama-compatible endpoint at `http://localhost:11434/v1` and uses `gemma4:26b` for drafting and both translation paths. During development, that local setup ran on a single NVIDIA RTX 4090 rather than a hosted API. That keeps the novel, drafts, translations, QA artifacts, and PDFs on-device, reduces exfiltration risk, avoids API-key sprawl, and keeps the trust boundary smaller and easier to audit.
 
@@ -27,7 +42,7 @@ That rewrite pass is constrained to:
 - cut any sentence that does not move the argument forward
 - prefer one precise sentence over two softer ones
 
-This repository is meant to show more than prompt writing. It shows how to build, test, verify, and package a local AI system with explicit controls around evidence, citations, translation fidelity, PDF rendering, privacy, and final artifacts.
+This repository shows how to build, test, verify, and package a local AI system with explicit controls around evidence, citations, translation fidelity, PDF rendering, privacy, and final artifacts.
 
 The core design choice is simple:
 
