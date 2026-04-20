@@ -52,6 +52,13 @@ def normalize_render_text(text: str, *, language: str) -> str:
     return normalized
 
 
+def language_pdf_setting(config: AppConfig, *, language: str, key: str, default: float) -> float:
+    language_key = f"{language}_{key}"
+    if language_key in config.pdf:
+        return float(config.pdf.get(language_key, default))
+    return float(config.pdf.get(key, default))
+
+
 def is_numbered_list_block(lines: list[str]) -> bool:
     non_empty_lines = [line.strip() for line in lines if line.strip()]
     return bool(non_empty_lines) and all(NUMBERED_LIST_LINE_RE.match(line) for line in non_empty_lines)
@@ -208,15 +215,35 @@ def configure_pdf_fonts(pdf: NumberedPDF, config: AppConfig, *, language: str) -
 
 
 def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str, *, language: str) -> None:
-    line_height = float(config.pdf.get("line_height", 7))
-    body_font_size = float(config.pdf.get("default_font_size", 12))
-    heading_font_size = float(config.pdf.get("heading_font_size", 16))
-    title_font_size = float(config.pdf.get("title_font_size", 18))
-    paragraph_spacing = float(config.pdf.get("paragraph_spacing", line_height))
-    title_spacing_after = float(config.pdf.get("title_spacing_after", line_height * 2))
-    heading_spacing_before = float(config.pdf.get("heading_spacing_before", line_height * 2))
-    heading_spacing_after = float(config.pdf.get("heading_spacing_after", line_height * 2))
-    citation_entry_spacing = float(config.pdf.get("citation_entry_spacing", 0))
+    line_height = language_pdf_setting(config, language=language, key="line_height", default=7)
+    body_font_size = language_pdf_setting(config, language=language, key="default_font_size", default=12)
+    heading_font_size = language_pdf_setting(config, language=language, key="heading_font_size", default=16)
+    title_font_size = language_pdf_setting(config, language=language, key="title_font_size", default=18)
+    paragraph_spacing = language_pdf_setting(config, language=language, key="paragraph_spacing", default=line_height)
+    title_spacing_after = language_pdf_setting(
+        config,
+        language=language,
+        key="title_spacing_after",
+        default=line_height * 2,
+    )
+    heading_spacing_before = language_pdf_setting(
+        config,
+        language=language,
+        key="heading_spacing_before",
+        default=line_height * 2,
+    )
+    heading_spacing_after = language_pdf_setting(
+        config,
+        language=language,
+        key="heading_spacing_after",
+        default=line_height * 2,
+    )
+    citation_entry_spacing = language_pdf_setting(
+        config,
+        language=language,
+        key="citation_entry_spacing",
+        default=0,
+    )
     blockquote_indent = 8
     section_min_following_sentences = int(config.pdf.get("section_min_following_sentences", 5))
     paragraph_keep_together_max_sentences = int(config.pdf.get("paragraph_keep_together_max_sentences", 3))

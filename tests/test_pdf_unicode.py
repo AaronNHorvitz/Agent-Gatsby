@@ -255,3 +255,25 @@ Sentence one. Sentence two. Sentence three. Sentence four. Sentence five.
 
     assert pdf.add_page_calls == 1
     assert "Tight Section" in pdf.multi_cell_calls
+
+
+def test_render_markdown_blocks_honors_mandarin_metric_overrides(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_pdf_repo(repo_root))
+    config.pdf["mandarin_default_font_size"] = 11
+    config.pdf["mandarin_heading_font_size"] = 14
+    config.pdf["mandarin_title_font_size"] = 16
+    config.pdf["mandarin_line_height"] = 6.3
+    pdf = FakePDF()
+    text = """# 标题
+
+### 引言
+
+盖茨比伸手去够那盏灯 [1]。第二句话也留在这一段。
+"""
+
+    render_markdown_blocks(pdf, config, text, language="mandarin")
+
+    assert any(size == 11 for _, size in pdf.font_calls)
+    assert any(size == 14 for _, size in pdf.font_calls)
+    assert any(size == 16 for _, size in pdf.font_calls)

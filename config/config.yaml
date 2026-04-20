@@ -223,6 +223,10 @@ pdf:
   spanish_font_regular: "NotoSans-Regular.ttf"
   spanish_font_bold: "NotoSans-Bold.ttf"
   mandarin_font_regular: "NotoSansSC-Regular.ttf"
+  mandarin_default_font_size: 10.0
+  mandarin_heading_font_size: 13.5
+  mandarin_title_font_size: 15.0
+  mandarin_line_height: 6.0
   english_pdf_path: "outputs/Gatsby_Analysis_English.pdf"
   spanish_pdf_path: "outputs/Gatsby_Analysis_Spanish.pdf"
   mandarin_pdf_path: "outputs/Gatsby_Analysis_Mandarin.pdf"

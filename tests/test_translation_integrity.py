@@ -11,6 +11,7 @@ from agent_gatsby.translation_common import (
     extract_visible_citation_markers,
     freeze_english_master,
     localize_citation_metadata_line,
+    normalize_translated_body,
     split_markdown_into_chunks,
 )
 
@@ -210,7 +211,7 @@ def test_freeze_english_master_applies_known_regression_fixes_and_writes_report(
     repo_root = tmp_path / "repo"
     config = load_config(write_translation_repo(repo_root))
     config.final_draft_output_path.write_text(
-        '# Title\n\nThe Valley of West was a mistake, and Gatsby tried to maintain a punctiliously manner. He could still look out over the solemn dumping ground [5], hear the thin and far away [30] echoes of a dead dream, and note that a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6].\n',
+        '# Title\n\nThe Valley of West was a mistake, and Gatsby tried to maintain a punctiliously manner. He could still look out over the solemn dumping ground [5], hear the thin and far away [30] echoes of a dead dream, and note that a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6]. The ash-grey men, who move dimly and already crumbling through the powdery air [4], remain part of the landscape.\n',
         encoding="utf-8",
     )
 
@@ -221,6 +222,7 @@ def test_freeze_english_master_applies_known_regression_fixes_and_writes_report(
     assert '"look out over the solemn dumping ground" [5]' in frozen
     assert 'the "thin and far away" [30] echoes of a dead dream' in frozen
     assert '"a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity" [6]' in frozen
+    assert '"ash-grey men, who move dimly and already crumbling through the powdery air" [4]' in frozen
     report_path = repo_root / "artifacts/qa/english_master_regression_report.json"
     assert report_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
@@ -241,6 +243,26 @@ def test_freeze_english_master_flags_unquoted_exact_quote_reuse(tmp_path) -> Non
         assert "terminology/regression validation" in str(exc)
     else:
         raise AssertionError("freeze_english_master should reject unquoted direct quote reuse")
+
+
+def test_freeze_english_master_quotes_additional_exact_quote_reuse_patterns(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    config.final_draft_output_path.write_text(
+        '# Title\n\n'
+        'Gatsby is described as Jay Gatsby of West Egg, Long Island, sprang from his Platonic conception of himself [13]. '
+        'Later the pressure rises until the straw seats of the car hovered on the edge of combustion [22]. '
+        'In the hotel scene, in this heat every extra gesture was an affront to the common store of life [23]. '
+        'The ending fades into a man’s voice, very thin and far away [30].\n',
+        encoding="utf-8",
+    )
+
+    frozen = freeze_english_master(config)
+
+    assert '"Jay Gatsby of West Egg, Long Island, sprang from his Platonic conception of himself" [13]' in frozen
+    assert '"the straw seats of the car hovered on the edge of combustion" [22]' in frozen
+    assert '"in this heat every extra gesture was an affront to the common store of life" [23]' in frozen
+    assert '"a man’s voice, very thin and far away" [30]' in frozen
 
 
 def test_extract_translated_quote_lookup_reads_inline_cited_quotes() -> None:
@@ -270,3 +292,17 @@ def test_localize_citation_metadata_line_uses_language_overrides_when_quote_look
 
     assert "Los ojos se le llenaban continuamente de emoción" in localized_spanish
     assert "‘杰伊·盖茨比’像玻璃一样在汤姆冷酷的恶意面前碎裂了" in localized_mandarin
+
+
+def test_normalize_translated_body_fixes_remaining_spanish_and_mandarin_overliteral_phrases() -> None:
+    spanish = "La confrontación entre Gatsby y Tom proporciona el momento en que esta artificialidad se rompe físicamente."
+    mandarin = "灰烬是如此普遍，以至于它在物理层面上改变了生活其中的人，而这种虚假性也在物理层面发生破碎的时刻显现出来。"
+
+    normalized_spanish = normalize_translated_body(spanish, language_name="Spanish")
+    normalized_mandarin = normalize_translated_body(mandarin, language_name="Simplified Chinese")
+
+    assert "rompe físicamente" not in normalized_spanish
+    assert "quiebra de forma visible" in normalized_spanish
+    assert "物理层面" not in normalized_mandarin
+    assert "切实地改变了生活其中的人" in normalized_mandarin
+    assert "明显走向破碎的时刻" in normalized_mandarin

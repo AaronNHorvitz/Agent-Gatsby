@@ -16,6 +16,7 @@ from agent_gatsby.index_text import PassageIndex, load_passage_index
 from agent_gatsby.llm_client import LLMResponseValidationError, invoke_text_completion
 from agent_gatsby.plan_outline import load_evidence_records, load_outline
 from agent_gatsby.schemas import EvidenceRecord, OutlinePlan, OutlineSection
+from agent_gatsby.translation_common import normalize_english_master_regressions
 
 LOGGER = logging.getLogger(__name__)
 
@@ -766,6 +767,12 @@ def draft_section(
                         heading=heading,
                         require_citation=require_citation,
                     )
+                    section_text = apply_draft_regression_fixes(section_text, label=f"section '{heading}'")
+                    section_text = validate_section_text(
+                        section_text,
+                        heading=heading,
+                        require_citation=require_citation,
+                    )
                     if section_type == "body":
                         focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
                         return f"{focus_block}\n\n{section_text}".strip()
@@ -841,6 +848,8 @@ def draft_section(
         else:
             raise
     section_text = validate_section_text(response_text, heading=heading, require_citation=require_citation)
+    section_text = apply_draft_regression_fixes(section_text, label=f"section '{heading}'")
+    section_text = validate_section_text(section_text, heading=heading, require_citation=require_citation)
     if section_type == "body":
         focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
         return f"{focus_block}\n\n{section_text}".strip()
@@ -883,6 +892,13 @@ def validate_combined_draft(draft_text: str, outline: OutlinePlan) -> None:
         if position <= last_position:
             raise ValueError(f"Combined draft heading order is invalid around: {heading}")
         last_position = position
+
+
+def apply_draft_regression_fixes(text: str, *, label: str) -> str:
+    normalized_text, applied_fixes = normalize_english_master_regressions(text)
+    if applied_fixes:
+        LOGGER.info("Applied %d deterministic regression fixes to %s", len(applied_fixes), label)
+    return normalized_text
 
 def write_english_draft(config: AppConfig, draft_text: str) -> None:
     output_path = config.draft_output_path
@@ -1012,6 +1028,7 @@ def draft_english(
         section_texts=section_texts,
         conclusion_text=conclusion_text,
     )
+    draft_text = apply_draft_regression_fixes(draft_text, label="combined English draft")
     validate_combined_draft(draft_text, loaded_outline)
     write_english_draft(config, draft_text)
 
