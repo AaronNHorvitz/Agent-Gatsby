@@ -215,6 +215,36 @@ At a high level, the system is divided into eight logical layers:
 7. **Deterministic PDF rendering and audit**
 8. **Final artifact promotion and manifest writing**
 
+### 5.1 Failure Handling
+
+The main architecture diagram intentionally omits most retry and fallback branches. Those behaviors are real, but rendering them inline would bury the pipeline's core shape under control-flow detail.
+
+In practice, the repo uses a bounded failure-handling strategy:
+
+- chunk-level translation and cleanup stages retry a limited number of times
+- placeholder and citation inventory checks run before a chunk is accepted
+- fragment-safe fallback paths are used when a chunk drifts but can still be salvaged structurally
+- final PDF promotion is blocked unless deterministic audits and the forensic audit both pass
+
+The translation-side control flow looks like this at a smaller scale:
+
+```mermaid
+flowchart TD
+    A[Translate Chunk] --> B{Placeholders Preserved?}
+    B -- Yes --> C[Cleanup Chunk]
+    B -- No --> D[Retry up to Limit]
+    D --> B
+    D --> E[Fragment Stitching Fallback]
+    E --> C
+    C --> F{Cleanup Preserved Placeholders?}
+    F -- Yes --> G[Dynamic Validation]
+    F -- No --> H[Fragment Safe Cleanup]
+    H --> G
+    G --> I{Structure Preserved?}
+    I -- Yes --> J[Accept Chunk]
+    I -- No --> K[Fallback to Prior Safe Text]
+```
+
 ---
 
 ## 6. End-to-End Workflow
