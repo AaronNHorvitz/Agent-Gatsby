@@ -74,7 +74,7 @@ The core design choice is simple:
 - [16. Logging, Error Handling, and Recovery](#16-logging-error-handling-and-recovery)
 - [17. Testing Strategy](#17-testing-strategy)
 - [18. Configuration](#18-configuration)
-- [19. Cold-Start Execution](#19-cold-start-execution)
+- [19. Getting Started and Local Execution](#19-getting-started-and-local-execution)
 - [20. Why This Approach Is Stronger Than a One-Shot Prompt](#20-why-this-approach-is-stronger-than-a-one-shot-prompt)
 - [21. Known Risks and Mitigations](#21-known-risks-and-mitigations)
 - [22. Future Enhancements](#22-future-enhancements)
@@ -224,6 +224,7 @@ In practice, the repo uses a bounded failure-handling strategy:
 - chunk-level translation and cleanup stages retry a limited number of times
 - placeholder and citation inventory checks run before a chunk is accepted
 - fragment-safe fallback paths are used when a chunk drifts but can still be salvaged structurally
+- dynamic validation and structure/parity checks run after the full translated document and localized citations section are reassembled
 - final PDF promotion is blocked unless deterministic audits and the forensic audit both pass
 
 The translation-side control flow looks like this at a smaller scale:
@@ -237,12 +238,17 @@ flowchart TD
     D --> E[Fragment Stitching Fallback]
     E --> C
     C --> F{Cleanup Preserved Placeholders?}
-    F -- Yes --> G[Dynamic Validation]
+    F -- Yes --> G[Accept Chunk]
     F -- No --> H[Fragment Safe Cleanup]
     H --> G
-    G --> I{Structure Preserved?}
-    I -- Yes --> J[Accept Chunk]
-    I -- No --> K[Fallback to Prior Safe Text]
+    G --> I{More Chunks?}
+    I -- Yes --> A
+    I -- No --> J[Assemble Translated Body]
+    J --> K[Render Localized Citations Section]
+    K --> L[Dynamic Validation on Full Document]
+    L --> M{Structure and Citation Parity Preserved?}
+    M -- Yes --> N[Accept Document]
+    M -- No --> O[Fallback to Regex-Repaired or Original Text]
 ```
 
 ---
@@ -725,22 +731,39 @@ The repository is organized around a small number of stable top-level areas:
 ```text
 Agent-Gatsby/
 ├── README.md
-├── requirements.txt
-├── pyproject.toml
 ├── AGENTS.md
+├── PRD.md
+├── SPRINTBOARD.md
+├── TASKS.md
+├── pyproject.toml
+├── requirements.txt
 ├── config/
+│   ├── config.yaml
+│   ├── config_5page.yaml
+│   └── prompts/
 ├── data/
-├── artifacts/
-├── outputs/
+│   ├── source/
+│   └── normalized/
 ├── fonts/
+├── artifacts/
+│   ├── drafts/
+│   ├── evidence/
+│   ├── final/
+│   ├── logs/
+│   ├── manifests/
+│   ├── qa/
+│   └── translations/
+├── outputs/
 ├── src/
 │   └── agent_gatsby/
 └── tests/
+    └── fixtures/
 ```
-### Note on Structure
-This README intentionally documents the stable architectural layout rather than an exhaustively detailed file tree.
 
-During active development, exact module names, prompt files, intermediate artifacts, and test files may evolve. The GitHub repository tree is the source of truth for the exact current file structure.
+### Note on Structure
+This section documents the stable architectural layout. For the current live tree, including the artifact and output files that exist right now, see the appendix at the end of this README.
+
+During active development, exact prompt assets, intermediate artifacts, and test files may evolve. The appendix is the repo-level source of truth for the current documented file structure.
 
 ---
 
@@ -1231,47 +1254,83 @@ Configuration should not be hidden in code. It should be inspectable and editabl
 
 ---
 
-## 19. Cold-Start Execution
+## 19. Getting Started and Local Execution
 
-## 19.1 Install dependencies
-Assumes the source text and required local font files are already present in the configured repository paths.
-This step installs only Python package dependencies for the repository.
-`ollama` is not included in `requirements.txt` and must be installed separately as a local runtime before running LLM-backed stages.
+## 19.1 Prerequisites
+Before running the pipeline locally, make sure you have:
+
+- Python `3.11+`
+- `ollama` installed and available on your shell `PATH`
+- the locked source text at `data/source/gatsby_source.txt`
+- the required PDF fonts in `fonts/`
+  - `NotoSerif-Regular.ttf`
+  - `NotoSerif-Bold.ttf`
+  - `NotoSansSC-Regular.ttf`
+
+`ollama` is not installed through this repository. It must be installed separately as a local runtime before any LLM-backed stage will work.
+
+## 19.2 Create and activate a virtual environment
 ```bash
-pip install -r requirements.txt
-pip install -e .
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 ```
 
-## 19.2 Start local inference server
-Requires a separate `ollama` installation that is available on your shell `PATH`.
+## 19.3 Install the repository
+The editable install path is the simplest way to run the CLI and tests locally.
+
+```bash
+python -m pip install -e '.[dev]'
+```
+
+If you prefer not to use the editable install, the requirements file remains available:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+## 19.4 Start the local inference server
+Open a separate terminal and start Ollama:
+
 ```bash
 ollama serve
 ```
 
-## 19.3 Pull local model
+## 19.5 Pull the reference model
 ```bash
 ollama pull gemma4:26b
 ```
 
-## 19.4 Run the full pipeline
+## 19.6 Run the full pipeline
+From an activated virtual environment:
+
 ```bash
 python -m agent_gatsby.orchestrator --config config/config.yaml --run all
 ```
 
-## 19.5 Run only specific stages
+That command runs the reference path end to end and produces:
+
+- `outputs/Gatsby_Analysis_English.pdf`
+- `outputs/Gatsby_Analysis_Spanish.pdf`
+- `outputs/Gatsby_Analysis_Mandarin.pdf`
+- `outputs/final_manifest.json`
+
+## 19.7 Run only specific stages
 ```bash
 python -m agent_gatsby.orchestrator --config config/config.yaml --run ingest
 python -m agent_gatsby.orchestrator --config config/config.yaml --run extract_metaphors
 python -m agent_gatsby.orchestrator --config config/config.yaml --run draft_english
 python -m agent_gatsby.orchestrator --config config/config.yaml --run render_pdfs
+python -m agent_gatsby.orchestrator --config config/config.yaml --run write_manifest
 ```
 
-## 19.6 Build the English report from the CLI
+## 19.8 Build the English report from the CLI
 These commands are enough to generate the English analysis and its deterministic verification artifacts without running translation or PDF stages.
 ```bash
 python -m agent_gatsby.orchestrator --config config/config.yaml --run draft_english
 python -m agent_gatsby.orchestrator --config config/config.yaml --run verify_english
 python -m agent_gatsby.orchestrator --config config/config.yaml --run critique_english
+python -m agent_gatsby.orchestrator --config config/config.yaml --run freeze_english
 ```
 
 Expected English-stage outputs:
@@ -1288,7 +1347,14 @@ The verification report now includes:
 - invalid quote and citation rates
 - advisory unsupported-sentence ratio for human review
 
-## 19.7 Recommended execution order
+## 19.9 Use the alternate shorter profile
+If you want the shorter five-page-oriented config for local experiments, use:
+
+```bash
+python -m agent_gatsby.orchestrator --config config/config_5page.yaml --run all
+```
+
+## 19.10 Recommended execution order
 ```bash
 python -m agent_gatsby.orchestrator --config config/config.yaml --run ingest
 python -m agent_gatsby.orchestrator --config config/config.yaml --run normalize
