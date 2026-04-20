@@ -106,8 +106,8 @@ evidence_ledger:
 
 outline:
   output_path: "artifacts/drafts/outline.json"
-  minimum_section_count: 8
-  maximum_section_count: 8
+  minimum_section_count: 12
+  maximum_section_count: 12
   max_prompt_evidence_records: 32
   llm_transport: "ollama_native_chat"
   fixed_title: "An Analysis of Metaphors in The Great Gatsby"

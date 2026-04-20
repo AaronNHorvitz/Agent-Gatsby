@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from agent_gatsby.config import load_config
-from agent_gatsby.plan_outline import plan_outline, round_robin_records_by_chapter, select_outline_evidence_records
+from agent_gatsby.plan_outline import (
+    build_outline_user_prompt,
+    plan_outline,
+    round_robin_records_by_chapter,
+    select_outline_evidence_records,
+)
 from agent_gatsby.schemas import EvidenceRecord
 
 
@@ -120,6 +125,7 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
         "purpose_guidance": False,
         "style_guidance": False,
         "grouped_section_guidance": False,
+        "granularity_guidance": False,
         "chapter_span_guidance": False,
         "breadth_guidance": False,
     }
@@ -140,6 +146,8 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
             prompt_checks["chapter_span_guidance"] = True
         if "opening-chapter evidence alone" in user_prompt:
             prompt_checks["breadth_guidance"] = True
+        if "split broad themes into smaller argumentative steps" in user_prompt:
+            prompt_checks["granularity_guidance"] = True
         return json.dumps(
             {
                 "title": "Some Other Title",
@@ -184,7 +192,35 @@ def test_plan_outline_writes_outline_with_valid_evidence_ids(monkeypatch, tmp_pa
     assert prompt_checks["grouped_section_guidance"] is True
     assert prompt_checks["chapter_span_guidance"] is True
     assert prompt_checks["breadth_guidance"] is True
+    assert prompt_checks["granularity_guidance"] is True
     assert seen_transport_overrides == ["ollama_native_chat"]
+
+
+def test_build_outline_user_prompt_uses_exact_section_count_guidance_when_bounds_match(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_outline_repo(repo_root))
+    config.outline["minimum_section_count"] = 3
+    config.outline["maximum_section_count"] = 3
+    evidence_records = [
+        EvidenceRecord(
+            evidence_id="E001",
+            metaphor="green light",
+            quote="green light",
+            passage_id="1.1",
+            chapter=1,
+            interpretation="A recurring image that concentrates Gatsby's longing into a distant object.",
+            supporting_theme_tags=["desire"],
+            status="verified",
+            source_candidate_id="C001",
+            source_type="candidate",
+        )
+    ]
+
+    prompt = build_outline_user_prompt(config, evidence_records)
+
+    assert "Use exactly 3 body sections." in prompt
+    assert "Use at least 3 body sections." not in prompt
+    assert "Use no more than 3 body sections." not in prompt
 
 
 def test_plan_outline_rejects_nonexistent_evidence_ids(monkeypatch, tmp_path) -> None:

@@ -145,16 +145,20 @@ def build_outline_user_prompt(config: AppConfig, evidence_records: list[Evidence
         "Make each body section feel like part of one flowing essay, not a disconnected catalog of isolated quotations.",
         "Each body section must include a short 'purpose' field that states the argumentative claim the section will prove.",
         "Order the body sections so the argument builds clearly from one metaphor to the next.",
+        "When the outline needs many body sections, split broad themes into smaller argumentative steps instead of collapsing many images into one oversized section.",
         "Prefer an outline that spans multiple chapters across the novel when the verified ledger supports that breadth.",
         "Do not build the full essay from opening-chapter evidence alone if later chapters provide strong metaphors for the same thesis.",
         "Favor argumentative coverage across the novel over repeated close reading of one early scene.",
     ]
     if fixed_title:
         instructions.append(f'Use this exact essay title: "{fixed_title}".')
-    if minimum_sections:
-        instructions.append(f"Use at least {minimum_sections} body sections.")
-    if maximum_sections:
-        instructions.append(f"Use no more than {maximum_sections} body sections.")
+    if minimum_sections and maximum_sections and minimum_sections == maximum_sections:
+        instructions.append(f"Use exactly {minimum_sections} body sections.")
+    else:
+        if minimum_sections:
+            instructions.append(f"Use at least {minimum_sections} body sections.")
+        if maximum_sections:
+            instructions.append(f"Use no more than {maximum_sections} body sections.")
 
     return "\n".join(instructions) + "\n\nVerified evidence ledger:\n" + json.dumps(
         evidence_payload,
