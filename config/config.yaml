@@ -122,6 +122,10 @@ drafting:
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
   llm_transport: "ollama_native_chat"
+  expansion_pass_enabled: true
+  expansion_pass_max_rounds: 1
+  expansion_pass_min_increase_words: 120
+  expansion_pass_transport: "ollama_native_chat"
   timing_output_path: "artifacts/qa/english_draft_timing.json"
   target_word_count_min: 7360
   target_word_count_max: 8280

@@ -317,10 +317,33 @@ def build_section_word_target_guidance(
     outline: OutlinePlan,
     section_type: str,
 ) -> str | None:
+    minimum_words, maximum_words = section_word_target_bounds(
+        config,
+        outline=outline,
+        section_type=section_type,
+    )
+    if minimum_words is None and maximum_words is None:
+        return None
+
+    if minimum_words and maximum_words:
+        return f"Target section length: about {minimum_words}-{maximum_words} words."
+    if minimum_words:
+        return f"Target section length: at least {minimum_words} words."
+    if maximum_words:
+        return f"Target section length: no more than {maximum_words} words."
+    return None
+
+
+def section_word_target_bounds(
+    config: AppConfig,
+    *,
+    outline: OutlinePlan,
+    section_type: str,
+) -> tuple[int | None, int | None]:
     minimum_total = int(config.drafting.get("target_word_count_min", 0))
     maximum_total = int(config.drafting.get("target_word_count_max", 0))
     if minimum_total <= 0 and maximum_total <= 0:
-        return None
+        return None, None
 
     body_section_count = max(len(outline.sections), 1)
     if section_type == "introduction":
@@ -332,14 +355,7 @@ def build_section_word_target_guidance(
 
     minimum_words = max(120, round(minimum_total * weight)) if minimum_total > 0 else None
     maximum_words = max(minimum_words or 120, round(maximum_total * weight)) if maximum_total > 0 else None
-
-    if minimum_words and maximum_words:
-        return f"Target section length: about {minimum_words}-{maximum_words} words."
-    if minimum_words:
-        return f"Target section length: at least {minimum_words} words."
-    if maximum_words:
-        return f"Target section length: no more than {maximum_words} words."
-    return None
+    return minimum_words, maximum_words
 
 
 def normalize_validator_text(text: str) -> str:
@@ -382,6 +398,12 @@ def strip_unauthorized_quotes(text: str, *, evidence_records: list[EvidenceRecor
     return cleaned
 
 
+def strip_all_direct_quotes(text: str) -> str:
+    cleaned = DOUBLE_QUOTE_RE.sub(lambda match: collapse_spaces(match.group(1)).strip(), text)
+    cleaned = SINGLE_QUOTE_RE.sub(lambda match: collapse_spaces(match.group(1)).strip(), cleaned)
+    return cleaned.replace('"', "").replace("“", "").replace("”", "")
+
+
 def strip_invalid_bracket_markers(text: str) -> str:
     def replace(match: re.Match[str]) -> str:
         marker = match.group(0)
@@ -392,9 +414,16 @@ def strip_invalid_bracket_markers(text: str) -> str:
     return ANY_BRACKET_RE.sub(replace, text)
 
 
-def repair_invalid_section_artifacts(text: str, *, evidence_records: list[EvidenceRecord]) -> str:
+def repair_invalid_section_artifacts(
+    text: str,
+    *,
+    evidence_records: list[EvidenceRecord],
+    forbid_direct_quotes: bool = False,
+) -> str:
     cleaned = strip_invalid_bracket_markers(text)
     cleaned = strip_unauthorized_quotes(cleaned, evidence_records=evidence_records)
+    if forbid_direct_quotes:
+        cleaned = strip_all_direct_quotes(cleaned)
     return cleaned
 
 
@@ -696,6 +725,187 @@ def build_conclusion_retry_user_prompt(
     )
 
 
+def build_section_expansion_user_prompt(
+    config: AppConfig,
+    outline: OutlinePlan,
+    *,
+    section_type: str,
+    heading: str,
+    section_notes: str,
+    current_text: str,
+    evidence_records: list[EvidenceRecord],
+    passage_index: PassageIndex,
+    completed_body_sections: list[tuple[str, str]] | None = None,
+) -> str:
+    instructions = [
+        "Expansion mode: revise and expand the existing section so the essay can reach its target length.",
+        f"Section type: {section_type}",
+        f"Essay title: {outline.title}",
+        f"Thesis: {outline.thesis}",
+        f"Section heading: {heading}",
+        f"Section notes: {section_notes.strip()}",
+        "Return markdown prose only for the revised section body.",
+        "Preserve the section's core claim and overall direction.",
+        "Keep all existing valid citation markers unchanged.",
+        "Do not add new citation locators.",
+        "Do not add new direct quotations.",
+        "If a direct quotation already appears, preserve it character-for-character.",
+        "Expand by adding more scene-specific explanation, clearer transitions, and fuller claim-evidence-analysis development.",
+        "Prefer concrete literary analysis over abstraction or filler.",
+    ]
+    section_word_target = build_section_word_target_guidance(
+        config,
+        outline=outline,
+        section_type=section_type,
+    )
+    if section_word_target:
+        instructions.append(section_word_target)
+    if section_type == "body":
+        instructions.extend(
+            [
+                "The deterministic `Metaphor text:` block will be reattached separately, so revise only the analytical prose body shown below.",
+                "Use only the evidence records and surrounding locked-source context provided below.",
+                "Do not use direct quotations or quotation marks in this expansion; rely on citations and paraphrase instead.",
+                "Keep the analysis moving paragraph by paragraph rather than collapsing it into one dense block.",
+                "Address all provided evidence at least once while deepening the explanation.",
+            ]
+        )
+        prompt_text = "\n".join(instructions)
+        prompt_text += "\n\nCurrent analytical prose:\n\n" + current_text.strip()
+        prompt_text += "\n\nVerified evidence entries:\n" + render_evidence_payload(
+            evidence_records,
+            passage_index=passage_index,
+            context_before=int(config.drafting.get("context_window_paragraphs_before", 1)),
+            context_after=int(config.drafting.get("context_window_paragraphs_after", 1)),
+        )
+        return prompt_text
+    if section_type == "introduction":
+        instructions.extend(
+            [
+                "Do not add direct quotations or quotation marks to the introduction.",
+                "Use the completed body arguments below to expand the framing, stakes, and roadmap.",
+            ]
+        )
+    if section_type == "conclusion":
+        instructions.extend(
+            [
+                "Do not add direct quotations or quotation marks to the conclusion.",
+                "Use the completed body arguments below to deepen the synthesis and final judgment.",
+            ]
+        )
+    prompt_text = "\n".join(instructions)
+    prompt_text += "\n\nCurrent section draft:\n\n" + current_text.strip()
+    if completed_body_sections:
+        prompt_text += "\n\nCompleted body arguments:\n" + render_completed_body_context(completed_body_sections)
+    return prompt_text
+
+
+def build_section_expansion_response_validator(
+    original_text: str,
+    evidence_records: list[EvidenceRecord],
+    *,
+    require_citation: bool,
+    minimum_word_count: int,
+    forbid_direct_quotes: bool,
+):
+    section_validator = build_section_response_validator(
+        evidence_records,
+        require_citation=require_citation,
+    )
+
+    def validator(response_text: str) -> None:
+        section_validator(response_text)
+        if forbid_direct_quotes and extract_quoted_strings(response_text):
+            raise ValueError("Expanded section must not contain direct quotations")
+        revised_word_count = count_words(response_text)
+        if revised_word_count < minimum_word_count:
+            raise ValueError(
+                f"Expanded section is still too short: {revised_word_count} < {minimum_word_count}"
+            )
+        if revised_word_count <= count_words(original_text):
+            raise ValueError("Expanded section did not materially increase length")
+
+    return validator
+
+
+def expand_section(
+    config: AppConfig,
+    *,
+    outline: OutlinePlan,
+    section_type: str,
+    heading: str,
+    section_notes: str,
+    current_text: str,
+    evidence_records: list[EvidenceRecord],
+    passage_index: PassageIndex,
+    output_path: str,
+    require_citation: bool,
+    completed_body_sections: list[tuple[str, str]] | None = None,
+) -> str:
+    current_body_text = strip_metaphor_focus_block(current_text) if section_type == "body" else current_text.strip()
+    current_word_count = count_words(current_body_text)
+    minimum_words, _ = section_word_target_bounds(
+        config,
+        outline=outline,
+        section_type=section_type,
+    )
+    minimum_increase = int(config.drafting.get("expansion_pass_min_increase_words", 120))
+    target_word_count = max(current_word_count + minimum_increase, minimum_words or 0)
+    response_validator = build_section_expansion_response_validator(
+        current_body_text,
+        evidence_records,
+        require_citation=require_citation,
+        minimum_word_count=target_word_count,
+        forbid_direct_quotes=True,
+    )
+    transport_override = (
+        str(config.drafting.get("expansion_pass_transport", "")).strip()
+        or str(config.drafting.get("llm_transport", "")).strip()
+        or None
+    )
+    try:
+        response_text = invoke_text_completion(
+            config,
+            stage_name="expand_english_section",
+            system_prompt=load_draft_prompt(config),
+            user_prompt=build_section_expansion_user_prompt(
+                config,
+                outline,
+                section_type=section_type,
+                heading=heading,
+                section_notes=section_notes,
+                current_text=current_body_text,
+                evidence_records=evidence_records,
+                passage_index=passage_index,
+                completed_body_sections=completed_body_sections,
+            ),
+            output_path=output_path,
+            response_validator=response_validator,
+            transport_override=transport_override,
+        )
+    except LLMResponseValidationError as exc:
+        if not exc.response_text:
+            raise
+        repaired_text = repair_invalid_section_artifacts(
+            exc.response_text,
+            evidence_records=evidence_records,
+            forbid_direct_quotes=True,
+        )
+        LOGGER.warning(
+            "Expanded section failed validation; applying deterministic cleanup before retrying validation: %s",
+            exc,
+        )
+        response_validator(repaired_text)
+        response_text = repaired_text
+    section_text = validate_section_text(response_text, heading=heading, require_citation=require_citation)
+    section_text = apply_draft_regression_fixes(section_text, label=f"expanded section '{heading}'")
+    section_text = validate_section_text(section_text, heading=heading, require_citation=require_citation)
+    if section_type == "body":
+        focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
+        return f"{focus_block}\n\n{section_text}".strip()
+    return section_text
+
+
 def validate_section_text(text: str, *, heading: str, require_citation: bool) -> str:
     stripped = text.strip()
     if not stripped:
@@ -922,6 +1132,14 @@ def write_draft_timing_report(config: AppConfig, payload: dict[str, object]) -> 
     LOGGER.info("Wrote English draft timing report to %s", output_path)
 
 
+def expansion_pass_enabled(config: AppConfig) -> bool:
+    return bool(config.drafting.get("expansion_pass_enabled", False))
+
+
+def expansion_pass_max_rounds(config: AppConfig) -> int:
+    return max(0, int(config.drafting.get("expansion_pass_max_rounds", 1)))
+
+
 def draft_english(
     config: AppConfig,
     *,
@@ -1048,6 +1266,133 @@ def draft_english(
     maximum_words = int(config.drafting.get("target_word_count_max", 0))
     if minimum_words > 0 and word_count < minimum_words:
         LOGGER.warning("English draft is below target word count: %d < %d", word_count, minimum_words)
+    expansion_rounds_used = 0
+    if minimum_words > 0 and word_count < minimum_words and expansion_pass_enabled(config):
+        for round_index in range(expansion_pass_max_rounds(config)):
+            LOGGER.info(
+                "Starting English expansion round %d because draft is below target: %d < %d",
+                round_index + 1,
+                word_count,
+                minimum_words,
+            )
+            expanded_any = False
+
+            for index, section in enumerate(loaded_outline.sections):
+                current_text = section_texts[index][1]
+                section_minimum_words, _ = section_word_target_bounds(
+                    config,
+                    outline=loaded_outline,
+                    section_type="body",
+                )
+                if section_minimum_words is not None and count_words(current_text) >= section_minimum_words:
+                    continue
+                section_records = gather_section_evidence(section, evidence_lookup)
+                expanded_text = expand_section(
+                    config,
+                    outline=loaded_outline,
+                    section_type="body",
+                    heading=section.heading,
+                    section_notes=section.purpose or loaded_outline.thesis,
+                    current_text=current_text,
+                    evidence_records=section_records,
+                    passage_index=loaded_index,
+                    output_path=str(config.section_drafts_dir_path / f"{section.section_id}.md"),
+                    require_citation=True,
+                )
+                if count_words(expanded_text) > count_words(current_text):
+                    expanded_any = True
+                section_texts[index] = (section.heading, expanded_text)
+                write_section_file(
+                    config,
+                    filename=f"{section.section_id}.md",
+                    heading=section.heading,
+                    text=expanded_text,
+                )
+
+            intro_minimum_words, _ = section_word_target_bounds(
+                config,
+                outline=loaded_outline,
+                section_type="introduction",
+            )
+            if intro_minimum_words is None or count_words(introduction_text) < intro_minimum_words:
+                expanded_intro = expand_section(
+                    config,
+                    outline=loaded_outline,
+                    section_type="introduction",
+                    heading="Introduction",
+                    section_notes=loaded_outline.intro_notes,
+                    current_text=introduction_text,
+                    evidence_records=outline_records,
+                    passage_index=loaded_index,
+                    output_path=str(config.section_drafts_dir_path / "00_introduction.md"),
+                    require_citation=False,
+                    completed_body_sections=section_texts,
+                )
+                if count_words(expanded_intro) > count_words(introduction_text):
+                    expanded_any = True
+                introduction_text = expanded_intro
+                write_section_file(
+                    config,
+                    filename="00_introduction.md",
+                    heading="Introduction",
+                    text=introduction_text,
+                )
+
+            conclusion_minimum_words, _ = section_word_target_bounds(
+                config,
+                outline=loaded_outline,
+                section_type="conclusion",
+            )
+            if conclusion_minimum_words is None or count_words(conclusion_text) < conclusion_minimum_words:
+                expanded_conclusion = expand_section(
+                    config,
+                    outline=loaded_outline,
+                    section_type="conclusion",
+                    heading="Conclusion",
+                    section_notes=loaded_outline.conclusion_notes,
+                    current_text=conclusion_text,
+                    evidence_records=outline_records,
+                    passage_index=loaded_index,
+                    output_path=str(config.section_drafts_dir_path / "99_conclusion.md"),
+                    require_citation=False,
+                    completed_body_sections=section_texts,
+                )
+                if count_words(expanded_conclusion) > count_words(conclusion_text):
+                    expanded_any = True
+                conclusion_text = expanded_conclusion
+                write_section_file(
+                    config,
+                    filename="99_conclusion.md",
+                    heading="Conclusion",
+                    text=conclusion_text,
+                )
+
+            if not expanded_any:
+                LOGGER.warning("English expansion round %d made no measurable progress", round_index + 1)
+                break
+
+            draft_text = compose_full_draft(
+                loaded_outline,
+                introduction_text=introduction_text,
+                section_texts=section_texts,
+                conclusion_text=conclusion_text,
+            )
+            draft_text = apply_draft_regression_fixes(draft_text, label="expanded English draft")
+            validate_combined_draft(draft_text, loaded_outline)
+            write_english_draft(config, draft_text)
+
+            word_count = count_words(draft_text)
+            estimated_pages = estimate_page_count(word_count, words_per_page)
+            expansion_rounds_used = round_index + 1
+            LOGGER.info(
+                "English draft length after expansion round %d: %d words, %.2f estimated pages",
+                expansion_rounds_used,
+                word_count,
+                estimated_pages,
+            )
+            if word_count >= minimum_words:
+                break
+
     if maximum_words > 0 and word_count > maximum_words:
         LOGGER.warning("English draft is above target word count: %d > %d", word_count, maximum_words)
 
@@ -1060,6 +1405,7 @@ def draft_english(
             "section_count": len(loaded_outline.sections),
             "word_count": word_count,
             "estimated_pages": estimated_pages,
+            "expansion_rounds_used": expansion_rounds_used,
             "total_elapsed_seconds": total_elapsed_seconds,
             "transport": str(config.drafting.get("llm_transport", "")).strip()
             or str(config.models.get("provider", "")).strip()

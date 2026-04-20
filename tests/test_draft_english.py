@@ -11,6 +11,7 @@ from agent_gatsby.draft_english import (
     build_metaphor_focus_lead,
     build_section_response_validator,
     draft_english,
+    expand_section,
     normalize_section_claim,
     promote_claim_to_clause,
     repair_invalid_section_artifacts,
@@ -18,7 +19,9 @@ from agent_gatsby.draft_english import (
     strip_invalid_bracket_markers,
     strip_unauthorized_quotes,
 )
+from agent_gatsby.index_text import load_passage_index
 from agent_gatsby.llm_client import LLMResponseValidationError
+from agent_gatsby.plan_outline import load_evidence_records, load_outline
 from agent_gatsby.schemas import EvidenceRecord
 
 
@@ -404,6 +407,67 @@ def test_draft_english_can_fail_early_when_below_target_word_count(monkeypatch, 
     assert (repo_root / "artifacts/drafts/analysis_english_draft.md").exists()
 
 
+def test_draft_english_runs_bounded_expansion_pass_when_short(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    config.drafting["expansion_pass_enabled"] = True
+    config.drafting["expansion_pass_max_rounds"] = 1
+    config.drafting["expansion_pass_min_increase_words"] = 40
+    config.drafting["fail_below_target_word_count"] = True
+    config.drafting["target_word_count_min"] = 520
+    config.drafting["target_word_count_max"] = 900
+    call_log: list[str] = []
+
+    expanded_s1 = (
+        "This longer paragraph keeps the argument anchored in the scene and explains how the cited image shapes the reader's view [1.2]. "
+        * 12
+    ).strip()
+    expanded_s2 = (
+        "This longer paragraph explains how the cited landscape image turns social decay into something concrete and visible for the reader [2.2]. "
+        * 12
+    ).strip()
+    expanded_intro = (
+        "The introduction now spends more time framing Fitzgerald's use of metaphor, the shape of the novel, and the stakes of the essay's argument. "
+        * 10
+    ).strip()
+    expanded_conclusion = (
+        "The conclusion now synthesizes the body arguments more fully and makes a clear final judgment about how metaphor carries the novel toward collapse. "
+        * 10
+    ).strip()
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        call_log.append(user_prompt)
+        if "Expansion mode: revise and expand the existing section" in user_prompt:
+            if "Section type: body" in user_prompt and "Section heading: Desire at a Distance" in user_prompt:
+                return expanded_s1
+            if "Section type: body" in user_prompt and "Section heading: Material Decay and Social Vision" in user_prompt:
+                return expanded_s2
+            if "Section type: introduction" in user_prompt:
+                return expanded_intro
+            return expanded_conclusion
+        if "Section type: introduction" in user_prompt:
+            return "Fitzgerald uses metaphor to make longing and decay concrete."
+        if "Section heading: Desire at a Distance" in user_prompt:
+            return 'This section argues that the "green light" gives desire a visible form [1.2].'
+        if "Section heading: Material Decay and Social Vision" in user_prompt:
+            return 'This section argues that the "valley of ashes" gives decay a physical landscape [2.2].'
+        return "The conclusion closes the argument quickly."
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+
+    draft_text = draft_english(config)
+
+    assert any("Expansion mode: revise and expand the existing section" in prompt for prompt in call_log)
+    assert expanded_s1 in draft_text
+    assert expanded_s2 in draft_text
+    assert expanded_intro in draft_text
+    assert expanded_conclusion in draft_text
+    timing_report = json.loads((repo_root / "artifacts/qa/english_draft_timing.json").read_text(encoding="utf-8"))
+    assert timing_report["expansion_rounds_used"] == 1
+    assert timing_report["word_count"] >= 520
+
+
 def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_draft_repo(repo_root))
@@ -735,6 +799,80 @@ def test_repair_invalid_section_artifacts_handles_mixed_bracket_and_quote_noise(
     assert '"green light"' in cleaned
     assert '"visible beacon"' not in cleaned
     assert "visible beacon" in cleaned
+
+
+def test_repair_invalid_section_artifacts_can_strip_all_direct_quotes_for_expansion() -> None:
+    evidence_records = [
+        EvidenceRecord(
+            evidence_id="E001",
+            metaphor="green light",
+            quote="green light",
+            passage_id="1.2",
+            chapter=1,
+            interpretation="A recurring image that concentrates Gatsby's longing into a distant object.",
+            supporting_theme_tags=[],
+            status="verified",
+            source_candidate_id="C001",
+            source_type="candidate",
+        )
+    ]
+
+    cleaned = repair_invalid_section_artifacts(
+        'Nick returns to the "green light" and calls it a "visible beacon" [1.2].',
+        evidence_records=evidence_records,
+        forbid_direct_quotes=True,
+    )
+
+    assert '"' not in cleaned
+    assert "green light" in cleaned
+    assert "visible beacon" in cleaned
+
+
+def test_expand_section_salvages_quote_bearing_expansion_output(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    config.drafting["target_word_count_min"] = 0
+    config.drafting["target_word_count_max"] = 0
+    config.drafting["expansion_pass_min_increase_words"] = 20
+
+    outline = load_outline(config)
+    evidence_records = load_evidence_records(config)
+    passage_index = load_passage_index(config)
+    section = outline.sections[0]
+    section_records = [record for record in evidence_records if record.evidence_id in section.evidence_ids]
+    response_text = (
+        'This expanded paragraph explains how the "green light" keeps Gatsby\'s desire visible in the scene [1.2]. '
+        "It then adds more explanation about how that image sharpens the reader's understanding of distance and longing [1.2]. "
+        "The added analysis keeps building the claim with concrete scene context and sustained explanation [1.2]. "
+    ) * 4
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        response_validator = kwargs["response_validator"]
+        try:
+            response_validator(response_text)
+        except ValueError as exc:
+            raise LLMResponseValidationError(str(exc), response_text) from exc
+        return response_text
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+
+    expanded = expand_section(
+        config,
+        outline=outline,
+        section_type="body",
+        heading=section.heading,
+        section_notes=section.purpose or outline.thesis,
+        current_text="This short section starts the argument about desire [1.2].",
+        evidence_records=section_records,
+        passage_index=passage_index,
+        output_path=str(config.section_drafts_dir_path / "S1.md"),
+        require_citation=True,
+    )
+
+    cleaned_body = strip_metaphor_focus_block(expanded)
+    assert '"green light"' not in cleaned_body
+    assert "green light" in cleaned_body
+    assert "[1.2]" in cleaned_body
 
 
 def test_strip_metaphor_focus_block_removes_lead_in_and_blockquote_cluster() -> None:
