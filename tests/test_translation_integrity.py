@@ -379,6 +379,24 @@ def test_freeze_english_master_fixes_denial_of_reality_and_quotes_ragged_edge_re
     assert '*"the ragged edge of the universe"* [2]' in frozen
 
 
+def test_freeze_english_master_normalizes_valley_of_ashes_only_in_prose(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    config.final_draft_output_path.write_text(
+        "# Title\n\n"
+        "The novel turns the landscape into a valley of ashes where moral waste collects.\n\n"
+        "> *\"This is a valley of ashes—a fantastic farm where ashes grow like wheat\"* [4]\n\n"
+        "1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 2, para. 1, cited passage beginning "
+        "\"This is a valley of ashes—a fantastic farm where ashes grow like wheat...\".\n",
+        encoding="utf-8",
+    )
+
+    frozen = freeze_english_master(config)
+
+    assert "the Valley of Ashes where moral waste collects" in frozen
+    assert '"This is a valley of ashes—a fantastic farm where ashes grow like wheat"' in frozen
+
+
 def test_extract_translated_quote_lookup_reads_inline_cited_quotes() -> None:
     translated = '\n'.join(
         [
@@ -458,7 +476,11 @@ def test_normalize_translated_body_removes_prompt_leaks_and_current_spanish_mand
         "他将长显长岛海峡那巨大的湿漉漉的牲口棚写成从餐饮承包园的篮子里产出的景象。 "
         "来自长岛西卵的杰伊·构想中的杰伊·盖茨比随即出现，杰伊·盖茨比那模糊的轮廓已变得如一个男人般厚实感。 "
         "他的轮廓后来又被误写成实体感感。 "
-        "这套叙骗手段最终压在盖盖茨比身上。"
+        "这套叙骗手段最终压在盖盖茨比身上。 "
+        "《了_不起的盖茨比》里的尼克·是否·卡拉威听着黄色鸡模音乐，闻到香骗的气味。 "
+        "在 [12] 在文中，菲茨杰拉德将汤向描述为一个能产生巨大杠杆作用的躯体。 "
+        "灰烬最终在物理层面上吞噬着生活其中的人们。 "
+        "这种不稳定性从生物层面延伸到了物理层面。"
     )
 
     normalized_spanish = normalize_translated_body(spanish, language_name="Spanish")
@@ -494,3 +516,18 @@ def test_normalize_translated_body_removes_prompt_leaks_and_current_spanish_mand
     assert "实体感感" not in normalized_mandarin
     assert "叙事手段" in normalized_mandarin
     assert "盖茨比" in normalized_mandarin
+    assert "《了_不起的盖茨比》" not in normalized_mandarin
+    assert "尼克·是否·卡拉威" not in normalized_mandarin
+    assert "黄色鸡模音乐" not in normalized_mandarin
+    assert "香骗" not in normalized_mandarin
+    assert "在 [12] 在文中" not in normalized_mandarin
+    assert "菲茨杰拉德将汤向描述为" not in normalized_mandarin
+    assert "物理层面" not in normalized_mandarin
+    assert "《了不起的盖茨比》" in normalized_mandarin
+    assert "尼克·卡拉威" in normalized_mandarin
+    assert "黄色鸡尾酒音乐" in normalized_mandarin
+    assert "香槟" in normalized_mandarin
+    assert "在 [12] 中" in normalized_mandarin
+    assert "菲茨杰拉德将汤姆描述为" in normalized_mandarin
+    assert "逐渐吞噬着生活其中的人们" in normalized_mandarin
+    assert "这种不稳定性从生物意象延伸到了流体意象" in normalized_mandarin

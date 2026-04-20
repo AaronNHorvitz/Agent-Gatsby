@@ -53,10 +53,14 @@ STANDALONE_ZERO_LINE_RE = re.compile(r"(?m)^[ \t]*0[ \t]*$\n?")
 ASCII_COMMA_AFTER_CITATION_RE = re.compile(
     r"(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])\s*,"
 )
+ENGLISH_PROSE_PROPER_NOUN_PATTERNS = (
+    (re.compile(r"\b(?:a|the)\s+valley of ashes\b"), "the Valley of Ashes"),
+)
 MANDARIN_NORMALIZATION_MAP = {
     "菲茨平": "菲茨杰拉德",
     "菲茨格拉德": "菲茨杰拉德",
     "《了了不起的盖茨比》": "《了不起的盖茨比》",
+    "《了_不起的盖茨比》": "《了不起的盖茨比》",
     "T·J·艾克堡医生": "T. J. 埃克尔伯格医生",
     "T·J·艾克堡": "T. J. 埃克尔伯格",
     "T. J. 艾克尔堡医生": "T. J. 埃克尔伯格医生",
@@ -128,6 +132,14 @@ MANDARIN_NORMALIZATION_MAP = {
     "轮控": "轮廓",
     "他的眼中不断流露出兴奋之情": "他的眼中因兴奋而不断溢出泪水",
     "\"It was this night that he told me the strange story of his youth...\"": "“‘杰伊·盖茨比’像玻璃一样在汤姆冷酷的恶意面前碎裂了”",
+    "尼克·是否·卡拉威": "尼克·卡拉威",
+    "黄色鸡模音乐": "黄色鸡尾酒音乐",
+    "香骗": "香槟",
+    "在 [12] 在文中": "在 [12] 中",
+    "菲茨杰拉德将汤向描述为": "菲茨杰拉德将汤姆描述为",
+    "它们在物理层面上吞噬着生活其中的人们": "它们逐渐吞噬着生活其中的人们",
+    "在物理层面上吞噬着生活其中的人们": "逐渐吞噬着生活其中的人们",
+    "这种不稳定性从生物层面延伸到了物理层面": "这种不稳定性从生物意象延伸到了流体意象",
 }
 SPANISH_NORMALIZATION_MAP = {
     "# Un análisis de las metáforas en *The Great Gatsby*": "# Un análisis de las metáforas en *El gran Gatsby*",
@@ -548,6 +560,19 @@ def normalize_english_master_regressions(text: str) -> tuple[str, list[dict[str,
             continue
         normalized = normalized.replace(source, target)
         applied_fixes.append({"from": source, "to": target})
+    normalized_lines: list[str] = []
+    for line in normalized.splitlines(keepends=True):
+        stripped_line = line.lstrip()
+        if stripped_line.startswith(">") or NUMBERED_LIST_LINE_RE.match(stripped_line):
+            normalized_lines.append(line)
+            continue
+        updated_line = line
+        for pattern, replacement in ENGLISH_PROSE_PROPER_NOUN_PATTERNS:
+            updated_line, replacement_count = pattern.subn(replacement, updated_line)
+            if replacement_count:
+                applied_fixes.append({"from": pattern.pattern, "to": replacement})
+        normalized_lines.append(updated_line)
+    normalized = "".join(normalized_lines)
     return normalized, applied_fixes
 
 
