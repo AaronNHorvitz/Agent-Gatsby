@@ -741,6 +741,8 @@ def build_section_expansion_user_prompt(
     current_text: str,
     evidence_records: list[EvidenceRecord],
     passage_index: PassageIndex,
+    current_word_count: int,
+    minimum_increase_words: int,
     completed_body_sections: list[tuple[str, str]] | None = None,
 ) -> str:
     instructions = [
@@ -752,6 +754,10 @@ def build_section_expansion_user_prompt(
         f"Section notes: {section_notes.strip()}",
         "Return markdown prose only for the revised section body.",
         "Preserve the section's core claim and overall direction.",
+        f"The current section is about {current_word_count} words long.",
+        f"Add at least about {minimum_increase_words} new words in this pass.",
+        "If you merely restate the same points at roughly the same length, the output will be rejected.",
+        "Do not compress existing analysis to make room for new sentences; keep the current reasoning and build on it.",
         "Keep all existing valid citation markers unchanged.",
         "Do not add new citation locators.",
         "Do not add new direct quotations.",
@@ -811,7 +817,7 @@ def build_section_expansion_response_validator(
     evidence_records: list[EvidenceRecord],
     *,
     require_citation: bool,
-    minimum_word_count: int,
+    minimum_progress_word_count: int,
     forbid_direct_quotes: bool,
 ):
     section_validator = build_section_response_validator(
@@ -824,9 +830,9 @@ def build_section_expansion_response_validator(
         if forbid_direct_quotes and extract_quoted_strings(response_text):
             raise ValueError("Expanded section must not contain direct quotations")
         revised_word_count = count_words(response_text)
-        if revised_word_count < minimum_word_count:
+        if revised_word_count < minimum_progress_word_count:
             raise ValueError(
-                f"Expanded section is still too short: {revised_word_count} < {minimum_word_count}"
+                f"Expanded section did not add enough material: {revised_word_count} < {minimum_progress_word_count}"
             )
         if revised_word_count <= count_words(original_text):
             raise ValueError("Expanded section did not materially increase length")
@@ -856,12 +862,12 @@ def expand_section(
         section_type=section_type,
     )
     minimum_increase = int(config.drafting.get("expansion_pass_min_increase_words", 120))
-    target_word_count = max(current_word_count + minimum_increase, minimum_words or 0)
+    minimum_progress_word_count = current_word_count + minimum_increase
     response_validator = build_section_expansion_response_validator(
         current_body_text,
         evidence_records,
         require_citation=require_citation,
-        minimum_word_count=target_word_count,
+        minimum_progress_word_count=minimum_progress_word_count,
         forbid_direct_quotes=True,
     )
     transport_override = (
@@ -883,6 +889,8 @@ def expand_section(
                 current_text=current_body_text,
                 evidence_records=evidence_records,
                 passage_index=passage_index,
+                current_word_count=current_word_count,
+                minimum_increase_words=minimum_increase,
                 completed_body_sections=completed_body_sections,
             ),
             output_path=output_path,
@@ -906,6 +914,13 @@ def expand_section(
     section_text = validate_section_text(response_text, heading=heading, require_citation=require_citation)
     section_text = apply_draft_regression_fixes(section_text, label=f"expanded section '{heading}'")
     section_text = validate_section_text(section_text, heading=heading, require_citation=require_citation)
+    if minimum_words and count_words(section_text) < minimum_words:
+        LOGGER.info(
+            "Expanded section '%s' is still below the per-section target after this pass: %d < %d",
+            heading,
+            count_words(section_text),
+            minimum_words,
+        )
     if section_type == "body":
         focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
         return f"{focus_block}\n\n{section_text}".strip()
@@ -1295,18 +1310,26 @@ def draft_english(
                 if section_minimum_words is not None and count_words(current_text) >= section_minimum_words:
                     continue
                 section_records = gather_section_evidence(section, evidence_lookup)
-                expanded_text = expand_section(
-                    config,
-                    outline=loaded_outline,
-                    section_type="body",
-                    heading=section.heading,
-                    section_notes=section.purpose or loaded_outline.thesis,
-                    current_text=current_text,
-                    evidence_records=section_records,
-                    passage_index=loaded_index,
-                    output_path=str(config.section_drafts_dir_path / f"{section.section_id}.md"),
-                    require_citation=True,
-                )
+                try:
+                    expanded_text = expand_section(
+                        config,
+                        outline=loaded_outline,
+                        section_type="body",
+                        heading=section.heading,
+                        section_notes=section.purpose or loaded_outline.thesis,
+                        current_text=current_text,
+                        evidence_records=section_records,
+                        passage_index=loaded_index,
+                        output_path=str(config.section_drafts_dir_path / f"{section.section_id}.md"),
+                        require_citation=True,
+                    )
+                except ValueError as exc:
+                    LOGGER.warning(
+                        "Skipping body expansion for '%s' after validation failure: %s",
+                        section.heading,
+                        exc,
+                    )
+                    continue
                 if count_words(expanded_text) > count_words(current_text):
                     expanded_any = True
                 section_texts[index] = (section.heading, expanded_text)
@@ -1323,19 +1346,23 @@ def draft_english(
                 section_type="introduction",
             )
             if intro_minimum_words is None or count_words(introduction_text) < intro_minimum_words:
-                expanded_intro = expand_section(
-                    config,
-                    outline=loaded_outline,
-                    section_type="introduction",
-                    heading="Introduction",
-                    section_notes=loaded_outline.intro_notes,
-                    current_text=introduction_text,
-                    evidence_records=outline_records,
-                    passage_index=loaded_index,
-                    output_path=str(config.section_drafts_dir_path / "00_introduction.md"),
-                    require_citation=False,
-                    completed_body_sections=section_texts,
-                )
+                try:
+                    expanded_intro = expand_section(
+                        config,
+                        outline=loaded_outline,
+                        section_type="introduction",
+                        heading="Introduction",
+                        section_notes=loaded_outline.intro_notes,
+                        current_text=introduction_text,
+                        evidence_records=outline_records,
+                        passage_index=loaded_index,
+                        output_path=str(config.section_drafts_dir_path / "00_introduction.md"),
+                        require_citation=False,
+                        completed_body_sections=section_texts,
+                    )
+                except ValueError as exc:
+                    LOGGER.warning("Skipping introduction expansion after validation failure: %s", exc)
+                    expanded_intro = introduction_text
                 if count_words(expanded_intro) > count_words(introduction_text):
                     expanded_any = True
                 introduction_text = expanded_intro
@@ -1352,19 +1379,23 @@ def draft_english(
                 section_type="conclusion",
             )
             if conclusion_minimum_words is None or count_words(conclusion_text) < conclusion_minimum_words:
-                expanded_conclusion = expand_section(
-                    config,
-                    outline=loaded_outline,
-                    section_type="conclusion",
-                    heading="Conclusion",
-                    section_notes=loaded_outline.conclusion_notes,
-                    current_text=conclusion_text,
-                    evidence_records=outline_records,
-                    passage_index=loaded_index,
-                    output_path=str(config.section_drafts_dir_path / "99_conclusion.md"),
-                    require_citation=False,
-                    completed_body_sections=section_texts,
-                )
+                try:
+                    expanded_conclusion = expand_section(
+                        config,
+                        outline=loaded_outline,
+                        section_type="conclusion",
+                        heading="Conclusion",
+                        section_notes=loaded_outline.conclusion_notes,
+                        current_text=conclusion_text,
+                        evidence_records=outline_records,
+                        passage_index=loaded_index,
+                        output_path=str(config.section_drafts_dir_path / "99_conclusion.md"),
+                        require_citation=False,
+                        completed_body_sections=section_texts,
+                    )
+                except ValueError as exc:
+                    LOGGER.warning("Skipping conclusion expansion after validation failure: %s", exc)
+                    expanded_conclusion = conclusion_text
                 if count_words(expanded_conclusion) > count_words(conclusion_text):
                     expanded_any = True
                 conclusion_text = expanded_conclusion

@@ -10,6 +10,7 @@ from agent_gatsby.draft_english import (
     build_selection_scope_note,
     build_metaphor_focus_lead,
     build_section_response_validator,
+    count_words,
     draft_english,
     expand_section,
     normalize_section_claim,
@@ -468,6 +469,62 @@ def test_draft_english_runs_bounded_expansion_pass_when_short(monkeypatch, tmp_p
     assert timing_report["word_count"] >= 520
 
 
+def test_draft_english_continues_when_one_section_expansion_fails(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    config.drafting["expansion_pass_enabled"] = True
+    config.drafting["expansion_pass_max_rounds"] = 1
+    config.drafting["expansion_pass_min_increase_words"] = 40
+    config.drafting["fail_below_target_word_count"] = True
+    config.drafting["target_word_count_min"] = 340
+    config.drafting["target_word_count_max"] = 900
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        if "Section type: introduction" in user_prompt:
+            return "Fitzgerald uses metaphor to make longing and decay concrete."
+        if "Section heading: Desire at a Distance" in user_prompt:
+            return "This section argues that the green light gives desire a visible form [1.2]."
+        if "Section heading: Material Decay and Social Vision" in user_prompt:
+            return "This section argues that the valley of ashes gives decay a physical landscape [2.2]."
+        return "The conclusion closes the argument quickly."
+
+    def fake_expand_section(
+        config,
+        *,
+        section_type,
+        heading,
+        current_text,
+        **kwargs,
+    ) -> str:
+        if section_type == "body" and heading == "Desire at a Distance":
+            raise ValueError("Expanded section did not add enough material")
+        if section_type == "body":
+            return (
+                "This expanded section adds more explanation about how the cited landscape image turns decay into a concrete social vision [2.2]. "
+                * 6
+            ).strip()
+        if section_type == "introduction":
+            return (
+                "The introduction now adds more framing about Fitzgerald's style, the novel's movement, and the argumentative shape of the essay. "
+                * 5
+            ).strip()
+        return (
+            "The conclusion now adds more synthesis about collapse, visibility, and the failure of Gatsby's idealized world. "
+            * 5
+        ).strip()
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+    monkeypatch.setattr("agent_gatsby.draft_english.expand_section", fake_expand_section)
+
+    draft_text = draft_english(config)
+
+    assert "This expanded section adds more explanation" in draft_text
+    timing_report = json.loads((repo_root / "artifacts/qa/english_draft_timing.json").read_text(encoding="utf-8"))
+    assert timing_report["expansion_rounds_used"] == 1
+    assert timing_report["word_count"] >= 340
+
+
 def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_draft_repo(repo_root))
@@ -872,6 +929,48 @@ def test_expand_section_salvages_quote_bearing_expansion_output(monkeypatch, tmp
     cleaned_body = strip_metaphor_focus_block(expanded)
     assert '"green light"' not in cleaned_body
     assert "green light" in cleaned_body
+    assert "[1.2]" in cleaned_body
+
+
+def test_expand_section_accepts_incremental_growth_below_section_target(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    config.drafting["expansion_pass_min_increase_words"] = 40
+
+    outline = load_outline(config)
+    evidence_records = load_evidence_records(config)
+    passage_index = load_passage_index(config)
+    section = outline.sections[0]
+    section_records = [record for record in evidence_records if record.evidence_id in section.evidence_ids]
+    current_text = (
+        "This short analytical paragraph introduces the argument about desire in the scene [1.2]. "
+        "It gives only a brief explanation."
+    )
+    expanded_body = (
+        "This expanded paragraph adds more scene-specific explanation about how the cited image organizes Gatsby's desire and keeps the argument visible for the reader [1.2]. "
+        "It continues by clarifying the local scene context, the emotional distance in the passage, and the way the image structures the section's reasoning [1.2]. "
+    )
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        return expanded_body
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+
+    expanded = expand_section(
+        config,
+        outline=outline,
+        section_type="body",
+        heading=section.heading,
+        section_notes=section.purpose or outline.thesis,
+        current_text=current_text,
+        evidence_records=section_records,
+        passage_index=passage_index,
+        output_path=str(config.section_drafts_dir_path / "S1.md"),
+        require_citation=True,
+    )
+
+    cleaned_body = strip_metaphor_focus_block(expanded)
+    assert count_words(cleaned_body) > count_words(current_text)
     assert "[1.2]" in cleaned_body
 
 
