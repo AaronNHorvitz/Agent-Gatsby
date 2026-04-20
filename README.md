@@ -1,7 +1,7 @@
 # Agent Gatsby
 ## Local AI Pipeline for the Treasury Gatsby Screening Task
 
-Agent Gatsby is a local-first AI pipeline built for Treasury's supplemental *Great Gatsby* screening task:
+Agent Gatsby is a local-first AI pipeline built for Treasury's supplemental *Great Gatsby* challenge to do the following:
 
 1. write an analysis of metaphors in *The Great Gatsby*, including citations
 2. translate that essay into Spanish
