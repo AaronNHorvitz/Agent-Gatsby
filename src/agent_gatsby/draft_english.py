@@ -431,6 +431,7 @@ def build_section_response_validator(
     evidence_records: list[EvidenceRecord],
     *,
     require_citation: bool,
+    forbid_direct_quotes: bool = False,
 ) -> callable:
     allowed_quotes = {normalize_validator_text(record.quote) for record in evidence_records}
     allowed_passage_ids = {record.passage_id for record in evidence_records}
@@ -443,6 +444,9 @@ def build_section_response_validator(
         invalid_markers = extract_invalid_bracket_markers(stripped)
         if invalid_markers:
             raise ValueError(f"Drafted section contains invalid bracket markers: {', '.join(invalid_markers)}")
+
+        if forbid_direct_quotes and extract_quoted_strings(stripped):
+            raise ValueError("Drafted section must not contain direct quotations")
 
         citations = extract_citation_passage_ids(stripped)
         if require_citation and not citations:
@@ -549,7 +553,7 @@ def build_draft_user_prompt(
         instructions.append("Avoid decorative recap; close with a concise final judgment.")
     if section_type == "body":
         instructions.append(
-            "Structure this section as a compact argument chain: opening claim, quoted supporting evidence with citation, "
+            "Structure this section as a compact argument chain: opening claim, cited supporting evidence, "
             "analysis of how the text proves the claim in scene context, and a closing or transition sentence."
         )
         instructions.append(
@@ -564,6 +568,9 @@ def build_draft_user_prompt(
         instructions.append("Use at least one bracketed chapter.paragraph citation from the provided evidence.")
         instructions.append(
             "Assume the exact metaphor text will be shown immediately before your analysis, so do not waste the opening sentence restating it."
+        )
+        instructions.append(
+            "Do not use direct quotations or quotation marks in the analytical prose body; rely on citations and paraphrase because the exact quoted text already appears in the section's `Metaphor text:` block."
         )
         instructions.append(
             "The final report will place a short thematic lead-in sentence before the `Metaphor text:` block, so make the analysis deepen that shared theme rather than reintroduce it."
@@ -658,10 +665,9 @@ def build_body_retry_user_prompt(
         "Do not include notes, self-critique, drafting commentary, or word-count checks.",
         "Use only the evidence summary provided below.",
         "Do not use any direct quotations or quotation marks in this compact retry; the exact quoted text already appears in the section's `Metaphor text:` block.",
-        "Build a compact argument chain: opening claim, exact quoted evidence with citation, explanation of how the scene context supports the claim, and a short closing or transition sentence.",
+        "Build a compact argument chain: opening claim, cited supporting evidence, explanation of how the scene context supports the claim, and a short closing or transition sentence.",
         "Treat the provided metaphors as one thematic cluster rather than as separate mini-sections.",
         "Address every quotation in the evidence summary at least once.",
-        "If you refer to a provided quote directly, copy it character-for-character rather than normalizing capitalization or punctuation.",
         'Do not overuse abstract openings such as "The text" or "This metaphor."',
         "Keep the prose direct, lightly academic, and faster-moving than a full literary close-reading seminar.",
         "Combine related images when that keeps the section concise and readable.",
@@ -941,6 +947,7 @@ def draft_section(
     response_validator = build_section_response_validator(
         evidence_records,
         require_citation=require_citation,
+        forbid_direct_quotes=section_type == "body",
     )
     try:
         response_text = invoke_text_completion(
@@ -966,6 +973,7 @@ def draft_section(
             repaired_text = repair_invalid_section_artifacts(
                 exc.response_text,
                 evidence_records=evidence_records,
+                forbid_direct_quotes=section_type == "body",
             )
             if repaired_text != exc.response_text:
                 LOGGER.warning(

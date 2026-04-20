@@ -250,7 +250,7 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
             prompt_checks["context_payload"] = True
         if "Ground the analysis in what the text is doing in the current scene" in user_prompt:
             prompt_checks["scene_guidance"] = True
-        if "opening claim, quoted supporting evidence with citation" in user_prompt:
+        if "opening claim, cited supporting evidence" in user_prompt:
             prompt_checks["body_structure"] = True
         if "Treat the provided metaphors as one thematic cluster" in user_prompt:
             prompt_checks["cluster_guidance"] = True
@@ -276,16 +276,16 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
         if "Section heading: Desire at a Distance" in user_prompt:
             call_order.append("body:S1")
             return (
-                'This section argues that Gatsby\'s "green light" turns longing into a visible destination [1.2]. '
-                'The quoted image gives the reader a concrete object that carries Gatsby\'s desire in scene context [1.2]. '
-                'That visible distance prepares the essay to move from desire to decay.'
+                "This section argues that Gatsby's green light turns longing into a visible destination [1.2]. "
+                "The cited image gives the reader a concrete object that carries Gatsby's desire in scene context [1.2]. "
+                "That visible distance prepares the essay to move from desire to decay."
             )
         if "Section heading: Material Decay and Social Vision" in user_prompt:
             call_order.append("body:S2")
             return (
-                'This section argues that the "valley of ashes" turns moral damage into a physical landscape [2.2]. '
-                'The quoted image proves that Fitzgerald makes social decay visible in the scene itself [2.2]. '
-                'That shift from desire to ruin sets up the conclusion.'
+                "This section argues that the valley of ashes turns moral damage into a physical landscape [2.2]. "
+                "The cited image proves that Fitzgerald makes social decay visible in the scene itself [2.2]. "
+                "That shift from desire to ruin sets up the conclusion."
             )
         call_order.append("conclusion")
         return "The conclusion gathers the essay's claims into a final judgment about Fitzgerald's metaphors."
@@ -304,7 +304,7 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert "Together," not in draft_text
     assert "green light turns Gatsby's longing into a visible, distant target." in draft_text
     assert 'Metaphor text:\n> "green light" [1.2]' in draft_text
-    assert 'This section argues that the "valley of ashes" turns moral damage into a physical landscape [2.2].' in draft_text
+    assert "This section argues that the Valley of Ashes turns moral damage into a physical landscape [2.2]." in draft_text
     assert 'Metaphor text:\n> "valley of ashes" [2.2]' in draft_text
     assert "[1.2]" in draft_text
     assert "[2.2]" in draft_text
@@ -392,9 +392,9 @@ def test_draft_english_can_fail_early_when_below_target_word_count(monkeypatch, 
     def fake_invoke_text_completion(*args, **kwargs) -> str:
         user_prompt = kwargs.get("user_prompt", "")
         if "Section heading: Desire at a Distance" in user_prompt:
-            return 'This section argues that the "green light" gives desire a visible form [1.2].'
+            return "This section argues that the green light gives desire a visible form [1.2]."
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return 'This section argues that the "valley of ashes" gives decay a physical landscape [2.2].'
+            return "This section argues that the valley of ashes gives decay a physical landscape [2.2]."
         if "Section type: introduction" in user_prompt:
             return "Fitzgerald uses metaphor to make longing and decay concrete."
         return "The conclusion closes the argument quickly."
@@ -449,9 +449,9 @@ def test_draft_english_runs_bounded_expansion_pass_when_short(monkeypatch, tmp_p
         if "Section type: introduction" in user_prompt:
             return "Fitzgerald uses metaphor to make longing and decay concrete."
         if "Section heading: Desire at a Distance" in user_prompt:
-            return 'This section argues that the "green light" gives desire a visible form [1.2].'
+            return "This section argues that the green light gives desire a visible form [1.2]."
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return 'This section argues that the "valley of ashes" gives decay a physical landscape [2.2].'
+            return "This section argues that the valley of ashes gives decay a physical landscape [2.2]."
         return "The conclusion closes the argument quickly."
 
     monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
@@ -488,9 +488,9 @@ def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp
                 "",
             )
         if "Section heading: Desire at a Distance" in user_prompt:
-            return 'In this scene, Gatsby\'s "green light" turns longing into a visible object of desire [1.2].'
+            return "In this scene, Gatsby's green light turns longing into a visible object of desire [1.2]."
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return 'In this scene, the "valley of ashes" gives moral decay a physical landscape [2.2].'
+            return "In this scene, the valley of ashes gives moral decay a physical landscape [2.2]."
         return "The conclusion gathers the essay's claims into a final judgment."
 
     monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
@@ -514,9 +514,9 @@ def test_draft_english_retries_body_section_with_compact_prompt(monkeypatch, tmp
         call_log.append(user_prompt)
         if "Compact retry mode: body argument only." in user_prompt:
             return (
-                'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2]. '
-                'That exact image proves the claim because the scene gives Gatsby\'s longing a concrete object the reader can picture [1.2]. '
-                'The section closes by preparing the essay to move toward broader social decay.'
+                "This section argues that Gatsby's green light turns desire into a visible target [1.2]. "
+                "That cited image proves the claim because the scene gives Gatsby's longing a concrete object the reader can picture [1.2]. "
+                "The section closes by preparing the essay to move toward broader social decay."
             )
         if "Section heading: Desire at a Distance" in user_prompt:
             raise LLMResponseValidationError(
@@ -529,14 +529,14 @@ def test_draft_english_retries_body_section_with_compact_prompt(monkeypatch, tmp
                 "The introduction summarizes the body arguments already drafted."
             )
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return 'This section argues that the "valley of ashes" gives decay a physical landscape [2.2].'
+            return "This section argues that the valley of ashes gives decay a physical landscape [2.2]."
         return "The conclusion gathers the essay's claims into a final judgment."
 
     monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
 
     draft_text = draft_english(config)
 
-    assert 'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2].' in draft_text
+    assert "This section argues that Gatsby's green light turns desire into a visible target [1.2]." in draft_text
     assert any("Compact retry mode: body argument only." in prompt for prompt in call_log)
     assert any("Do not use any direct quotations or quotation marks in this compact retry" in prompt for prompt in call_log)
     assert any('"metaphor": "green light"' in prompt for prompt in call_log)
@@ -564,9 +564,9 @@ def test_draft_english_retries_conclusion_with_compact_prompt(monkeypatch, tmp_p
                 "This conclusion cites the wrong place [9.9].",
             )
         if "Section heading: Desire at a Distance" in user_prompt:
-            return 'This section argues that Gatsby\'s "green light" turns longing into a visible object of desire [1.2].'
+            return "This section argues that Gatsby's green light turns longing into a visible object of desire [1.2]."
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return 'This section argues that the "valley of ashes" gives moral decay a physical landscape [2.2].'
+            return "This section argues that the valley of ashes gives moral decay a physical landscape [2.2]."
         if "Section type: introduction" in user_prompt:
             return (
                 "Fitzgerald writes in a style that turns emotion into visible imagery. "
@@ -594,14 +594,14 @@ def test_draft_english_retries_body_after_cleanup_still_fails(monkeypatch, tmp_p
         call_log.append(user_prompt)
         if "Compact retry mode: body argument only." in user_prompt:
             return (
-                'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2]. '
-                'That exact image proves the claim because the scene gives Gatsby\'s longing a concrete object the reader can picture [1.2]. '
-                'The section closes by preparing the essay to move toward broader social decay.'
+                "This section argues that Gatsby's green light turns desire into a visible target [1.2]. "
+                "That cited image proves the claim because the scene gives Gatsby's longing a concrete object the reader can picture [1.2]. "
+                "The section closes by preparing the essay to move toward broader social decay."
             )
         if "Section heading: Desire at a Distance" in user_prompt:
             raise LLMResponseValidationError(
                 "Drafted section contains citations outside the allowed evidence set: 9.9",
-                'This section argues that Gatsby\'s "green light" marks desire [9.9].',
+                "This section argues that Gatsby's green light marks desire [9.9].",
             )
         if "Section type: introduction" in user_prompt:
             return (
@@ -609,14 +609,14 @@ def test_draft_english_retries_body_after_cleanup_still_fails(monkeypatch, tmp_p
                 "The introduction summarizes the body arguments already drafted."
             )
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return 'This section argues that the "valley of ashes" gives decay a physical landscape [2.2].'
+            return "This section argues that the valley of ashes gives decay a physical landscape [2.2]."
         return "The conclusion gathers the essay's claims into a final judgment."
 
     monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
 
     draft_text = draft_english(config)
 
-    assert 'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2].' in draft_text
+    assert "This section argues that Gatsby's green light turns desire into a visible target [1.2]." in draft_text
     assert any("Compact retry mode: body argument only." in prompt for prompt in call_log)
     assert any("Do not use any direct quotations or quotation marks in this compact retry" in prompt for prompt in call_log)
 
