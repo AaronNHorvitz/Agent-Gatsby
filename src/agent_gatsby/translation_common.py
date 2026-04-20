@@ -20,6 +20,9 @@ HEADING_LINE_RE = re.compile(r"^(#{1,6}\s+)(.*)$")
 BLOCKQUOTE_LINE_RE = re.compile(r"^(\s*>\s?)(.*)$")
 NUMBERED_LIST_LINE_RE = re.compile(r"^\d+\.\s+")
 NUMBERED_CITATION_ENTRY_RE = re.compile(r"(?m)^\d+\.\s+")
+ENGLISH_CITATION_ENTRY_RE = re.compile(
+    r'^(?P<number>\d+\.)\s+F\. Scott Fitzgerald, \*The Great Gatsby\*, ch\. (?P<chapter>\d+), para\. (?P<paragraph>\d+), cited passage beginning (?P<lemma>.+)$'
+)
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
 TRANSLATION_CITATION_PLACEHOLDER_RE = re.compile(r"AGCITTOKEN(\d{4})XYZ")
 STRAIGHT_QUOTE_SPAN_RE = re.compile(r'"[^"\n]+?"')
@@ -35,21 +38,88 @@ MANDARIN_NORMALIZATION_MAP = {
     "菲茨平": "菲茨杰拉德",
     "菲茨格拉德": "菲茨杰拉德",
     "《了了不起的盖茨比》": "《了不起的盖茨比》",
-    "T·J·艾克堡医生": "T. J. 艾克尔堡医生",
-    "T·J·艾克堡": "T. J. 艾克尔堡",
+    "T·J·艾克堡医生": "T. J. 埃克尔伯格医生",
+    "T·J·艾克堡": "T. J. 埃克尔伯格",
+    "T. J. 艾克尔堡医生": "T. J. 埃克尔伯格医生",
     "盖失比": "盖茨比",
     "盖茨模": "盖茨比",
+    "（Nick Carraway）": "",
+    "（West Egg）": "",
+    "（Valley of Ashes）": "",
+    "“veiled”（遮蔽）": "“遮蔽”",
+    "（casual gaming）": "",
+    "### # 梦想的瓦解": "### 梦想的瓦解",
+    "长岛海峡那巨大的湿润农场": "长岛海峡那片潮湿而阔大的牲口院",
+    "长岛海峡那巨大的湿润院落": "长岛海峡那片潮湿而阔大的牲口院",
+    "谷仓院": "牲口院",
+    "来自长岛西卵的杰伊·盖茨比，从他对自己的一种柏拉图式的构想中脱颖而出。": "来自长岛西卵的杰伊·盖茨比，源于他对自己的一种柏拉图式构想。",
+    "杰·盖茨比": "杰伊·盖茨比",
+    "整个大篷车营地就像纸牌屋一样坍塌了": "整个商队旅馆就像纸牌屋一样坍塌了",
+    "他的眼中不断流露出激动": "他的眼睛不断流出激动的泪水",
+    "构成了听觉意象 [30]；这构成了角色与退却的梦想之间日益加剧的情感与物理距离的隐喻。": "构成了一种听觉意象，象征着角色与退却的梦想之间日益扩大的情感与物理距离 [30]。",
+}
+SPANISH_NORMALIZATION_MAP = {
+    "desibuja": "desdibuja",
+    "música de cóctel amarillo": "música amarilla de cóctel",
+    "cesta de un catering": "cesta de un banquetero",
+    "La casa no simplemente existe": "La casa no existe simplemente",
+    "masimvo": "masivo",
+    "el excitante ondular de su encuentro": "el excitante ondular de su voz",
+    "colapiente": "colapso",
+    "inestímulo": "inestabilidad",
+    "laberinto de pantallas": "laberinto de parabrisas",
+    "el vago contorno de Jay Gatsby se había robustecido hasta alcanzar la sustancialidad de un hombre": "el vago contorno de Jay Gatsby se había completado hasta alcanzar la consistencia de un hombre",
+    "acervo común de la vida": "reserva común de la vida",
+    "recinto de cuero verde": "invernadero de cuero verde",
+    "experiencia altamente curada": "experiencia cuidadosamente diseñada",
+    "dinero viejo y el nuevo": "vieja élite adinerada y los nuevos ricos",
+    "la perfección agresiva y curada": "la perfección agresiva y cuidadosamente diseñada",
+    'surgió de su concepción platónica de sí mismo". [13]': 'surgió de su concepción platónica de sí mismo" [13].',
+    '*"surgió de su concepción platónica de sí mismo"*. [13]': '*"surgió de su concepción platónica de sí mismo"* [13].',
 }
 ENGLISH_MASTER_REGRESSION_FIXES = {
     "Valley of West": "Valley of Ashes",
     "punctiliously manner": "punctilious manner",
+    "theragged edge": "the ragged edge",
+    "it actively populating the landscape": "it actively populates the landscape",
+    "a complex, labyrinth of windshields": "a complex labyrinth of windshields",
+    "the persona of Jay Gatsby literally broken up like glass": "the persona of Jay Gatsby is literally broken up like glass",
+    "look out over the solemn dumping ground [5]": '"look out over the solemn dumping ground" [5]',
+    "a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6]": '"a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity" [6]',
+    "the thin and far away [30] echoes of a dead dream": 'the "thin and far away" [30] echoes of a dead dream',
 }
 DEFAULT_REQUIRED_ENGLISH_MASTER_TERMS: tuple[str, ...] = ()
-DEFAULT_FORBIDDEN_ENGLISH_MASTER_PHRASES = ("Valley of West", "punctiliously manner")
+DEFAULT_FORBIDDEN_ENGLISH_MASTER_PHRASES = (
+    "Valley of West",
+    "punctiliously manner",
+    "theragged edge",
+    "it actively populating the landscape",
+    "a complex, labyrinth of windshields",
+    "the persona of Jay Gatsby literally broken up like glass",
+    "look out over the solemn dumping ground [5]",
+    "a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6]",
+    "the thin and far away [30] echoes of a dead dream",
+)
 SPANISH_INTERNAL_TOKEN_RE = re.compile(r"\bAGCIT\w*(?:\s+[\u0400-\u04FF]+)?")
 SPANISH_ESCAPE_SEQUENCE_RE = re.compile(r"\$\\\\\w+\b|\\[A-Za-z]+\b")
 MANDARIN_ELLIPSIS_BEFORE_CITATION_RE = re.compile(
     r"[.…]{2,}\s*(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])"
+)
+MANDARIN_SENTENCE_BREAK_BEFORE_CITATION_RE = re.compile(
+    r"([。！？])\s*(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])，"
+)
+UNQUOTED_ENGLISH_QUOTE_PATTERNS = (
+    re.compile(r'(?<!["“])the ragged edge of the universe \[2\]'),
+    re.compile(r'(?<!["“])the great wet barnyard of Long Island Sound \[3\]'),
+    re.compile(r'(?<!["“])ash-grey men, who move dimly and already crumbling through the powdery air \[4\]'),
+    re.compile(r'(?<!["“])look out over the solemn dumping ground \[5\]'),
+    re.compile(r'(?<!["“])a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity \[6\]'),
+    re.compile(r'(?<!["“])Jay Gatsby of West Egg, Long Island, sprang from his Platonic conception of himself \[13\]'),
+    re.compile(r'(?<!["“])The exhilarating ripple of her voice was a wild tonic in the rain \[19\]'),
+    re.compile(r'(?<!["“])the whole caravansary had fallen in like a card house(?: at the disapproval in her eyes)? \[21\]'),
+    re.compile(r'(?<!["“])the straw seats of the car hovered on the edge of combustion \[22\]'),
+    re.compile(r'(?<!["“])in this heat every extra gesture was an affront to the common store of life \[23\]'),
+    re.compile(r'(?<!["“])thin and far away \[30\]'),
 )
 
 
@@ -190,8 +260,32 @@ def render_translated_citations_section(citations_text: str, *, language_name: s
         stripped = line.strip()
         if not stripped:
             continue
-        rendered_lines.append(stripped)
+        rendered_lines.append(localize_citation_metadata_line(stripped, language_name=language_name))
     return "\n".join(rendered_lines).strip()
+
+
+def localize_citation_metadata_line(line: str, *, language_name: str) -> str:
+    stripped = line.strip()
+    match = ENGLISH_CITATION_ENTRY_RE.match(stripped)
+    if not match:
+        return stripped
+
+    number = match.group("number")
+    chapter = match.group("chapter")
+    paragraph = match.group("paragraph")
+    lemma = match.group("lemma")
+
+    if language_name == "Spanish":
+        return (
+            f"{number} F. Scott Fitzgerald, *The Great Gatsby*, "
+            f"cap. {chapter}, párr. {paragraph}, pasaje citado que comienza {lemma}"
+        )
+    if language_name == "Simplified Chinese":
+        return (
+            f"{number} F. Scott Fitzgerald, *The Great Gatsby*, "
+            f"第{chapter}章，第{paragraph}段，引文开头：{lemma}"
+        )
+    return stripped
 
 
 def validate_citations_section_parity(english_master: str, translated_text: str) -> None:
@@ -247,11 +341,14 @@ def build_english_master_regression_report(config: AppConfig, text: str, *, appl
     )
     missing_required_terms = [term for term in required_terms if term not in text]
     forbidden_phrase_hits = [phrase for phrase in forbidden_phrases if phrase in text]
+    unquoted_quote_reuse_matches = find_unquoted_english_quote_reuse(text)
     major_issues: list[str] = []
     if missing_required_terms:
         major_issues.append("English master is missing required terminology.")
     if forbidden_phrase_hits:
         major_issues.append("English master still contains forbidden regression phrases.")
+    if unquoted_quote_reuse_matches:
+        major_issues.append("English master reuses exact source-language quotations without quotation marks.")
     return {
         "stage": "freeze_english",
         "generated_at": utc_now_iso(),
@@ -260,6 +357,8 @@ def build_english_master_regression_report(config: AppConfig, text: str, *, appl
         "missing_required_terms": missing_required_terms,
         "forbidden_phrases": list(forbidden_phrases),
         "forbidden_phrase_hits": forbidden_phrase_hits,
+        "unquoted_quote_reuse_count": len(unquoted_quote_reuse_matches),
+        "unquoted_quote_reuse_matches": unquoted_quote_reuse_matches,
         "applied_fixes": applied_fixes or [],
         "major_issues": major_issues,
     }
@@ -279,6 +378,10 @@ def validate_english_master_regressions(config: AppConfig, text: str) -> str:
     if report["major_issues"]:
         raise ValueError("English master failed terminology/regression validation")
     return normalized_text
+
+
+def find_unquoted_english_quote_reuse(text: str) -> list[str]:
+    return [pattern.pattern for pattern in UNQUOTED_ENGLISH_QUOTE_PATTERNS if pattern.search(text)]
 
 
 def freeze_english_master(config: AppConfig) -> str:
@@ -399,8 +502,11 @@ def normalize_translated_body(text: str, *, language_name: str) -> str:
         normalized = SPANISH_INTERNAL_TOKEN_RE.sub("", normalized)
         normalized = SPANISH_ESCAPE_SEQUENCE_RE.sub(" ", normalized)
         normalized = normalized.replace("esporádíamos", "esporádicos")
+        for source, target in SPANISH_NORMALIZATION_MAP.items():
+            normalized = normalized.replace(source, target)
     if language_name == "Simplified Chinese":
         normalized = MANDARIN_ELLIPSIS_BEFORE_CITATION_RE.sub(r" \1", normalized)
+        normalized = MANDARIN_SENTENCE_BREAK_BEFORE_CITATION_RE.sub(r" \2，", normalized)
         for source, target in MANDARIN_NORMALIZATION_MAP.items():
             normalized = normalized.replace(source, target)
     normalized = re.sub(r"[ \t]{2,}", " ", normalized)

@@ -20,10 +20,17 @@ LOGGER = logging.getLogger(__name__)
 NUMBERED_LIST_LINE_RE = re.compile(r"^\d+\.\s+")
 CITATION_SECTION_HEADINGS = {"Citations", "Citas", "引文"}
 SENTENCE_END_RE = re.compile(r'[.!?](?:["”’)\]]+)?|[。！？]')
+VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
+CITATION_SPACE_RE = re.compile(r"(?<=\S)\s+(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])")
+CITATION_PUNCTUATION_RE = re.compile(
+    r"(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])([,.;:!?，。；：！？、])"
+)
 
 FONT_HINTS = {
     "NotoSerif-Regular.ttf": "Noto Serif",
     "NotoSerif-Bold.ttf": "Noto Serif:style=Bold",
+    "NotoSans-Regular.ttf": "Noto Sans",
+    "NotoSans-Bold.ttf": "Noto Sans:style=Bold",
     "NotoSansSC-Regular.ttf": "Noto Sans CJK SC",
     "NotoSansCJK-VF.ttc": "Noto Sans CJK SC",
 }
@@ -40,6 +47,15 @@ def strip_markdown_formatting(text: str) -> str:
     cleaned = text.replace("**", "").replace("__", "")
     cleaned = cleaned.replace("*", "").replace("_", "")
     return cleaned.strip()
+
+
+def normalize_render_text(text: str, *, language: str) -> str:
+    normalized = re.sub(r"[ \t]{2,}", " ", text.strip())
+    if language == "mandarin":
+        return normalized
+    normalized = CITATION_SPACE_RE.sub(lambda match: "\u202f" + match.group(1), normalized)
+    normalized = CITATION_PUNCTUATION_RE.sub(lambda match: match.group(1) + "\u2060" + match.group(2), normalized)
+    return normalized
 
 
 def is_numbered_list_block(lines: list[str]) -> bool:
@@ -197,7 +213,7 @@ def configure_pdf_fonts(pdf: NumberedPDF, config: AppConfig, *, language: str) -
     pdf.heading_font_family = "BodyBold"
 
 
-def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str) -> None:
+def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str, *, language: str) -> None:
     line_height = float(config.pdf.get("line_height", 7))
     body_font_size = float(config.pdf.get("default_font_size", 12))
     heading_font_size = float(config.pdf.get("heading_font_size", 16))
@@ -209,15 +225,55 @@ def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str) -> No
     citation_entry_spacing = float(config.pdf.get("citation_entry_spacing", 0))
     blockquote_indent = 8
     section_min_following_sentences = int(config.pdf.get("section_min_following_sentences", 5))
+    paragraph_keep_together_max_sentences = int(config.pdf.get("paragraph_keep_together_max_sentences", 3))
+
+    def maybe_start_new_page_for_text(
+        content_text: str,
+        *,
+        width: float,
+        spacing_after: float,
+        align: str = "L",
+        keep_together: bool = False,
+    ) -> None:
+        if not keep_together:
+            return
+        required_height = estimate_rendered_height(
+            pdf,
+            text=content_text,
+            width=width,
+            line_height=line_height,
+            align=align,
+        ) + spacing_after
+        if remaining_page_space(pdf) < required_height:
+            pdf.add_page()
+
+    def paragraph_should_stay_together(paragraph_text: str) -> bool:
+        sentence_count = count_sentences(paragraph_text)
+        return sentence_count <= paragraph_keep_together_max_sentences or bool(VISIBLE_CITATION_RE.search(paragraph_text))
 
     def render_paragraph(paragraph_text: str) -> None:
+        normalized_text = normalize_render_text(paragraph_text, language=language)
         pdf.set_font("Body", size=body_font_size)
-        pdf.multi_cell(0, line_height, paragraph_text, align="L")
+        maybe_start_new_page_for_text(
+            normalized_text,
+            width=usable_page_width(pdf),
+            spacing_after=paragraph_spacing,
+            align="L",
+            keep_together=paragraph_should_stay_together(normalized_text),
+        )
+        pdf.multi_cell(0, line_height, normalized_text, align="L")
         pdf.ln(paragraph_spacing)
 
     def render_blockquote(quote_lines: list[str]) -> None:
-        quote_text = "\n".join(quote_lines)
+        quote_text = "\n".join(normalize_render_text(line, language=language) for line in quote_lines)
         pdf.set_font("Body", size=body_font_size)
+        maybe_start_new_page_for_text(
+            quote_text,
+            width=pdf.w - pdf.l_margin - pdf.r_margin - blockquote_indent,
+            spacing_after=paragraph_spacing,
+            align="L",
+            keep_together=True,
+        )
         pdf.set_x(pdf.l_margin + blockquote_indent)
         pdf.multi_cell(
             pdf.w - pdf.l_margin - pdf.r_margin - blockquote_indent,
@@ -298,7 +354,15 @@ def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str) -> No
                 stripped_line = line.strip()
                 if not stripped_line:
                     continue
-                pdf.multi_cell(0, line_height, strip_markdown_formatting(stripped_line), align="L")
+                normalized_line = normalize_render_text(strip_markdown_formatting(stripped_line), language=language)
+                maybe_start_new_page_for_text(
+                    normalized_line,
+                    width=usable_page_width(pdf),
+                    spacing_after=citation_entry_spacing,
+                    align="L",
+                    keep_together=True,
+                )
+                pdf.multi_cell(0, line_height, normalized_line, align="L")
                 pdf.ln(citation_entry_spacing)
             continue
 
@@ -323,7 +387,7 @@ def render_pdf_document(
     )
     configure_pdf_fonts(pdf, config, language=language)
     pdf.add_page()
-    render_markdown_blocks(pdf, config, text)
+    render_markdown_blocks(pdf, config, text, language=language)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(str(output_path))

@@ -24,11 +24,12 @@ def test_build_pdf_audit_report_flags_english_known_regressions() -> None:
     report = build_pdf_audit_report(
         language="english",
         pdf_path=Path("english.pdf"),
-        extracted_text="The Valley of West was there, and Gatsby tried to maintain a punctiliously manner.",
+        extracted_text="The Valley of West was there, Gatsby tried to maintain a punctiliously manner, and his eyes look out over the solemn dumping ground [5].",
     )
 
     assert report["status"] == "failed"
     assert report["known_bad_token_count"] >= 2
+    assert report["unquoted_quote_reuse_count"] >= 1
 
 
 def test_build_pdf_audit_report_flags_mandarin_punctuation_bleed() -> None:
@@ -41,6 +42,18 @@ def test_build_pdf_audit_report_flags_mandarin_punctuation_bleed() -> None:
     assert report["status"] == "failed"
     assert report["repeated_ellipsis_issue_count"] >= 1
     assert report["citation_neighborhood_issue_count"] >= 1
+
+
+def test_build_pdf_audit_report_flags_markdown_leak_and_unlocalized_bibliography() -> None:
+    report = build_pdf_audit_report(
+        language="mandarin",
+        pdf_path=Path("mandarin.pdf"),
+        extracted_text='### # 梦想的瓦解\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "hello".\n',
+    )
+
+    assert report["status"] == "failed"
+    assert report["markdown_heading_leak_count"] >= 1
+    assert report["bibliography_localization_issue_count"] >= 1
 
 
 def test_pdf_audit_reports_are_renderable_requires_all_reports_to_pass() -> None:

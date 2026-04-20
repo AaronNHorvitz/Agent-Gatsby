@@ -135,7 +135,7 @@ def test_translate_spanish_freezes_master_and_preserves_citations(monkeypatch, t
     assert config.spanish_translation_output_path.exists()
     assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
     assert "## Citas" in translated_text
-    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "In my younger and more vulnerable years my father gave me some advice...".' in translated_text
+    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "In my younger and more vulnerable years my father gave me some advice...".' in translated_text
     assert any("Existing translated markdown chunk:" in prompt for prompt in prompts)
 
 
@@ -153,6 +153,7 @@ def test_translate_mandarin_writes_output(monkeypatch, tmp_path) -> None:
     assert config.mandarin_translation_output_path.exists()
     assert translated_text.startswith("# An Analysis")
     assert "## 引文" in translated_text
+    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, 第1章，第1段，引文开头："In my younger and more vulnerable years my father gave me some advice...".' in translated_text
 
 
 def test_translate_spanish_falls_back_to_fragment_stitching_when_placeholders_drift(monkeypatch, tmp_path) -> None:
@@ -204,7 +205,7 @@ def test_freeze_english_master_applies_known_regression_fixes_and_writes_report(
     repo_root = tmp_path / "repo"
     config = load_config(write_translation_repo(repo_root))
     config.final_draft_output_path.write_text(
-        '# Title\n\nThe Valley of West was a mistake, and Gatsby tried to maintain a punctiliously manner.\n',
+        '# Title\n\nThe Valley of West was a mistake, and Gatsby tried to maintain a punctiliously manner. He could still look out over the solemn dumping ground [5], hear the thin and far away [30] echoes of a dead dream, and note that a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6].\n',
         encoding="utf-8",
     )
 
@@ -212,7 +213,26 @@ def test_freeze_english_master_applies_known_regression_fixes_and_writes_report(
 
     assert "Valley of Ashes" in frozen
     assert "punctilious manner" in frozen
+    assert '"look out over the solemn dumping ground" [5]' in frozen
+    assert 'the "thin and far away" [30] echoes of a dead dream' in frozen
+    assert '"a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity" [6]' in frozen
     report_path = repo_root / "artifacts/qa/english_master_regression_report.json"
     assert report_path.exists()
     report_text = report_path.read_text(encoding="utf-8")
     assert '"status": "passed"' in report_text
+
+
+def test_freeze_english_master_flags_unquoted_exact_quote_reuse(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    config.final_draft_output_path.write_text(
+        '# Title\n\nHe refers to the great wet barnyard of Long Island Sound [3].\n',
+        encoding="utf-8",
+    )
+
+    try:
+        freeze_english_master(config)
+    except ValueError as exc:
+        assert "terminology/regression validation" in str(exc)
+    else:
+        raise AssertionError("freeze_english_master should reject unquoted direct quote reuse")

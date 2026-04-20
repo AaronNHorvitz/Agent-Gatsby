@@ -10,6 +10,11 @@ Your task:
 - assign evidence IDs to the most relevant section(s)
 - build the body argument order before the introduction and conclusion
 - give each body section a short `purpose` claim explaining what the section argues
+- keep the title, section headings, thesis, and notes in plain English
+- prefer short, concrete section headings over literary or abstract labels
+- keep wording plainspoken, conversational, and easy to follow
+- keep abstraction low and favor concrete nouns and verbs
+- make the outline read like it will support a clear claim -> evidence -> analysis essay
 
 Rules:
 - Output JSON only.
@@ -27,16 +32,16 @@ Rules:
 Return a JSON object with this schema:
 
 {
-  "title": "Metaphor and the Architecture of Desire in The Great Gatsby",
-  "thesis": "Fitzgerald uses metaphor to convert aspiration into distance, wealth into illusion, and memory into a structure of longing.",
-  "intro_notes": "Introduce metaphor as a structural device rather than decorative language.",
+  "title": "An Analysis of Metaphors in The Great Gatsby",
+  "thesis": "Fitzgerald uses metaphor to make wealth look unstable, identity look performed, and desire look hard to hold onto.",
+  "intro_notes": "Explain how Fitzgerald uses metaphor to connect setting, feeling, and social pressure.",
   "sections": [
     {
       "section_id": "S1",
-      "heading": "The Green Light and Deferred Aspiration",
-      "purpose": "Argue that Fitzgerald turns Gatsby's desire into a visible, distant object so the novel can treat longing as something seen and pursued.",
+      "heading": "Desire at a Distance",
+      "purpose": "Argue that Fitzgerald turns Gatsby's desire into something visible and distant so the novel can show how longing drives him.",
       "evidence_ids": ["E001", "E004"]
     }
   ],
-  "conclusion_notes": "Conclude by linking metaphor to the collapse of idealized desire."
+  "conclusion_notes": "Conclude by showing how the metaphors move the novel from hope to collapse."
 }

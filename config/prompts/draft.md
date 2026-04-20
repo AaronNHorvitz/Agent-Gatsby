@@ -16,11 +16,17 @@ Your task:
 - move quickly from claim to evidence to explanation
 - write for a high-agency reader who wants fast signal and no fluff
 - use an asynchronous, document-driven, systems-minded prose style
+- write in plainspoken, conversational, human prose without sounding casual or sloppy
 - prefer shorter topic sentences and direct prose
 - prefer short sentences and simple sentence structures
 - preserve citation markers exactly as provided
 - use bracketed chapter.paragraph citations such as `[5.18]`
 - write in clear, readable, plainspoken modern prose
+- prefer concrete word choice over abstract phrasing
+- keep abstraction low unless a literary concept truly requires it
+- make the prose easy to follow on a first read
+- keep a clear claim -> evidence -> analysis flow
+- aim for light, human readability without literary flourish
 - prefer direct sentences over dense, formal phrasing
 - prefer small, familiar words when they convey the point accurately
 - prefer dense, actionable sentences over ornamental flow

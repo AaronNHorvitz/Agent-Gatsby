@@ -1,25 +1,33 @@
 # Agent Gatsby
-## Local, Citation-Verified Literary Analysis and Translation Pipeline
+## Local AI Pipeline for the Treasury Gatsby Screening Task
 
-Agent Gatsby is a local-first pipeline for producing a literary analysis of *The Great Gatsby* and packaging three PDF outputs:
+Agent Gatsby is a local-first AI pipeline built for Treasury's supplemental *Great Gatsby* screening task:
 
-1. **English analysis**
-2. **Spanish translation**
-3. **Mandarin translation (Simplified Chinese)**
+1. write an analysis of metaphors in *The Great Gatsby*, including citations
+2. translate that essay into Spanish
+3. translate that essay into Mandarin (Simplified Chinese)
 
-> **This repo runs locally on Gemma 4 through Ollama on a single NVIDIA RTX 4090 instead of a hosted API.** That keeps the novel, drafts, translations, QA artifacts, and PDFs on-device. It also reduces exfiltration risk, avoids API-key sprawl, and makes the trust boundary smaller and easier to audit.
+The point of this repository is not just to generate an essay. It is to show the underlying job requirement in code: the ability to implement AI solutions in a real test environment with explicit validation, deterministic artifacts, and failure gates.
 
-> **One practical adjustment was needed in the English path.** When the model drafts from Fitzgerald-heavy evidence, it tends to drift toward ornate literary-analysis prose. To keep the report in plain English, the system drafts a fuller first pass and then applies a bounded rewrite pass that only touches prose paragraphs while preserving verified quotes, citation markers, headings, and evidence structure.
+In its current reference configuration, the repo runs against a local Ollama-compatible endpoint at `http://localhost:11434/v1` and uses `gemma4:26b` for drafting and both translation paths. During development, that local setup ran on a single NVIDIA RTX 4090 rather than a hosted API. That keeps the novel, drafts, translations, QA artifacts, and PDFs on-device, reduces exfiltration risk, avoids API-key sprawl, and keeps the trust boundary smaller and easier to audit.
 
-The rewrite pass uses these rules:
+One practical adjustment was needed in the English path. When the model drafts from Fitzgerald-heavy evidence, it tends to drift toward ornate literary-analysis prose. To keep the final report readable in plain English, the system drafts a fuller first pass and then applies a bounded rewrite pass that only touches prose paragraphs while preserving verified quotes, citation markers, headings, and evidence structure.
 
+That rewrite pass is constrained to:
+
+- plainspoken, conversational prose
+- short sentences
+- concrete word choice
+- low abstraction
+- clear claim -> evidence -> analysis flow
+- light, human readability without literary flourish
 - zero tolerance for fluff, pleasantries, or soft setup
 - dense but still readable prose
 - absolute clarity over emotional padding
 - cut any sentence that does not move the argument forward
 - prefer one precise sentence over two softer ones
 
-This repository is meant to show more than prompt writing. It shows how to build, test, verify, and package a local AI system with explicit controls around evidence, citations, translation fidelity, privacy, and final artifacts.
+This repository is meant to show more than prompt writing. It shows how to build, test, verify, and package a local AI system with explicit controls around evidence, citations, translation fidelity, PDF rendering, privacy, and final artifacts.
 
 The core design choice is simple:
 

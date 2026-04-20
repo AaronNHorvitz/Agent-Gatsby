@@ -184,10 +184,13 @@ def build_style_simplifier_user_prompt(block_text: str) -> str:
     instructions = [
         "Rewrite the prose paragraph below in plainspoken modern prose.",
         "Write for a high-agency reader who wants fast signal and no fluff.",
+        "Keep the prose conversational, human, and easy to follow without adding filler.",
         "Use short sentences, simple structure, and direct topic sentences.",
         "Move in a clear claim-evidence-analysis rhythm when the paragraph contains evidence.",
+        "Prefer concrete word choice and keep abstraction low unless the point truly requires it.",
         "Prefer small, familiar words when they convey the point accurately.",
         "Cut throat-clearing transitions, repeated abstraction, and ornamental phrasing.",
+        "Aim for light, human readability without literary flourish.",
         "Make the logic explicit without sounding stiff.",
         "Preserve every AGQPROTECT token exactly as written.",
         "Preserve every AGCPROTECT token exactly as written.",

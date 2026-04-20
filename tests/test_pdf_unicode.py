@@ -8,6 +8,10 @@ from agent_gatsby.config import load_config
 from agent_gatsby.pdf_compiler import render_markdown_blocks, render_pdfs, resolve_font_path
 
 
+def normalize_rendered_test_text(text: str) -> str:
+    return text.replace("\u202f", " ").replace("\u2060", "")
+
+
 def write_pdf_repo(repo_root: Path) -> Path:
     (repo_root / "config").mkdir(parents=True)
     (repo_root / "artifacts/final").mkdir(parents=True)
@@ -184,15 +188,17 @@ Second paragraph.
 2. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 2, cited passage beginning "Beta".
 """
 
-    render_markdown_blocks(pdf, config, text)
+    render_markdown_blocks(pdf, config, text, language="english")
 
-    assert "Metaphor text:" in pdf.multi_cell_calls
-    assert '"Quoted one" [1]\n"Quoted two" [2]' in pdf.multi_cell_calls
-    assert "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\"." in pdf.multi_cell_calls
-    assert "2. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 2, cited passage beginning \"Beta\"." in pdf.multi_cell_calls
+    normalized_calls = [normalize_rendered_test_text(call) for call in pdf.multi_cell_calls]
+
+    assert "Metaphor text:" in normalized_calls
+    assert '"Quoted one" [1]\n"Quoted two" [2]' in normalized_calls
+    assert "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\"." in normalized_calls
+    assert "2. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 2, cited passage beginning \"Beta\"." in normalized_calls
     assert all(
         "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\". 2." not in call
-        for call in pdf.multi_cell_calls
+        for call in normalized_calls
     )
     assert 3.0 in pdf.ln_calls
     assert 6.0 in pdf.ln_calls
@@ -213,11 +219,13 @@ Body paragraph.
 2. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 2, cited passage beginning "Beta".
 """
 
-    render_markdown_blocks(pdf, config, text)
+    render_markdown_blocks(pdf, config, text, language="spanish")
 
-    assert "Citas" in pdf.multi_cell_calls
-    assert "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\"." in pdf.multi_cell_calls
-    assert "2. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 2, cited passage beginning \"Beta\"." in pdf.multi_cell_calls
+    normalized_calls = [normalize_rendered_test_text(call) for call in pdf.multi_cell_calls]
+
+    assert "Citas" in normalized_calls
+    assert "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\"." in normalized_calls
+    assert "2. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 2, cited passage beginning \"Beta\"." in normalized_calls
 
 
 def test_render_markdown_blocks_moves_section_to_new_page_when_space_is_too_tight(tmp_path) -> None:
@@ -230,7 +238,7 @@ def test_render_markdown_blocks_moves_section_to_new_page_when_space_is_too_tigh
 Sentence one. Sentence two. Sentence three. Sentence four. Sentence five.
 """
 
-    render_markdown_blocks(pdf, config, text)
+    render_markdown_blocks(pdf, config, text, language="english")
 
     assert pdf.add_page_calls == 1
     assert "Tight Section" in pdf.multi_cell_calls

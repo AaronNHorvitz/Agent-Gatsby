@@ -120,8 +120,8 @@ drafting:
   master_output_path: "artifacts/final/analysis_english_master.md"
   llm_transport: "ollama_native_chat"
   timing_output_path: "artifacts/qa/english_draft_timing.json"
-  target_word_count_min: 6400
-  target_word_count_max: 7200
+  target_word_count_min: 7040
+  target_word_count_max: 7920
   estimated_page_target: 10
   words_per_page_estimate: 500
   write_section_by_section: true
@@ -208,10 +208,11 @@ pdf:
   heading_spacing_after: 6
   citation_entry_spacing: 0
   section_min_following_sentences: 5
-  english_font_regular: "NotoSerif-Regular.ttf"
-  english_font_bold: "NotoSerif-Bold.ttf"
-  spanish_font_regular: "NotoSerif-Regular.ttf"
-  spanish_font_bold: "NotoSerif-Bold.ttf"
+  paragraph_keep_together_max_sentences: 3
+  english_font_regular: "NotoSans-Regular.ttf"
+  english_font_bold: "NotoSans-Bold.ttf"
+  spanish_font_regular: "NotoSans-Regular.ttf"
+  spanish_font_bold: "NotoSans-Bold.ttf"
   mandarin_font_regular: "NotoSansSC-Regular.ttf"
   english_pdf_path: "outputs/Gatsby_Analysis_English.pdf"
   spanish_pdf_path: "outputs/Gatsby_Analysis_Spanish.pdf"

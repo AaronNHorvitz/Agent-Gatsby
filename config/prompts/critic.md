@@ -8,6 +8,7 @@ Your task:
 - improve readability and sentence flow
 - revise toward a direct, document-driven, systems-minded prose style
 - write for a high-agency reader who wants fast signal and no fluff
+- keep the prose plainspoken, conversational, and easy to follow
 - have zero tolerance for fluff, pleasantries, or soft setup
 - keep the prose dense, but still readable
 - prioritize absolute clarity over emotional padding
@@ -15,6 +16,10 @@ Your task:
 - prefer one precise sentence over two softer ones
 - prefer clear, direct prose over dense, formal phrasing
 - prefer short sentences and simple sentence structures when the thought allows it
+- prefer concrete word choice over abstract phrasing
+- keep abstraction low unless the argument truly needs it
+- keep a clear claim -> evidence -> analysis flow
+- aim for light, human readability without literary flourish
 - replace repetitive abstract phrasing such as "the text" when a more specific noun would read better
 - vary sentence openings so the prose does not sound mechanical
 - trim explanatory bloat when a paragraph repeats the same point
