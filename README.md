@@ -1369,3 +1369,142 @@ That is the core claim of this repository:
 > **The value is not merely that a model can produce text.**
 >  
 > **The value is that the system is engineered to produce defensible artifacts under constraints.**
+
+---
+
+## Appendix: Current File Architecture
+
+The repository currently looks like this at a high level. This tree reflects the live working layout and focuses on the operational files and artifact locations that matter to the pipeline. It intentionally omits transient caches such as `__pycache__/`, `.git/`, `.venv/`, and temporary editor lock files.
+
+```text
+Agent-Gatsby/
+├── AGENTS.md
+├── PRD.md
+├── README.md
+├── SPRINTBOARD.md
+├── TASKS.md
+├── pyproject.toml
+├── requirements.txt
+├── config/
+│   ├── config.yaml
+│   ├── config_5page.yaml
+│   └── prompts/
+│       ├── critic.md
+│       ├── draft.md
+│       ├── dynamic_validation_critic.md
+│       ├── extractor.md
+│       ├── final_forensic_audit.md
+│       ├── ledger.md
+│       ├── outline.md
+│       ├── style_simplifier.md
+│       ├── translation_qa.md
+│       ├── translator_es.md
+│       ├── translator_es_cleanup.md
+│       ├── translator_zh.md
+│       └── translator_zh_cleanup.md
+├── data/
+│   ├── normalized/
+│   │   └── gatsby_locked.txt
+│   └── source/
+│       ├── README.md
+│       └── gatsby_source.txt
+├── fonts/
+│   ├── NotoSansSC-Regular.ttf
+│   ├── NotoSerif-Bold.ttf
+│   ├── NotoSerif-Regular.ttf
+│   └── README.md
+├── src/
+│   └── agent_gatsby/
+│       ├── __init__.py
+│       ├── bilingual_qa.py
+│       ├── build_evidence_ledger.py
+│       ├── citation_registry.py
+│       ├── compare_inference_paths.py
+│       ├── config.py
+│       ├── critique_and_edit.py
+│       ├── data_ingest.py
+│       ├── draft_english.py
+│       ├── extract_metaphors.py
+│       ├── final_artifact_audit.py
+│       ├── index_text.py
+│       ├── llm_client.py
+│       ├── logging_utils.py
+│       ├── manifest_writer.py
+│       ├── normalize.py
+│       ├── orchestrator.py
+│       ├── pdf_compiler.py
+│       ├── plan_outline.py
+│       ├── schemas.py
+│       ├── translate_mandarin.py
+│       ├── translate_spanish.py
+│       ├── translation_common.py
+│       └── verify_citations.py
+├── tests/
+│   ├── fixtures/
+│   │   └── gatsby_sample.txt
+│   ├── test_bilingual_qa.py
+│   ├── test_citation_registry.py
+│   ├── test_config.py
+│   ├── test_draft_english.py
+│   ├── test_editorial_integrity.py
+│   ├── test_evidence_ledger.py
+│   ├── test_final_artifact_audit.py
+│   ├── test_hashing.py
+│   ├── test_llm_client.py
+│   ├── test_logging_utils.py
+│   ├── test_manifest_writer.py
+│   ├── test_metaphor_candidates.py
+│   ├── test_normalize.py
+│   ├── test_normalize_full_source.py
+│   ├── test_orchestrator.py
+│   ├── test_outline.py
+│   ├── test_package_init.py
+│   ├── test_passage_index.py
+│   ├── test_pdf_unicode.py
+│   ├── test_quote_verification.py
+│   ├── test_schemas.py
+│   └── test_translation_integrity.py
+├── artifacts/
+│   ├── drafts/
+│   │   ├── analysis_english_draft.md
+│   │   ├── analysis_english_final.md
+│   │   ├── outline.json
+│   │   └── sections/
+│   ├── evidence/
+│   │   ├── evidence_ledger.json
+│   │   ├── metaphor_candidates.json
+│   │   └── rejected_candidates.json
+│   ├── final/
+│   │   ├── analysis_english_master.md
+│   │   └── citation_text.md
+│   ├── logs/
+│   │   └── pipeline.log
+│   ├── manifests/
+│   │   ├── passage_index.json
+│   │   └── source_manifest.json
+│   ├── qa/
+│   │   ├── citation_registry.json
+│   │   ├── english_draft_timing.json
+│   │   ├── english_dynamic_validation_report.json
+│   │   ├── english_llm_forensic_audit_report.json
+│   │   ├── english_master_regression_report.json
+│   │   ├── english_pdf_audit_report.json
+│   │   ├── english_verification_report.json
+│   │   ├── interface_compare/
+│   │   ├── mandarin_dynamic_validation_report.json
+│   │   ├── mandarin_llm_forensic_audit_report.json
+│   │   ├── mandarin_pdf_audit_report.json
+│   │   ├── mandarin_qa_report.json
+│   │   ├── spanish_dynamic_validation_report.json
+│   │   ├── spanish_llm_forensic_audit_report.json
+│   │   ├── spanish_pdf_audit_report.json
+│   │   └── spanish_qa_report.json
+│   └── translations/
+│       ├── analysis_mandarin_draft.md
+│       └── analysis_spanish_draft.md
+└── outputs/
+    ├── Gatsby_Analysis_English.pdf
+    ├── Gatsby_Analysis_Mandarin.pdf
+    ├── Gatsby_Analysis_Spanish.pdf
+    └── final_manifest.json
+```
