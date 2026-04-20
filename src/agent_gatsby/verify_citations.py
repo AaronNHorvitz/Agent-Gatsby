@@ -26,6 +26,7 @@ LOGGER = logging.getLogger(__name__)
 
 DOUBLE_QUOTE_RE = re.compile(r"[\"“](.+?)[\"”]", re.DOTALL)
 SINGLE_QUOTE_RE = re.compile(r"(?<!\w)['‘]([^'\n]{2,}?)['’](?!\w)")
+BLOCKQUOTE_QUOTE_LINE_RE = re.compile(r'^\s*>\s*"(?P<quote>.+)"\s+(?P<citation>\[[^\]]+\])\s*$')
 QUOTE_ISSUE_CODES = {
     "quote_not_in_passage",
     "quote_not_in_evidence",
@@ -101,6 +102,33 @@ def extract_quoted_strings(text: str) -> list[str]:
 
 def paragraph_blocks(text: str) -> list[str]:
     return [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
+
+
+def quote_validation_blocks(text: str) -> list[str]:
+    blocks: list[str] = []
+    for block in paragraph_blocks(text):
+        if "Metaphor text:" not in block:
+            blocks.append(block)
+            continue
+        quote_lines = [
+            line.strip()
+            for line in block.splitlines()
+            if BLOCKQUOTE_QUOTE_LINE_RE.match(line.strip())
+        ]
+        if quote_lines:
+            blocks.extend(quote_lines)
+            continue
+        blocks.append(block)
+    return blocks
+
+
+def extract_validation_quotes(block: str) -> list[str]:
+    stripped = block.strip()
+    blockquote_match = BLOCKQUOTE_QUOTE_LINE_RE.match(stripped)
+    if blockquote_match:
+        candidate = collapse_spaces(blockquote_match.group("quote")).strip()
+        return [candidate] if candidate else []
+    return extract_quoted_strings(block)
 
 
 def split_main_text_and_appendix(text: str, *, appendix_heading: str) -> tuple[str, str | None]:
@@ -225,9 +253,9 @@ def validate_quotes(
 ) -> list[VerificationIssue]:
     issues: list[VerificationIssue] = []
 
-    for block in paragraph_blocks(text):
+    for block in quote_validation_blocks(text):
         citations = extract_citation_markers(block)
-        quotes = extract_quoted_strings(block)
+        quotes = extract_validation_quotes(block)
         if not quotes:
             continue
 

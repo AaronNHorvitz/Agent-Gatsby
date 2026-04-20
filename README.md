@@ -1,21 +1,31 @@
 # Agent Gatsby
 ## Local, Citation-Verified Literary Analysis and Translation Pipeline
 
-Agent Gatsby is a local-first, deterministic, evidence-led AI system for producing a literary analysis of *The Great Gatsby* and generating three submission-ready PDF artifacts:
+Agent Gatsby is a local-first pipeline for producing a literary analysis of *The Great Gatsby* and packaging three PDF outputs:
 
 1. **English analysis**
 2. **Spanish translation**
 3. **Mandarin translation (Simplified Chinese)**
 
-> **For this assignment, I deliberately chose to build the reference implementation around a local instance of Gemma 4 running through Ollama on a single NVIDIA RTX 4090, rather than a hosted API workflow.** That decision keeps the novel, drafts, translations, QA artifacts, and final PDFs on-device; reduces exfiltration and secret-management risk; and creates a smaller, more auditable trust boundary. It also forces the solution to behave like a real engineering system: evidence is extracted before prose is drafted, citations are verified, translations are checked structurally, and final PDFs are rendered deterministically.
+> **This repo runs locally on Gemma 4 through Ollama on a single NVIDIA RTX 4090 instead of a hosted API.** That keeps the novel, drafts, translations, QA artifacts, and PDFs on-device. It also reduces exfiltration risk, avoids API-key sprawl, and makes the trust boundary smaller and easier to audit.
 
-This repository is intentionally designed to demonstrate more than prompt-writing. It is meant to show the ability to **engineer, implement, test, verify, and package an AI-enabled system** that can run in a constrained local environment with explicit controls around evidence, citations, translation fidelity, privacy, and artifact generation.
+> **One practical adjustment was needed in the English path.** When the model drafts from Fitzgerald-heavy evidence, it tends to drift toward ornate literary-analysis prose. To keep the report in plain English, the system drafts a fuller first pass and then applies a bounded rewrite pass that only touches prose paragraphs while preserving verified quotes, citation markers, headings, and evidence structure.
 
-The central design decision in this repository is simple:
+The rewrite pass uses these rules:
+
+- zero tolerance for fluff, pleasantries, or soft setup
+- dense but still readable prose
+- absolute clarity over emotional padding
+- cut any sentence that does not move the argument forward
+- prefer one precise sentence over two softer ones
+
+This repository is meant to show more than prompt writing. It shows how to build, test, verify, and package a local AI system with explicit controls around evidence, citations, translation fidelity, privacy, and final artifacts.
+
+The core design choice is simple:
 
 > **Do not treat a large context window as a substitute for system design.**
 >  
-> Instead, treat the model as one component inside a controlled pipeline with explicit state, verification gates, and deterministic artifact generation.
+> Treat the model as one component inside a controlled pipeline with explicit state, verification gates, and deterministic artifact generation.
 
 ---
 
@@ -48,14 +58,14 @@ The central design decision in this repository is simple:
 
 ## 1. Project Objective
 
-The objective of Agent Gatsby is to take a locked source text of *The Great Gatsby* and produce a submission package that satisfies the following output requirements:
+Agent Gatsby takes a locked source text of *The Great Gatsby* and produces a submission package with:
 
-- a polished **English literary analysis of the novel’s major recurring metaphor systems, including citations**, targeting approximately 10 pages in the rendered submission format
+- a polished **English literary analysis of the novel’s major recurring metaphor systems, including citations**
 - a **Spanish translation** of that analysis
 - a **Mandarin translation** of that analysis, rendered in Simplified Chinese
-- three separate, professional **PDF artifacts** suitable for upload
+- three separate **PDF artifacts** suitable for upload
 
-This repository does **not** optimize for maximal autonomy or novelty. It optimizes for:
+This repo does **not** optimize for novelty or maximum autonomy. It optimizes for:
 
 - **accuracy**
 - **traceability**
@@ -74,16 +84,16 @@ This repository does **not** optimize for maximal autonomy or novelty. It optimi
 
 ## 2. Why This Architecture Exists
 
-A naive implementation of this assignment would do the following:
+A one-shot version of this assignment would:
 
 1. load the entire novel into a long-context model
 2. ask for a 10-page metaphor analysis with citations
 3. translate the result twice
 4. export three PDFs
 
-That approach is fast, but it is brittle.
+That is fast, but brittle.
 
-The most common failure modes of that approach are:
+Common failure modes:
 
 - invented or imprecise citations
 - paraphrases disguised as direct quotations
@@ -92,34 +102,34 @@ The most common failure modes of that approach are:
 - translation drift
 - broken typography in CJK PDF output
 - poor reproducibility
-- no meaningful verification layer
+- no real verification layer
 
-Agent Gatsby exists to solve those problems by replacing a one-shot generation pattern with a **controlled multi-stage pipeline**.
+Agent Gatsby exists to solve those problems with a **controlled multi-stage pipeline**.
 
 ---
 
 ## 3. Core Design Principles
 
 ### 3.1 Local-First Execution
-The entire pipeline is designed to run locally on a single workstation. No external inference APIs are required for the reference implementation.
+The reference pipeline runs locally on a single workstation. No external inference API is required.
 
 ### 3.2 Explicit State Over Hidden Agent Magic
-State is stored as structured artifacts on disk. The system does not rely on opaque chain-of-thought persistence, hidden session state, or orchestration wrappers that conceal intermediate decisions.
+State lives in explicit artifacts on disk. The system does not depend on hidden session state or opaque orchestration wrappers.
 
 ### 3.3 Evidence Before Prose
-The model does not write the final essay first. It first identifies candidate metaphors, extracts evidence, and builds an **evidence ledger**. The essay is then generated from that ledger.
+The model does not write the essay first. It first identifies candidate metaphors, extracts evidence, and builds an **evidence ledger**. The essay is drafted from that ledger.
 
 ### 3.4 Verification Before Promotion
-A stage is not considered complete merely because the model produced output. A stage is promoted only if it passes validation checks.
+A stage is not complete just because the model returned text. It is complete only if validation passes.
 
 ### 3.5 Deterministic Artifact Generation
-The model produces structured content. A deterministic renderer produces the final PDFs. The model is not responsible for layout.
+The model produces text. A deterministic renderer produces the final PDFs. The model does not control layout.
 
 ### 3.6 Reproducible Inputs
-The system uses a locked text source and records hashes, prompts, configuration, and output manifests.
+The system uses a locked source text and records hashes, prompts, config, and manifests.
 
 ### 3.7 Minimum Viable Complexity
-The pipeline intentionally avoids unnecessary abstraction layers. No LangChain or LangGraph is required. Orchestration is handled by a plain Python state machine and explicit module boundaries.
+The pipeline avoids unnecessary abstraction layers. No LangChain or LangGraph is required. Orchestration is handled by plain Python and explicit module boundaries.
 
 ---
 
@@ -132,9 +142,9 @@ Agent Gatsby is **not**:
 - a generic autonomous agent platform
 - a chain-of-thought visualizer
 - a human replacement for literary scholarship
-- a weekend attempt to train a custom metaphor classifier or build a labeled metaphor dataset from scratch
+- a rushed attempt to train a custom metaphor classifier or build a labeled metaphor dataset from scratch
 
-It is a **production-minded local AI pipeline** built for a concrete deliverable.
+It is a **production-minded local AI pipeline** built for one concrete deliverable.
 
 ---
 

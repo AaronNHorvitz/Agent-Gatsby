@@ -132,13 +132,13 @@ def build_selection_scope_note(section_count: int) -> str:
 def normalize_section_claim(section_notes: str) -> str:
     normalized = collapse_spaces(section_notes).strip()
     normalized = re.sub(
-        r"^(argue|show|explain|demonstrate|trace|analyze|examine|explore)\s+that\s+",
+        r"^(argue|show|explain|demonstrate|trace|analyze|examine|explore|establish|discuss)\s+that\s+",
         "",
         normalized,
         flags=re.IGNORECASE,
     )
     normalized = re.sub(
-        r"^(demonstrate|explore|analyze|show|explain|trace|examine)\s+how\s+",
+        r"^(demonstrate|explore|analyze|show|explain|trace|examine|establish|discuss)\s+how\s+",
         "",
         normalized,
         flags=re.IGNORECASE,
@@ -171,6 +171,7 @@ def promote_claim_to_clause(section_claim: str) -> str:
     verbs = (
         "establish",
         "create",
+        "set",
         "illustrate",
         "portray",
         "reveal",
@@ -239,11 +240,27 @@ def render_metaphor_focus_block(evidence_records: list[EvidenceRecord], *, secti
 
 
 def strip_metaphor_focus_block(text: str) -> str:
-    if text.startswith("Metaphor text:\n"):
-        parts = text.split("\n\n", maxsplit=1)
-        if len(parts) == 2:
-            return parts[1].strip()
-    return text.strip()
+    stripped = text.strip()
+    while stripped:
+        lines = stripped.splitlines()
+        try:
+            marker_index = next(index for index, line in enumerate(lines) if line.strip() == "Metaphor text:")
+        except StopIteration:
+            return stripped
+
+        # Only treat an early leading block as the deterministic focus block.
+        if marker_index > 2:
+            return stripped
+
+        content_index = marker_index + 1
+        while content_index < len(lines) and (
+            not lines[content_index].strip() or lines[content_index].lstrip().startswith(">")
+        ):
+            content_index += 1
+        while content_index < len(lines) and not lines[content_index].strip():
+            content_index += 1
+        stripped = "\n".join(lines[content_index:]).strip()
+    return stripped
 
 
 def split_sentences(text: str) -> list[str]:
@@ -283,20 +300,12 @@ def render_body_retry_evidence_summary(
 ) -> str:
     payload = []
     for record in evidence_records:
-        context_payload = build_context_payload(
-            passage_index,
-            passage_id=record.passage_id,
-            count_before=1,
-            count_after=1,
-        )
         payload.append(
             {
                 "evidence_id": record.evidence_id,
                 "metaphor": record.metaphor,
-                "quote": record.quote,
                 "passage_id": record.passage_id,
                 "interpretation": record.interpretation,
-                "cited_passage_text": context_payload["cited_passage"]["text"],
             }
         )
     return json.dumps(payload, indent=2, ensure_ascii=False)
@@ -463,6 +472,7 @@ def build_draft_user_prompt(
         "Vary your phrasing by referring naturally to Fitzgerald, the novel, the narrator, Gatsby, the scene, the image, or the passage when appropriate.",
         "Prefer concrete literary-analysis prose over abstract academic filler.",
         "Cut decorative phrasing when it slows the argument.",
+        "Because a later editorial pass will simplify the prose, keep this first-pass section full, scene-rich, and complete rather than prematurely compressed.",
         "Treat the surrounding context as paraphrase-only background unless the exact words also appear in a provided quote field.",
         "If you use a direct quotation, keep it exact and preserve its locator exactly as given.",
         "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
@@ -510,6 +520,9 @@ def build_draft_user_prompt(
         instructions.append(
             "Structure this section as a compact argument chain: opening claim, quoted supporting evidence with citation, "
             "analysis of how the text proves the claim in scene context, and a closing or transition sentence."
+        )
+        instructions.append(
+            "Do not collapse the body section into outline prose. Develop the reasoning fully enough that a later plain-English edit can shorten the sentences without stripping out the argument."
         )
         instructions.append(
             "Treat the provided metaphors as one thematic cluster rather than as separate mini-sections."
@@ -609,15 +622,14 @@ def build_body_retry_user_prompt(
         "Do not repeat the section heading.",
         "Do not include notes, self-critique, drafting commentary, or word-count checks.",
         "Use only the evidence summary provided below.",
+        "Do not use any direct quotations or quotation marks in this compact retry; the exact quoted text already appears in the section's `Metaphor text:` block.",
         "Build a compact argument chain: opening claim, exact quoted evidence with citation, explanation of how the scene context supports the claim, and a short closing or transition sentence.",
         "Treat the provided metaphors as one thematic cluster rather than as separate mini-sections.",
         "Address every quotation in the evidence summary at least once.",
         'Do not overuse abstract openings such as "The text" or "This metaphor."',
         "Keep the prose direct, lightly academic, and faster-moving than a full literary close-reading seminar.",
         "Combine related images when that keeps the section concise and readable.",
-        "Use at least one exact quote from the provided evidence.",
-        "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
-        "Do not shorten, trim, or partially quote any provided quote string.",
+        "Use citations rather than direct quotation when referring back to the evidence.",
         "The only allowed locator markers for this section are: "
         + ", ".join(f"[{record.passage_id}]" for record in evidence_records),
     ]
@@ -634,6 +646,46 @@ def build_body_retry_user_prompt(
     return "\n".join(instructions) + "\n\nEvidence summary:\n" + render_body_retry_evidence_summary(
         evidence_records,
         passage_index=passage_index,
+    )
+
+
+def build_conclusion_retry_user_prompt(
+    config: AppConfig,
+    outline: OutlinePlan,
+    *,
+    heading: str,
+    section_notes: str,
+    completed_body_sections: list[tuple[str, str]],
+) -> str:
+    instructions = [
+        "Compact retry mode: conclusion synthesis only.",
+        f"Essay title: {outline.title}",
+        f"Thesis: {outline.thesis}",
+        f"Section heading: {heading}",
+        f"Section notes: {section_notes.strip()}",
+        "Write markdown prose only for this section body.",
+        "Write 4 substantial paragraphs in clear, readable English.",
+        "Do not repeat the section heading.",
+        "Do not include notes, self-critique, drafting commentary, or word-count checks.",
+        "Use only the completed body arguments provided below.",
+        "Do not use any direct quotations or quotation marks in this conclusion; paraphrase the evidence instead.",
+        "Synthesize the body arguments into one final judgment about Fitzgerald's use of metaphor.",
+        "Keep the prose direct, plainspoken, and controlled rather than ornamental.",
+        "Do not turn the conclusion into outline bullets or compressed notes.",
+        "Close with a clear final judgment about the collapse of Gatsby's dream.",
+    ]
+    overall_word_target = build_overall_word_target_guidance(config)
+    if overall_word_target:
+        instructions.append(overall_word_target)
+    section_word_target = build_section_word_target_guidance(
+        config,
+        outline=outline,
+        section_type="conclusion",
+    )
+    if section_word_target:
+        instructions.append(section_word_target)
+    return "\n".join(instructions) + "\n\nCompleted body arguments:\n" + render_completed_body_context(
+        completed_body_sections
     )
 
 
@@ -703,19 +755,66 @@ def draft_section(
                     "Drafted section failed validation; applying deterministic cleanup before retrying validation: %s",
                     exc,
                 )
-                response_validator(repaired_text)
-                section_text = validate_section_text(
-                    repaired_text,
+                try:
+                    response_validator(repaired_text)
+                    section_text = validate_section_text(
+                        repaired_text,
+                        heading=heading,
+                        require_citation=require_citation,
+                    )
+                    if section_type == "body":
+                        focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
+                        return f"{focus_block}\n\n{section_text}".strip()
+                    return section_text
+                except ValueError as repair_exc:
+                    LOGGER.warning(
+                        "Deterministic cleanup still failed validation; continuing to compact retry path: %s",
+                        repair_exc,
+                    )
+        if section_type == "conclusion":
+            LOGGER.warning(
+                "Conclusion draft failed validation; retrying with compact conclusion prompt: %s",
+                exc,
+            )
+            response_text = invoke_text_completion(
+                config,
+                stage_name="draft_english",
+                system_prompt=load_draft_prompt(config),
+                user_prompt=build_conclusion_retry_user_prompt(
+                    config,
+                    outline,
                     heading=heading,
-                    require_citation=require_citation,
-                )
-                if section_type == "body":
-                    focus_block = render_metaphor_focus_block(evidence_records, section_notes=section_notes)
-                    return f"{focus_block}\n\n{section_text}".strip()
-                return section_text
-        if "Model returned empty content" not in str(exc):
+                    section_notes=section_notes,
+                    completed_body_sections=completed_body_sections or [],
+                ),
+                output_path=output_path,
+                response_validator=response_validator,
+                transport_override=transport_override,
+            )
+        elif section_type == "body":
+            LOGGER.warning(
+                "Body section draft failed validation; retrying with compact body prompt: %s",
+                exc,
+            )
+            response_text = invoke_text_completion(
+                config,
+                stage_name="draft_english",
+                system_prompt=load_draft_prompt(config),
+                user_prompt=build_body_retry_user_prompt(
+                    config,
+                    outline,
+                    heading=heading,
+                    section_notes=section_notes,
+                    evidence_records=evidence_records,
+                    passage_index=passage_index,
+                ),
+                output_path=output_path,
+                response_validator=response_validator,
+                transport_override=transport_override,
+            )
+        elif "Model returned empty content" not in str(exc):
             raise
-        if section_type == "introduction":
+        elif section_type == "introduction":
             LOGGER.warning(
                 "Introduction draft returned empty content; retrying with compact intro prompt: %s",
                 exc,
@@ -730,27 +829,6 @@ def draft_section(
                     heading=heading,
                     section_notes=section_notes,
                     completed_body_sections=completed_body_sections or [],
-                ),
-                output_path=output_path,
-                response_validator=response_validator,
-                transport_override=transport_override,
-            )
-        elif section_type == "body":
-            LOGGER.warning(
-                "Body section draft returned empty content; retrying with compact body prompt: %s",
-                exc,
-            )
-            response_text = invoke_text_completion(
-                config,
-                stage_name="draft_english",
-                system_prompt=load_draft_prompt(config),
-                user_prompt=build_body_retry_user_prompt(
-                    config,
-                    outline,
-                    heading=heading,
-                    section_notes=section_notes,
-                    evidence_records=evidence_records,
-                    passage_index=passage_index,
                 ),
                 output_path=output_path,
                 response_validator=response_validator,

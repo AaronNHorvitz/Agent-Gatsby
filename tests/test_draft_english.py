@@ -13,6 +13,7 @@ from agent_gatsby.draft_english import (
     normalize_section_claim,
     promote_claim_to_clause,
     repair_invalid_section_artifacts,
+    strip_metaphor_focus_block,
     strip_invalid_bracket_markers,
     strip_unauthorized_quotes,
 )
@@ -229,6 +230,7 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
         "anti_text_repetition": False,
         "direct_style_guidance": False,
         "breadth_guidance": False,
+        "full_first_guidance": False,
     }
     call_order: list[str] = []
     seen_transport_overrides: list[str | None] = []
@@ -258,6 +260,8 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
             prompt_checks["direct_style_guidance"] = True
         if "Address every quotation shown in the section's `Metaphor text:` block at least once, but combine related images" in user_prompt:
             prompt_checks["breadth_guidance"] = True
+        if "Because a later editorial pass will simplify the prose" in user_prompt:
+            prompt_checks["full_first_guidance"] = True
         if "Section type: introduction" in user_prompt:
             call_order.append("introduction")
             return (
@@ -311,6 +315,7 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert prompt_checks["anti_text_repetition"] is True
     assert prompt_checks["direct_style_guidance"] is True
     assert prompt_checks["breadth_guidance"] is True
+    assert prompt_checks["full_first_guidance"] is True
     assert call_order == ["body:S1", "body:S2", "introduction", "conclusion"]
     assert all(value == "ollama_native_chat" for value in seen_transport_overrides)
     timing_report = json.loads((repo_root / "artifacts/qa/english_draft_timing.json").read_text(encoding="utf-8"))
@@ -391,7 +396,87 @@ def test_draft_english_retries_body_section_with_compact_prompt(monkeypatch, tmp
 
     assert 'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2].' in draft_text
     assert any("Compact retry mode: body argument only." in prompt for prompt in call_log)
-    assert any('"cited_passage_text": "Gatsby reached toward the green light at the end of the dock."' in prompt for prompt in call_log)
+    assert any("Do not use any direct quotations or quotation marks in this compact retry" in prompt for prompt in call_log)
+    assert any('"metaphor": "green light"' in prompt for prompt in call_log)
+    assert not any('"cited_passage_text": "Gatsby reached toward the green light at the end of the dock."' in prompt for prompt in call_log)
+
+
+def test_draft_english_retries_conclusion_with_compact_prompt(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    call_log: list[str] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        call_log.append(user_prompt)
+        if "Compact retry mode: conclusion synthesis only." in user_prompt:
+            return (
+                "Fitzgerald uses metaphor to move the novel from desire to collapse.\n\n"
+                "The body sections show that wealth, class, and self-invention all depend on unstable images.\n\n"
+                "By the end, those images lose force and expose the dream as fragile.\n\n"
+                "The conclusion leaves the reader with a final judgment about the failure of Gatsby's ideal."
+            )
+        if "Section heading: Conclusion" in user_prompt:
+            raise LLMResponseValidationError(
+                "Drafted section contains citations outside the allowed evidence set: 9.9",
+                "This conclusion cites the wrong place [9.9].",
+            )
+        if "Section heading: Desire at a Distance" in user_prompt:
+            return 'This section argues that Gatsby\'s "green light" turns longing into a visible object of desire [1.2].'
+        if "Section heading: Material Decay and Social Vision" in user_prompt:
+            return 'This section argues that the "valley of ashes" gives moral decay a physical landscape [2.2].'
+        if "Section type: introduction" in user_prompt:
+            return (
+                "Fitzgerald writes in a style that turns emotion into visible imagery. "
+                "The introduction summarizes the body arguments already drafted."
+            )
+        return "Unexpected path"
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+
+    draft_text = draft_english(config)
+
+    assert "Fitzgerald uses metaphor to move the novel from desire to collapse." in draft_text
+    assert any("Compact retry mode: conclusion synthesis only." in prompt for prompt in call_log)
+    assert any("Do not use any direct quotations or quotation marks in this conclusion" in prompt for prompt in call_log)
+    assert any("Completed body arguments:" in prompt for prompt in call_log)
+
+
+def test_draft_english_retries_body_after_cleanup_still_fails(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    call_log: list[str] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        call_log.append(user_prompt)
+        if "Compact retry mode: body argument only." in user_prompt:
+            return (
+                'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2]. '
+                'That exact image proves the claim because the scene gives Gatsby\'s longing a concrete object the reader can picture [1.2]. '
+                'The section closes by preparing the essay to move toward broader social decay.'
+            )
+        if "Section heading: Desire at a Distance" in user_prompt:
+            raise LLMResponseValidationError(
+                "Drafted section contains citations outside the allowed evidence set: 9.9",
+                'This section argues that Gatsby\'s "green light" marks desire [9.9].',
+            )
+        if "Section type: introduction" in user_prompt:
+            return (
+                "Fitzgerald writes in a style that turns emotion into visible imagery. "
+                "The introduction summarizes the body arguments already drafted."
+            )
+        if "Section heading: Material Decay and Social Vision" in user_prompt:
+            return 'This section argues that the "valley of ashes" gives decay a physical landscape [2.2].'
+        return "The conclusion gathers the essay's claims into a final judgment."
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+
+    draft_text = draft_english(config)
+
+    assert 'This section argues that Gatsby\'s "green light" turns desire into a visible target [1.2].' in draft_text
+    assert any("Compact retry mode: body argument only." in prompt for prompt in call_log)
+    assert any("Do not use any direct quotations or quotation marks in this compact retry" in prompt for prompt in call_log)
 
 
 def test_section_response_validator_rejects_paraphrase_quotes_and_bad_locators() -> None:
@@ -469,6 +554,18 @@ def test_normalize_section_claim_strips_instructional_prefixes() -> None:
         )
         == "sensory metaphors of light and texture create a dreamlike universe"
     )
+    assert (
+        normalize_section_claim(
+            "Establish how early metaphors set the stage for the unstable ethical and physical landscapes the characters inhabit."
+        )
+        == "early metaphors set the stage for the unstable ethical and physical landscapes the characters inhabit"
+    )
+    assert (
+        normalize_section_claim(
+            "Discuss how physical boundaries and theatrical imagery highlight the rigid, performative nature of social standing."
+        )
+        == "physical boundaries and theatrical imagery highlight the rigid, performative nature of social standing"
+    )
 
 
 def test_promote_claim_to_clause_turns_fragment_into_fitzgerald_clause() -> None:
@@ -479,6 +576,10 @@ def test_promote_claim_to_clause_turns_fragment_into_fitzgerald_clause() -> None
     assert (
         promote_claim_to_clause("similes of buoyancy and detachment illustrate the ethereal existence of the upper class")
         == "Fitzgerald uses similes of buoyancy and detachment to illustrate the ethereal existence of the upper class"
+    )
+    assert (
+        promote_claim_to_clause("early metaphors set the stage for the unstable ethical and physical landscapes the characters inhabit")
+        == "Fitzgerald uses early metaphors to set the stage for the unstable ethical and physical landscapes the characters inhabit"
     )
 
 
@@ -504,6 +605,28 @@ def test_build_metaphor_focus_lead_varies_and_removes_instruction_leak_phrases()
     assert (
         "Fitzgerald uses sensory metaphors of light and texture to create a sense of a vast, unreachable, and dreamlike universe."
         in concluding_lead
+    )
+
+    stage_setting_lead = build_metaphor_focus_lead(
+        "Establish how early metaphors set the stage for the unstable ethical and physical landscapes the characters inhabit.",
+        evidence_count=3,
+    )
+
+    assert "Establish how" not in stage_setting_lead
+    assert (
+        "Fitzgerald uses early metaphors to set the stage for the unstable ethical and physical landscapes the characters inhabit."
+        in stage_setting_lead
+    )
+
+    performance_lead = build_metaphor_focus_lead(
+        "Discuss how physical boundaries and theatrical imagery highlight the rigid, performative nature of social standing.",
+        evidence_count=4,
+    )
+
+    assert "Discuss how" not in performance_lead
+    assert (
+        "Fitzgerald uses physical boundaries and theatrical imagery to highlight the rigid, performative nature of social standing."
+        in performance_lead
     )
 
 
@@ -534,3 +657,21 @@ def test_repair_invalid_section_artifacts_handles_mixed_bracket_and_quote_noise(
     assert '"green light"' in cleaned
     assert '"visible beacon"' not in cleaned
     assert "visible beacon" in cleaned
+
+
+def test_strip_metaphor_focus_block_removes_lead_in_and_blockquote_cluster() -> None:
+    text = """
+This cluster of metaphors points to one larger idea: Fitzgerald uses early metaphors to set the stage for instability.
+
+Metaphor text:
+> "green light" [1.2]
+> "valley of ashes" [2.2]
+
+This paragraph begins the real analysis.
+
+Another analytical paragraph follows.
+""".strip()
+
+    cleaned = strip_metaphor_focus_block(text)
+
+    assert cleaned == "This paragraph begins the real analysis.\n\nAnother analytical paragraph follows."

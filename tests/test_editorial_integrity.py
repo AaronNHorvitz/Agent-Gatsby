@@ -6,16 +6,22 @@ from pathlib import Path
 import pytest
 
 from agent_gatsby.config import load_config
-from agent_gatsby.critique_and_edit import build_editorial_response_validator, critique_and_edit
+from agent_gatsby.critique_and_edit import (
+    build_editorial_response_validator,
+    build_style_simplifier_response_validator,
+    is_style_rewrite_eligible_block,
+    critique_and_edit,
+)
 from agent_gatsby.llm_client import LLMResponseValidationError
 
 
-def write_editorial_repo(repo_root: Path) -> Path:
+def write_editorial_repo(repo_root: Path, *, enable_style_simplifier: bool = False) -> Path:
     (repo_root / "config/prompts").mkdir(parents=True)
     (repo_root / "artifacts/manifests").mkdir(parents=True)
     (repo_root / "artifacts/evidence").mkdir(parents=True)
     (repo_root / "artifacts/drafts").mkdir(parents=True)
     (repo_root / "config/prompts/critic.md").write_text("Output revised markdown only.\n", encoding="utf-8")
+    (repo_root / "config/prompts/style_simplifier.md").write_text("Rewrite the paragraph only.\n", encoding="utf-8")
 
     passage_index = {
         "source_name": "gatsby_locked",
@@ -101,7 +107,22 @@ def write_editorial_repo(repo_root: Path) -> Path:
     )
     (repo_root / "artifacts/drafts/analysis_english_draft.md").write_text(draft_text, encoding="utf-8")
 
-    config_text = """
+    prompts_block = ['prompts:', '  critic_prompt_path: "config/prompts/critic.md"']
+    if enable_style_simplifier:
+        prompts_block.append('  style_simplifier_prompt_path: "config/prompts/style_simplifier.md"')
+
+    editorial_block = ['editorial:', '  llm_transport: "ollama_native_chat"']
+    if enable_style_simplifier:
+        editorial_block.extend(
+            [
+                "  style_simplifier_enabled: true",
+                '  style_simplifier_transport: "ollama_native_chat"',
+                "  style_simplifier_min_words: 3",
+                "  style_simplifier_min_word_ratio: 0.5",
+            ]
+        )
+
+    config_text = f"""
 paths:
   repo_root: "."
   config_dir: "config"
@@ -136,14 +157,13 @@ llm_defaults:
   temperature: 0.2
   top_p: 0.9
   max_tokens: 512
-prompts:
-  critic_prompt_path: "config/prompts/critic.md"
+{"\n".join(prompts_block)}
 indexing:
   output_path: "artifacts/manifests/passage_index.json"
   chapter_pattern: "^Chapter\\\\s+[IVXLC0-9]+$"
   paragraph_split_strategy: "blank_line"
   remove_empty_paragraphs: true
-  passage_id_format: "{chapter}.{paragraph}"
+  passage_id_format: "{{chapter}}.{{paragraph}}"
 extraction:
   output_path: "artifacts/evidence/metaphor_candidates.json"
   raw_debug_output_path: "artifacts/evidence/metaphor_candidates_raw.txt"
@@ -158,12 +178,11 @@ drafting:
   final_output_path: "artifacts/drafts/analysis_english_final.md"
   master_output_path: "artifacts/final/analysis_english_master.md"
   llm_transport: "ollama_native_chat"
-  display_citation_format: "[{citation_number}]"
+  display_citation_format: "[{{citation_number}}]"
   citation_appendix_heading: "Citations"
   citation_text_title: "Citation Text"
   citation_text_output_path: "artifacts/final/citation_text.md"
-editorial:
-  llm_transport: "ollama_native_chat"
+{"\n".join(editorial_block)}
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
@@ -367,3 +386,113 @@ def test_critique_and_edit_falls_back_to_verified_draft_when_editor_returns_empt
     assert '1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1' in final_text
     assert (repo_root / "artifacts/final/citation_text.md").exists()
     assert (repo_root / "artifacts/drafts/analysis_english_final.md").read_text(encoding="utf-8").strip() == final_text.strip()
+
+
+def test_critique_and_edit_applies_bounded_style_simplifier(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_editorial_repo(repo_root, enable_style_simplifier=True))
+    seen_stages: list[str] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        stage_name = kwargs.get("stage_name")
+        seen_stages.append(stage_name)
+        if stage_name == "critique_english":
+            raise LLMResponseValidationError("Full-document critic drifted", "")
+
+        paragraph = kwargs["user_prompt"].split("Paragraph:\n\n", maxsplit=1)[1].strip()
+        rewritten = (
+            paragraph
+            .replace(
+                "The essay opens by framing metaphor as a structural device.",
+                "Metaphor sets the terms of the essay and clarifies the structure that follows.",
+            )
+            .replace(
+                "turns longing into a visible object of desire",
+                "makes desire visible in concrete form",
+            )
+            .replace(
+                "gives decay a physical landscape",
+                "makes decay physical and easier to see",
+            )
+            .replace(
+                "define the essay's closing contrast",
+                "set the essay's final contrast more clearly",
+            )
+        )
+        validator = kwargs.get("response_validator")
+        if validator is not None:
+            validator(rewritten)
+        return rewritten
+
+    monkeypatch.setattr("agent_gatsby.critique_and_edit.invoke_text_completion", fake_invoke_text_completion)
+
+    final_text = critique_and_edit(config)
+
+    assert "Metaphor sets the terms of the essay and clarifies the structure that follows." in final_text
+    assert 'Gatsby\'s *"green light"* makes desire visible in concrete form [1].' in final_text
+    assert 'The *"valley of ashes"* makes decay physical and easier to see [2].' in final_text
+    assert "set the essay's final contrast more clearly" in final_text
+    assert seen_stages == [
+        "critique_english",
+        "style_simplify_english",
+        "style_simplify_english",
+        "style_simplify_english",
+        "style_simplify_english",
+    ]
+
+
+def test_style_simplifier_falls_back_on_token_drift(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_editorial_repo(repo_root, enable_style_simplifier=True))
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        stage_name = kwargs.get("stage_name")
+        if stage_name == "critique_english":
+            raise LLMResponseValidationError("Full-document critic drifted", "")
+
+        paragraph = kwargs["user_prompt"].split("Paragraph:\n\n", maxsplit=1)[1].strip()
+        rewritten = paragraph
+        if "physical landscape" in paragraph:
+            rewritten = paragraph.replace("AGCPROTECT0001TOKEN", "")
+
+        validator = kwargs.get("response_validator")
+        if validator is not None:
+            try:
+                validator(rewritten)
+            except ValueError as exc:
+                raise LLMResponseValidationError(str(exc), rewritten) from exc
+        return rewritten
+
+    monkeypatch.setattr("agent_gatsby.critique_and_edit.invoke_text_completion", fake_invoke_text_completion)
+
+    final_text = critique_and_edit(config)
+
+    assert 'The *"valley of ashes"* gives decay a physical landscape [2].' in final_text
+
+
+def test_style_simplifier_response_validator_rejects_new_quotes_and_brackets() -> None:
+    validator = build_style_simplifier_response_validator(
+        "Metaphor sets the terms of the essay.",
+        minimum_word_ratio=0.9,
+    )
+
+    with pytest.raises(ValueError, match="direct-quote content"):
+        validator('Metaphor calls it "pure" and sets the terms of the essay.')
+
+    with pytest.raises(ValueError, match="bracketed content"):
+        validator("Metaphor sets the terms of the essay [later].")
+
+    with pytest.raises(ValueError, match="over-compressed"):
+        validator("Metaphor sets the terms.")
+
+
+def test_style_simplifier_skips_metaphor_text_blocks() -> None:
+    assert is_style_rewrite_eligible_block(
+        '\n'.join(
+            [
+                "Metaphor text:",
+                '> "green light" [1.1]',
+                '> "valley of ashes" [2.1]',
+            ]
+        )
+    ) is False

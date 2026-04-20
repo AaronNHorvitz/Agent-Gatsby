@@ -9,13 +9,19 @@ from agent_gatsby.config import load_config
 from agent_gatsby.verify_citations import verify_english_draft
 
 
-def write_verification_repo(repo_root: Path, *, draft_text: str) -> Path:
+def write_verification_repo(
+    repo_root: Path,
+    *,
+    draft_text: str,
+    passage_index: dict | None = None,
+    evidence_records: list[dict] | None = None,
+) -> Path:
     (repo_root / "artifacts/manifests").mkdir(parents=True)
     (repo_root / "artifacts/evidence").mkdir(parents=True)
     (repo_root / "artifacts/drafts").mkdir(parents=True)
     (repo_root / "config").mkdir(parents=True)
 
-    passage_index = {
+    passage_index = passage_index or {
         "source_name": "gatsby_locked",
         "normalized_path": "data/normalized/gatsby_locked.txt",
         "chapter_count": 2,
@@ -40,7 +46,7 @@ def write_verification_repo(repo_root: Path, *, draft_text: str) -> Path:
             },
         ],
     }
-    evidence_records = [
+    evidence_records = evidence_records or [
         {
             "evidence_id": "E001",
             "metaphor": "green light",
@@ -193,6 +199,83 @@ Gatsby's "green light" turns longing into a visible object of desire [#1, Chapte
     assert report.status == "passed"
     registry = json.loads((repo_root / "artifacts/qa/citation_registry.json").read_text(encoding="utf-8"))
     assert registry[0]["passage_id"] == "1.1"
+
+
+def test_verify_english_draft_accepts_metaphor_text_blockquotes_with_nested_quotes(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    passage_index = {
+        "source_name": "gatsby_locked",
+        "normalized_path": "data/normalized/gatsby_locked.txt",
+        "chapter_count": 1,
+        "passage_count": 2,
+        "generated_at": "2026-04-18T00:00:00Z",
+        "passages": [
+            {
+                "passage_id": "8.9",
+                "chapter": 8,
+                "paragraph": 9,
+                "text": "It was this night that he told me the strange story of his youth with Dan Cody—told it to me because “Jay Gatsby” had broken up like glass against Tom’s hard malice, and the long secret extravaganza was played out.",
+                "char_start": 0,
+                "char_end": 214,
+            },
+            {
+                "passage_id": "9.19",
+                "chapter": 9,
+                "paragraph": 19,
+                "text": "Someone started to ask me questions, but I broke away and going upstairs looked hastily through the unlocked parts of his desk—he’d never told me definitely that his parents were dead. But there was nothing—only the picture of Dan Cody, a token of forgotten violence, staring down from the wall.",
+                "char_start": 216,
+                "char_end": 519,
+            },
+        ],
+    }
+    evidence_records = [
+        {
+            "evidence_id": "E001",
+            "metaphor": "broken like glass",
+            "quote": "“Jay Gatsby” had broken up like glass against Tom’s hard malice",
+            "passage_id": "8.9",
+            "chapter": 8,
+            "interpretation": "The persona shatters under direct social pressure.",
+            "supporting_theme_tags": [],
+            "status": "verified",
+            "source_candidate_id": "C001",
+            "source_type": "candidate",
+        },
+        {
+            "evidence_id": "E002",
+            "metaphor": "forgotten violence",
+            "quote": "a token of forgotten violence",
+            "passage_id": "9.19",
+            "chapter": 9,
+            "interpretation": "The glamour of Gatsby's story carries a hidden brutality.",
+            "supporting_theme_tags": [],
+            "status": "verified",
+            "source_candidate_id": "C002",
+            "source_type": "candidate",
+        },
+    ]
+    draft_text = """
+# Dissolution
+
+Metaphor text:
+> "“Jay Gatsby” had broken up like glass against Tom’s hard malice" [8.9]
+> "a token of forgotten violence" [9.19]
+""".strip() + "\n"
+    config = load_config(
+        write_verification_repo(
+            repo_root,
+            draft_text=draft_text,
+            passage_index=passage_index,
+            evidence_records=evidence_records,
+        )
+    )
+
+    report = verify_english_draft(config)
+
+    assert report.status == "passed"
+    assert not report.issues
+    assert report.quote_checks_total == 2
+    assert report.quote_checks_passed == 2
 
 
 def test_verify_english_draft_fails_for_fake_quotes_and_invalid_locators(tmp_path) -> None:

@@ -68,6 +68,7 @@ prompts:
   outline_prompt_path: "config/prompts/outline.md"
   draft_prompt_path: "config/prompts/draft.md"
   critic_prompt_path: "config/prompts/critic.md"
+  style_simplifier_prompt_path: "config/prompts/style_simplifier.md"
   translator_es_prompt_path: "config/prompts/translator_es.md"
   translator_es_cleanup_prompt_path: "config/prompts/translator_es_cleanup.md"
   translator_zh_prompt_path: "config/prompts/translator_zh.md"
@@ -119,8 +120,8 @@ drafting:
   master_output_path: "artifacts/final/analysis_english_master.md"
   llm_transport: "ollama_native_chat"
   timing_output_path: "artifacts/qa/english_draft_timing.json"
-  target_word_count_min: 5600
-  target_word_count_max: 6200
+  target_word_count_min: 6400
+  target_word_count_max: 7200
   estimated_page_target: 10
   words_per_page_estimate: 500
   write_section_by_section: true
@@ -156,6 +157,10 @@ editorial:
   improve_transitions: true
   improve_topic_sentences: true
   improve_conclusion: true
+  style_simplifier_enabled: true
+  style_simplifier_transport: "ollama_native_chat"
+  style_simplifier_min_words: 8
+  style_simplifier_min_word_ratio: 0.90
 
 translation:
   split_strategy: "heading_then_paragraph_group"
