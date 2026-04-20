@@ -474,7 +474,8 @@ def build_draft_user_prompt(
         "Cut decorative phrasing when it slows the argument.",
         "Because a later editorial pass will simplify the prose, keep this first-pass section full, scene-rich, and complete rather than prematurely compressed.",
         "Treat the surrounding context as paraphrase-only background unless the exact words also appear in a provided quote field.",
-        "If you use a direct quotation, keep it exact and preserve its locator exactly as given.",
+        "If you use a direct quotation, copy the provided quote field character-for-character and preserve its locator exactly as given.",
+        "Do not normalize capitalization, articles, punctuation, or spacing inside a quoted span.",
         "Never place quotation marks around any phrase unless it exactly matches one of the provided quote strings.",
         "Do not shorten, trim, or partially quote any provided quote string.",
     ]
@@ -631,6 +632,7 @@ def build_body_retry_user_prompt(
         "Build a compact argument chain: opening claim, exact quoted evidence with citation, explanation of how the scene context supports the claim, and a short closing or transition sentence.",
         "Treat the provided metaphors as one thematic cluster rather than as separate mini-sections.",
         "Address every quotation in the evidence summary at least once.",
+        "If you refer to a provided quote directly, copy it character-for-character rather than normalizing capitalization or punctuation.",
         'Do not overuse abstract openings such as "The text" or "This metaphor."',
         "Keep the prose direct, lightly academic, and faster-moving than a full literary close-reading seminar.",
         "Combine related images when that keeps the section concise and readable.",
@@ -1066,5 +1068,14 @@ def draft_english(
         },
     )
     LOGGER.info("Completed English report draft in %.3f seconds", total_elapsed_seconds)
+
+    if (
+        minimum_words > 0
+        and word_count < minimum_words
+        and bool(config.drafting.get("fail_below_target_word_count", False))
+    ):
+        raise ValueError(
+            f"English draft is below target word count: {word_count} < {minimum_words}"
+        )
 
     return draft_text

@@ -21,6 +21,7 @@ from agent_gatsby.verify_citations import (
     extract_citation_markers,
     extract_quoted_strings,
     load_english_draft,
+    repair_cited_quote_alignment,
     verify_english_draft,
 )
 
@@ -341,6 +342,18 @@ def critique_and_edit(
         revised_text = loaded_draft.strip()
 
     revised_text = apply_style_simplifier(config, revised_text)
+    revised_text, quote_repairs = repair_cited_quote_alignment(
+        revised_text,
+        evidence_records=load_evidence_records(config),
+        passage_index=loaded_index,
+        appendix_heading=str(config.drafting.get("citation_appendix_heading", "Citations")),
+        normalize_curly_quotes=bool(config.verification.get("normalize_curly_quotes_for_matching", True)),
+    )
+    if quote_repairs:
+        LOGGER.info(
+            "Applied %d canonical English quote alignment repairs after critique",
+            len(quote_repairs),
+        )
     verify_english_draft(
         config,
         draft_text=revised_text,

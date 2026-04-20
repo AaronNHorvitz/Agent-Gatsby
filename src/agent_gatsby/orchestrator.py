@@ -31,7 +31,7 @@ from agent_gatsby.plan_outline import plan_outline
 from agent_gatsby.translation_common import freeze_english_master
 from agent_gatsby.translate_mandarin import translate_mandarin
 from agent_gatsby.translate_spanish import translate_spanish
-from agent_gatsby.verify_citations import verify_english_draft
+from agent_gatsby.verify_citations import repair_cited_quote_alignment, verify_english_draft
 
 LOGGER = logging.getLogger(__name__)
 
@@ -129,6 +129,21 @@ def stage_verify_english(config: AppConfig, context: StageContext) -> None:
         stage_index(config, context)
     if "evidence_records" not in context:
         stage_build_evidence_ledger(config, context)
+
+    repaired_draft, quote_repairs = repair_cited_quote_alignment(
+        context["english_draft"],
+        evidence_records=context["evidence_records"],
+        passage_index=context["passage_index"],
+        appendix_heading=str(config.drafting.get("citation_appendix_heading", "Citations")),
+        normalize_curly_quotes=bool(config.verification.get("normalize_curly_quotes_for_matching", True)),
+    )
+    if quote_repairs:
+        config.draft_output_path.write_text(repaired_draft, encoding="utf-8")
+        context["english_draft"] = repaired_draft
+        LOGGER.info(
+            "Applied %d canonical English quote alignment repairs before verification",
+            len(quote_repairs),
+        )
 
     context["english_verification_report"] = verify_english_draft(
         config,

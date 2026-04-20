@@ -125,6 +125,7 @@ drafting:
   timing_output_path: "artifacts/qa/english_draft_timing.json"
   target_word_count_min: 7360
   target_word_count_max: 8280
+  fail_below_target_word_count: true
   estimated_page_target: 10
   words_per_page_estimate: 500
   write_section_by_section: true

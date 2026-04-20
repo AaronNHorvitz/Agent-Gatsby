@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 
 from agent_gatsby.config import load_config
-from agent_gatsby.verify_citations import verify_english_draft
+from agent_gatsby.index_text import load_passage_index
+from agent_gatsby.plan_outline import load_evidence_records
+from agent_gatsby.verify_citations import repair_cited_quote_alignment, verify_english_draft
 
 
 def write_verification_repo(
@@ -297,6 +299,95 @@ Metaphor text:
     assert not report.issues
     assert report.quote_checks_total == 2
     assert report.quote_checks_passed == 2
+
+
+def test_repair_cited_quote_alignment_restores_canonical_evidence_quote(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    draft_text = """
+# Metaphor and the Shape of Desire
+
+## Material Decay and Social Vision
+
+Fitzgerald describes the wasteland as "The Valley of Ashes" [2.1].
+
+He then expands the image into "This is the Valley of Ashes—a fantastic farm where ashes grow like wheat" [2.1].
+""".strip() + "\n"
+    passage_index = {
+        "source_name": "gatsby_locked",
+        "normalized_path": "data/normalized/gatsby_locked.txt",
+        "chapter_count": 2,
+        "passage_count": 2,
+        "generated_at": "2026-04-18T00:00:00Z",
+        "passages": [
+            {
+                "passage_id": "1.1",
+                "chapter": 1,
+                "paragraph": 1,
+                "text": "Gatsby reached toward the green light at the end of the dock.",
+                "char_start": 0,
+                "char_end": 58,
+            },
+            {
+                "passage_id": "2.1",
+                "chapter": 2,
+                "paragraph": 1,
+                "text": "This is a valley of ashes—a fantastic farm where ashes grow like wheat into ridges and hills.",
+                "char_start": 60,
+                "char_end": 148,
+            },
+        ],
+    }
+    evidence_records = [
+        {
+            "evidence_id": "E001",
+            "metaphor": "green light",
+            "quote": "green light",
+            "passage_id": "1.1",
+            "chapter": 1,
+            "interpretation": "A recurring image that concentrates Gatsby's longing into a distant object.",
+            "supporting_theme_tags": [],
+            "status": "verified",
+            "source_candidate_id": "C001",
+            "source_type": "candidate",
+        },
+        {
+            "evidence_id": "E002",
+            "metaphor": "valley of ashes",
+            "quote": "This is a valley of ashes—a fantastic farm where ashes grow like wheat",
+            "passage_id": "2.1",
+            "chapter": 2,
+            "interpretation": "A social metaphor for material and moral decay.",
+            "supporting_theme_tags": [],
+            "status": "verified",
+            "source_candidate_id": "C002",
+            "source_type": "candidate",
+        },
+    ]
+    config = load_config(
+        write_verification_repo(
+            repo_root,
+            draft_text=draft_text,
+            passage_index=passage_index,
+            evidence_records=evidence_records,
+        )
+    )
+
+    repaired_text, repairs = repair_cited_quote_alignment(
+        draft_text,
+        evidence_records=load_evidence_records(config),
+        passage_index=load_passage_index(config),
+        appendix_heading=str(config.drafting.get("citation_appendix_heading", "Citations")),
+        normalize_curly_quotes=bool(config.verification.get("normalize_curly_quotes_for_matching", True)),
+    )
+
+    assert repairs == [
+        {
+            "quote": "This is the Valley of Ashes—a fantastic farm where ashes grow like wheat",
+            "replacement": "This is a valley of ashes—a fantastic farm where ashes grow like wheat",
+        }
+    ]
+    assert '"This is a valley of ashes—a fantastic farm where ashes grow like wheat" [2.1]' in repaired_text
+    assert '"The Valley of Ashes" [2.1]' in repaired_text
 
 
 def test_verify_english_draft_fails_for_fake_quotes_and_invalid_locators(tmp_path) -> None:

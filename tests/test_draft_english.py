@@ -301,7 +301,7 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert "Together," not in draft_text
     assert "green light turns Gatsby's longing into a visible, distant target." in draft_text
     assert 'Metaphor text:\n> "green light" [1.2]' in draft_text
-    assert "valley of ashes turns social decay into a concrete landscape." in draft_text
+    assert 'This section argues that the "valley of ashes" turns moral damage into a physical landscape [2.2].' in draft_text
     assert 'Metaphor text:\n> "valley of ashes" [2.2]' in draft_text
     assert "[1.2]" in draft_text
     assert "[2.2]" in draft_text
@@ -379,6 +379,29 @@ def test_draft_english_applies_regression_fixes_before_writing(monkeypatch, tmp_
     assert '"Your place looks like the World’s Fair"' in draft_text
     assert "theragged edge" not in section_one
     assert "it actively populating the landscape" not in section_two
+
+
+def test_draft_english_can_fail_early_when_below_target_word_count(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    config.drafting["fail_below_target_word_count"] = True
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        if "Section heading: Desire at a Distance" in user_prompt:
+            return 'This section argues that the "green light" gives desire a visible form [1.2].'
+        if "Section heading: Material Decay and Social Vision" in user_prompt:
+            return 'This section argues that the "valley of ashes" gives decay a physical landscape [2.2].'
+        if "Section type: introduction" in user_prompt:
+            return "Fitzgerald uses metaphor to make longing and decay concrete."
+        return "The conclusion closes the argument quickly."
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+
+    with pytest.raises(ValueError, match="below target word count"):
+        draft_english(config)
+
+    assert (repo_root / "artifacts/drafts/analysis_english_draft.md").exists()
 
 
 def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp_path) -> None:

@@ -4,6 +4,7 @@ Deterministic English quote and citation verification for Agent Gatsby.
 
 from __future__ import annotations
 
+from difflib import SequenceMatcher
 import json
 import logging
 import re
@@ -85,6 +86,10 @@ def normalize_match_text(text: str, *, normalize_curly_quotes: bool) -> str:
     return collapse_spaces(normalized).strip()
 
 
+def normalize_loose_quote_match(text: str, *, normalize_curly_quotes: bool) -> str:
+    return normalize_match_text(text, normalize_curly_quotes=normalize_curly_quotes).lower()
+
+
 def extract_citation_markers(text: str) -> list[str]:
     return extract_citation_passage_ids(text)
 
@@ -135,6 +140,121 @@ def split_main_text_and_appendix(text: str, *, appendix_heading: str) -> tuple[s
         return text, None
     body_text, appendix_text = text.split(appendix_marker, maxsplit=1)
     return body_text.strip(), appendix_marker + appendix_text
+
+
+def find_canonical_quote_replacement(
+    quote: str,
+    *,
+    cited_passage_ids: list[str],
+    evidence_lookup: dict[str, list[EvidenceRecord]],
+    normalize_curly_quotes: bool,
+) -> str | None:
+    normalized_quote = normalize_match_text(quote, normalize_curly_quotes=normalize_curly_quotes)
+    loose_quote = normalize_loose_quote_match(quote, normalize_curly_quotes=normalize_curly_quotes)
+    candidates: list[str] = []
+
+    for passage_id in cited_passage_ids:
+        for record in evidence_lookup.get(passage_id, []):
+            candidate = collapse_spaces(record.quote).strip()
+            if not candidate:
+                continue
+            if normalize_match_text(candidate, normalize_curly_quotes=normalize_curly_quotes) == normalized_quote:
+                return None
+            if normalize_loose_quote_match(candidate, normalize_curly_quotes=normalize_curly_quotes) == loose_quote:
+                candidates.append(candidate)
+
+    unique_candidates = list(dict.fromkeys(candidates))
+    if len(unique_candidates) == 1:
+        return unique_candidates[0]
+
+    similarity_candidates: list[tuple[float, str]] = []
+    for passage_id in cited_passage_ids:
+        for record in evidence_lookup.get(passage_id, []):
+            candidate = collapse_spaces(record.quote).strip()
+            if not candidate:
+                continue
+            candidate_ratio = SequenceMatcher(
+                None,
+                loose_quote,
+                normalize_loose_quote_match(candidate, normalize_curly_quotes=normalize_curly_quotes),
+            ).ratio()
+            if candidate_ratio >= 0.9:
+                similarity_candidates.append((candidate_ratio, candidate))
+
+    unique_similarity_candidates: list[tuple[float, str]] = []
+    seen_candidates: set[str] = set()
+    for ratio, candidate in sorted(similarity_candidates, reverse=True):
+        if candidate in seen_candidates:
+            continue
+        seen_candidates.add(candidate)
+        unique_similarity_candidates.append((ratio, candidate))
+
+    if len(unique_similarity_candidates) == 1:
+        return unique_similarity_candidates[0][1]
+    if len(unique_similarity_candidates) > 1:
+        best_ratio, best_candidate = unique_similarity_candidates[0]
+        next_ratio = unique_similarity_candidates[1][0]
+        if best_ratio - next_ratio >= 0.05:
+            return best_candidate
+    return None
+
+
+def repair_cited_quote_alignment(
+    text: str,
+    *,
+    evidence_records: list[EvidenceRecord],
+    passage_index: PassageIndex,
+    appendix_heading: str,
+    normalize_curly_quotes: bool,
+) -> tuple[str, list[dict[str, str]]]:
+    main_text, appendix_text = split_main_text_and_appendix(text, appendix_heading=appendix_heading)
+    evidence_lookup = build_evidence_lookup(evidence_records)
+    passage_lookup = build_passage_lookup(passage_index)
+    repaired_blocks: list[str] = []
+    repairs: list[dict[str, str]] = []
+
+    for block in quote_validation_blocks(main_text):
+        cited_passage_ids = [marker for marker in extract_citation_markers(block) if marker in passage_lookup]
+        if not cited_passage_ids:
+            repaired_blocks.append(block)
+            continue
+
+        matches = list(DOUBLE_QUOTE_RE.finditer(block))
+        if not matches:
+            repaired_blocks.append(block)
+            continue
+
+        repaired_block = block
+        for match in reversed(matches):
+            quoted_text = collapse_spaces(match.group(1)).strip()
+            if not quoted_text:
+                continue
+            replacement = find_canonical_quote_replacement(
+                quoted_text,
+                cited_passage_ids=cited_passage_ids,
+                evidence_lookup=evidence_lookup,
+                normalize_curly_quotes=normalize_curly_quotes,
+            )
+            if not replacement or replacement == quoted_text:
+                continue
+            repaired_block = (
+                repaired_block[: match.start(1)]
+                + replacement
+                + repaired_block[match.end(1) :]
+            )
+            repairs.append(
+                {
+                    "quote": quoted_text,
+                    "replacement": replacement,
+                }
+            )
+
+        repaired_blocks.append(repaired_block)
+
+    repaired_main_text = "\n\n".join(repaired_blocks).strip()
+    if appendix_text is None:
+        return repaired_main_text + "\n", repairs
+    return repaired_main_text + "\n\n" + appendix_text.strip() + "\n", repairs
 
 
 def prose_paragraph_blocks(text: str) -> list[str]:
