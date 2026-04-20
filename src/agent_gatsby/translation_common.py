@@ -55,6 +55,10 @@ ASCII_COMMA_AFTER_CITATION_RE = re.compile(
 )
 ENGLISH_PROSE_PROPER_NOUN_PATTERNS = (
     (re.compile(r"\b(?:a|the)\s+valley of ashes\b"), "the Valley of Ashes"),
+    (
+        re.compile(r"\bJay Gatsby had broken up like glass against Tom’s hard malice \[27\]"),
+        "Gatsby is described as breaking like glass against Tom’s hard malice [27]",
+    ),
 )
 MANDARIN_NORMALIZATION_MAP = {
     "菲茨平": "菲茨杰拉德",

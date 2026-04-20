@@ -362,6 +362,21 @@ def test_freeze_english_master_quotes_additional_exact_quote_reuse_patterns(tmp_
     assert '"a man’s voice, very thin and far away" [30]' in frozen
 
 
+def test_freeze_english_master_paraphrases_glass_against_hard_malice_prose_reuse(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    config.final_draft_output_path.write_text(
+        "# Title\n\n"
+        "The novel concludes this arc by revealing that Jay Gatsby had broken up like glass against Tom’s hard malice [27].\n",
+        encoding="utf-8",
+    )
+
+    frozen = freeze_english_master(config)
+
+    assert "Jay Gatsby had broken up like glass against Tom’s hard malice [27]" not in frozen
+    assert "Gatsby is described as breaking like glass against Tom’s hard malice [27]" in frozen
+
+
 def test_freeze_english_master_fixes_denial_of_reality_and_quotes_ragged_edge_reference(tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_translation_repo(repo_root))
