@@ -9,7 +9,7 @@ from agent_gatsby.pdf_compiler import render_markdown_blocks, render_pdfs, resol
 
 
 def normalize_rendered_test_text(text: str) -> str:
-    return text.replace("\u202f", " ").replace("\u2060", "")
+    return text
 
 
 def write_pdf_repo(repo_root: Path) -> Path:
@@ -204,6 +204,7 @@ Second paragraph.
     assert 6.0 in pdf.ln_calls
     assert 0.0 in pdf.ln_calls
     assert pdf.add_page_calls == 1
+    assert all("\u2060" not in call and "\u202f" not in call for call in pdf.multi_cell_calls)
 
 
 def test_render_markdown_blocks_keeps_heading_followed_immediately_by_citation_entries(tmp_path) -> None:
@@ -226,6 +227,18 @@ Body paragraph.
     assert "Citas" in normalized_calls
     assert "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\"." in normalized_calls
     assert "2. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 2, cited passage beginning \"Beta\"." in normalized_calls
+
+
+def test_render_markdown_blocks_strips_hidden_zero_width_characters(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_pdf_repo(repo_root))
+    pdf = FakePDF()
+    text = "# Title\n\nGatsby reaches for the light [1]\u2060.\n"
+
+    render_markdown_blocks(pdf, config, text, language="english")
+
+    assert all("\u2060" not in call and "\ufeff" not in call for call in pdf.multi_cell_calls)
+    assert "Gatsby reaches for the light [1]." in pdf.multi_cell_calls
 
 
 def test_render_markdown_blocks_moves_section_to_new_page_when_space_is_too_tight(tmp_path) -> None:

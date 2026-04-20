@@ -21,10 +21,7 @@ NUMBERED_LIST_LINE_RE = re.compile(r"^\d+\.\s+")
 CITATION_SECTION_HEADINGS = {"Citations", "Citas", "引文"}
 SENTENCE_END_RE = re.compile(r'[.!?](?:["”’)\]]+)?|[。！？]')
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
-CITATION_SPACE_RE = re.compile(r"(?<=\S)\s+(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])")
-CITATION_PUNCTUATION_RE = re.compile(
-    r"(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])([,.;:!?，。；：！？、])"
-)
+ZERO_WIDTH_RE = re.compile(r"[\u200b-\u200d\u2060\ufeff]")
 
 FONT_HINTS = {
     "NotoSerif-Regular.ttf": "Noto Serif",
@@ -50,11 +47,8 @@ def strip_markdown_formatting(text: str) -> str:
 
 
 def normalize_render_text(text: str, *, language: str) -> str:
-    normalized = re.sub(r"[ \t]{2,}", " ", text.strip())
-    if language == "mandarin":
-        return normalized
-    normalized = CITATION_SPACE_RE.sub(lambda match: "\u202f" + match.group(1), normalized)
-    normalized = CITATION_PUNCTUATION_RE.sub(lambda match: match.group(1) + "\u2060" + match.group(2), normalized)
+    normalized = ZERO_WIDTH_RE.sub("", text.strip())
+    normalized = re.sub(r"[ \t]{2,}", " ", normalized)
     return normalized
 
 

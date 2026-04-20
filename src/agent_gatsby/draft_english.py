@@ -124,8 +124,7 @@ def build_overall_word_target_guidance(config: AppConfig) -> str | None:
 
 def build_selection_scope_note(section_count: int) -> str:
     return (
-        f"_This report organizes selected metaphors into {section_count} thematic sections to fit an approximately ten-page assignment requirement. "
-        "The analysis could be expanded with additional metaphor clusters if a longer study were desired._"
+        f"_This report organizes selected metaphor clusters into {section_count} thematic sections for a structured, citation-supported analysis._"
     )
 
 
@@ -502,7 +501,7 @@ def build_draft_user_prompt(
             "State a thesis about how Fitzgerald uses metaphor in the novel, based on the verified text discussed in the body sections."
         )
         instructions.append(
-            "Explain in plain English what the story is about, why these selected metaphors were chosen for an approximately ten-page analysis, "
+            "Explain in plain English what the story is about, why these selected metaphors matter, "
             "and how the body sections will prove the essay's argument."
         )
         instructions.append("Keep the introduction direct and readable rather than ornate.")
@@ -510,6 +509,7 @@ def build_draft_user_prompt(
             "End with a transition sentence that leads naturally into the first body section."
         )
         instructions.append("Prefer paraphrase over direct quotation in the introduction.")
+        instructions.append("Develop the introduction fully enough to land near the high end of the section target range.")
     if section_type == "conclusion":
         instructions.append("Write this conclusion after the body arguments already exist.")
         instructions.append("Keep the conclusion short, direct, and easy to read.")
@@ -542,6 +542,9 @@ def build_draft_user_prompt(
         )
         instructions.append(
             "Do not collapse the section into one dense block, but keep the argument moving briskly."
+        )
+        instructions.append(
+            "Aim for the high end of the section target range and keep building the argument until each paragraph has concrete evidence and explanation."
         )
         instructions.append(
             "Address every quotation shown in the section's `Metaphor text:` block at least once, but combine related images when that keeps the analysis direct and readable."
@@ -584,8 +587,9 @@ def build_intro_retry_user_prompt(
         'Do not open multiple sentences with "The text" or similar abstract filler.',
         "Keep the prose direct and lightly academic rather than ornamental.",
         "Explain F. Scott Fitzgerald's writing style in The Great Gatsby and how he uses metaphor, based on the body arguments already drafted.",
-        "Briefly explain what happens in the story, how the text uses metaphor as a literary device, and why this selected number of metaphors was chosen to fit an approximately ten-page assignment while still being expandable.",
+        "Briefly explain what happens in the story, how the text uses metaphor as a literary device, and how the selected metaphor clusters organize the analysis.",
         "End with a transition sentence leading into the first body section.",
+        "Land near the high end of the section target range instead of compressing the introduction.",
     ]
     overall_word_target = build_overall_word_target_guidance(config)
     if overall_word_target:

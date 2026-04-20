@@ -25,10 +25,14 @@ def test_build_pdf_audit_report_flags_english_known_regressions() -> None:
         language="english",
         pdf_path=Path("english.pdf"),
         extracted_text="The Valley of West was there, Gatsby tried to maintain a punctiliously manner, and his eyes look out over the solemn dumping ground [5].",
+        page_count=14,
+        min_page_count=10,
+        max_page_count=13,
     )
 
     assert report["status"] == "failed"
     assert report["known_bad_token_count"] >= 2
+    assert report["page_count_issue_count"] == 1
     assert report["unquoted_quote_reuse_count"] >= 1
 
 
@@ -54,6 +58,17 @@ def test_build_pdf_audit_report_flags_markdown_leak_and_unlocalized_bibliography
     assert report["status"] == "failed"
     assert report["markdown_heading_leak_count"] >= 1
     assert report["bibliography_localization_issue_count"] >= 1
+
+
+def test_build_pdf_audit_report_flags_zero_width_characters() -> None:
+    report = build_pdf_audit_report(
+        language="english",
+        pdf_path=Path("english.pdf"),
+        extracted_text="Gatsby reaches for the light [1]\u2060.",
+    )
+
+    assert report["status"] == "failed"
+    assert report["zero_width_issue_count"] >= 1
 
 
 def test_pdf_audit_reports_are_renderable_requires_all_reports_to_pass() -> None:

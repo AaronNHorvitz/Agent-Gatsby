@@ -5,7 +5,7 @@ from agent_gatsby.bilingual_qa import build_translation_qa_report, translation_r
 
 def test_build_translation_qa_report_passes_for_structurally_matching_translation() -> None:
     english = '# Title\n\n### Intro\n\n> *"hello"* [1]\n\nBody text.\n\n## Citations\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "hello".\n'
-    translated = '# Titulo\n\n### Introduccion\n\n> *“hola”* [1]\n\nTexto del cuerpo.\n\n## Citas\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "hello".\n'
+    translated = '# Titulo\n\n### Introduccion\n\n> *“hola”* [1]\n\nTexto del cuerpo.\n\n## Citas\n\n1. F. Scott Fitzgerald, *El gran Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "hola".\n'
 
     report = build_translation_qa_report(
         language="spanish",
@@ -41,7 +41,7 @@ def test_build_translation_qa_report_flags_changed_citations() -> None:
 
 def test_build_translation_qa_report_ignores_extra_body_quotes_when_protected_quotes_match() -> None:
     english = '# Title\n\n> *"hello"* [1]\n\nBody text.\n\n## Citations\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "hello".\n'
-    translated = '# Titulo\n\n> *“hola”* [1]\n\nEl ensayo llama esto “importante” en el cuerpo.\n\n## Citas\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "hello".\n'
+    translated = '# Titulo\n\n> *“hola”* [1]\n\nEl ensayo llama esto “importante” en el cuerpo.\n\n## Citas\n\n1. F. Scott Fitzgerald, *El gran Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "hola".\n'
 
     report = build_translation_qa_report(
         language="spanish",
@@ -69,7 +69,7 @@ def test_build_translation_qa_report_flags_untranslated_english_quotes_in_body()
 
 def test_build_translation_qa_report_does_not_flag_translated_spanish_multiword_quotes() -> None:
     english = '# Title\n\n> *"hello world there"* [1]\n\n## Citations\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 1, para. 1, cited passage beginning "hello world there".\n'
-    translated = '# Titulo\n\n> *"la conducta puede fundamentarse en la roca firme"* [1]\n\n## Citas\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "hello world there".\n'
+    translated = '# Titulo\n\n> *"la conducta puede fundamentarse en la roca firme"* [1]\n\n## Citas\n\n1. F. Scott Fitzgerald, *El gran Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "la conducta puede fundamentarse en la roca firme".\n'
 
     report = build_translation_qa_report(
         language="spanish",
@@ -171,3 +171,16 @@ def test_build_translation_qa_report_flags_unlocalized_bibliography_metadata_and
     assert report["markdown_heading_leak_count"] >= 1
     assert report["bibliography_localization_issue_count"] >= 1
     assert translation_report_is_renderable(report) is False
+
+
+def test_build_translation_qa_report_matches_quote_units_even_when_quote_glyphs_differ() -> None:
+    english = '# Title\n\n> *"*“Jay Gatsby”* had broken up like glass against Tom’s hard malice"* [27]\n\n## Citations\n\n1. F. Scott Fitzgerald, *The Great Gatsby*, ch. 8, para. 9, cited passage beginning "hello".\n'
+    translated = '# 标题\n\n> “杰伊·盖茨比在汤姆那冷酷的恶意面前如玻璃般碎裂” [27]\n\n## 引文\n\n1. F. Scott Fitzgerald, 《了不起的盖茨比》，第8章，第9段，引文开头：“你好”。\n'
+
+    report = build_translation_qa_report(
+        language="mandarin",
+        english_master=english,
+        translated_text=translated,
+    )
+
+    assert report["quote_marker_count_match"] is True

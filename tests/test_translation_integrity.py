@@ -7,8 +7,10 @@ from agent_gatsby.llm_client import LLMResponseValidationError
 from agent_gatsby.translate_mandarin import translate_mandarin
 from agent_gatsby.translate_spanish import translate_spanish
 from agent_gatsby.translation_common import (
+    extract_translated_quote_lookup,
     extract_visible_citation_markers,
     freeze_english_master,
+    localize_citation_metadata_line,
     split_markdown_into_chunks,
 )
 
@@ -24,7 +26,10 @@ def write_translation_repo(repo_root: Path) -> Path:
 
 ### Introduction
 
-Gatsby reaches for *"the green light"* [1].
+Metaphor text:
+> *"the green light"* [1]
+
+Gatsby reaches for the green light [1].
 
 ### Conclusion
 
@@ -133,9 +138,9 @@ def test_translate_spanish_freezes_master_and_preserves_citations(monkeypatch, t
 
     assert config.english_master_output_path.exists()
     assert config.spanish_translation_output_path.exists()
-    assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
+    assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]", "[1]"]
     assert "## Citas" in translated_text
-    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "In my younger and more vulnerable years my father gave me some advice...".' in translated_text
+    assert '1. F. Scott Fitzgerald, *El gran Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "the green light".' in translated_text
     assert any("Existing translated markdown chunk:" in prompt for prompt in prompts)
 
 
@@ -153,7 +158,7 @@ def test_translate_mandarin_writes_output(monkeypatch, tmp_path) -> None:
     assert config.mandarin_translation_output_path.exists()
     assert translated_text.startswith("# An Analysis")
     assert "## 引文" in translated_text
-    assert '1. F. Scott Fitzgerald, *The Great Gatsby*, 第1章，第1段，引文开头："In my younger and more vulnerable years my father gave me some advice...".' in translated_text
+    assert '1. F. Scott Fitzgerald，《了不起的盖茨比》，第1章，第1段，引文开头："the green light"。' in translated_text
 
 
 def test_translate_spanish_falls_back_to_fragment_stitching_when_placeholders_drift(monkeypatch, tmp_path) -> None:
@@ -173,7 +178,7 @@ def test_translate_spanish_falls_back_to_fragment_stitching_when_placeholders_dr
     translated_text = translate_spanish(config)
 
     assert config.spanish_translation_output_path.exists()
-    assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
+    assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]", "[1]"]
     assert any("English markdown chunk:" in call for call in calls)
     assert any("English markdown fragment:" in call for call in calls)
     assert any("Existing translated markdown chunk:" in call for call in calls)
@@ -196,7 +201,7 @@ def test_translate_spanish_uses_fragment_safe_cleanup_when_cleanup_chunk_placeho
     translated_text = translate_spanish(config)
 
     assert config.spanish_translation_output_path.exists()
-    assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
+    assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]", "[1]"]
     assert any("Existing translated markdown chunk:" in call for call in calls)
     assert any("Existing translated markdown fragment:" in call for call in calls)
 
@@ -236,3 +241,32 @@ def test_freeze_english_master_flags_unquoted_exact_quote_reuse(tmp_path) -> Non
         assert "terminology/regression validation" in str(exc)
     else:
         raise AssertionError("freeze_english_master should reject unquoted direct quote reuse")
+
+
+def test_extract_translated_quote_lookup_reads_inline_cited_quotes() -> None:
+    translated = '\n'.join(
+        [
+            'El narrador observa «el borde deshilachado del universo» [2] en el pasaje.',
+            'Más tarde, la imagen reaparece como «el gran corral húmedo de Long Island Sound» [3].',
+        ]
+    )
+
+    lookup = extract_translated_quote_lookup(translated)
+
+    assert lookup[2] == "«el borde deshilachado del universo»"
+    assert lookup[3] == "«el gran corral húmedo de Long Island Sound»"
+
+
+def test_localize_citation_metadata_line_uses_language_overrides_when_quote_lookup_is_missing() -> None:
+    spanish_line = '29. F. Scott Fitzgerald, *The Great Gatsby*, ch. 9, para. 35, cited passage beginning "His eyes leaked continuously with excitement".'
+    mandarin_line = '27. F. Scott Fitzgerald, *The Great Gatsby*, ch. 8, para. 9, cited passage beginning "It was this night that he told me the strange story of his youth...".'
+
+    localized_spanish = localize_citation_metadata_line(spanish_line, language_name="Spanish", translated_quote_lookup={})
+    localized_mandarin = localize_citation_metadata_line(
+        mandarin_line,
+        language_name="Simplified Chinese",
+        translated_quote_lookup={},
+    )
+
+    assert "Los ojos se le llenaban continuamente de emoción" in localized_spanish
+    assert "‘杰伊·盖茨比’像玻璃一样在汤姆冷酷的恶意面前碎裂了" in localized_mandarin

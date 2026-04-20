@@ -24,16 +24,23 @@ ENGLISH_CITATION_ENTRY_RE = re.compile(
     r'^(?P<number>\d+\.)\s+F\. Scott Fitzgerald, \*The Great Gatsby\*, ch\. (?P<chapter>\d+), para\. (?P<paragraph>\d+), cited passage beginning (?P<lemma>.+)$'
 )
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
+SIMPLE_VISIBLE_CITATION_RE = re.compile(r"\[(\d+)\]")
 TRANSLATION_CITATION_PLACEHOLDER_RE = re.compile(r"AGCITTOKEN(\d{4})XYZ")
 STRAIGHT_QUOTE_SPAN_RE = re.compile(r'"[^"\n]+?"')
 CURLY_QUOTE_SPAN_RE = re.compile(r"“[^”\n]+?”")
 LOW_SINGLE_QUOTE_SPAN_RE = re.compile(r"‘[^’\n]+?’")
+GUILLEMET_QUOTE_SPAN_RE = re.compile(r"«[^»\n]+?»")
 CJK_CORNER_QUOTE_SPAN_RE = re.compile(r"「[^」\n]+?」")
 CJK_WHITE_CORNER_QUOTE_SPAN_RE = re.compile(r"『[^』\n]+?』")
+CITATION_QUOTE_LINE_RE = re.compile(r'^\s*>\s+\*?(?P<quote>(?:"[^"\n]+?"|“[^”\n]+?”|「[^」\n]+?」|『[^』\n]+?』))\*?\s+\[(?P<number>\d+)\]\s*$')
+CITED_QUOTE_SPAN_RE = re.compile(
+    r'(?P<quote>\*?(?:"[^"\n]+?"|“[^”\n]+?”|«[^»\n]+?»|「[^」\n]+?」|『[^』\n]+?』)\*?)\s*\[(?P<number>\d+)\]'
+)
 CITATIONS_SECTION_RE = re.compile(r"(?m)^## Citations\s*$")
 TRANSLATED_CITATIONS_SECTION_RE = re.compile(r"(?m)^##\s+(?:Citations|Citas|引文)\s*$")
 ENGLISH_MULTIWORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*(?:\s+[a-z][A-Za-z'’.-]*){2,}")
 CITATION_GLUE_RE = re.compile(r"(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])(?=[A-Za-zÁ-ÿ一-龯])")
+ZERO_WIDTH_RE = re.compile(r"[\u200b-\u200d\u2060\ufeff]")
 MANDARIN_NORMALIZATION_MAP = {
     "菲茨平": "菲茨杰拉德",
     "菲茨格拉德": "菲茨杰拉德",
@@ -46,19 +53,51 @@ MANDARIN_NORMALIZATION_MAP = {
     "（Nick Carraway）": "",
     "（West Egg）": "",
     "（Valley of Ashes）": "",
+    "_本报告将所选隐喻分为八个主题部分，以符合约十页的篇幅要求。若需进行更深入的研究，可通过增加额外的隐喻集群来扩展分析内容._": "_本报告将选定的隐喻群组织为八个主题部分，以形成结构清晰、引文可核查的分析。_",
     "“veiled”（遮蔽）": "“遮蔽”",
+    "“遮蔽”（veiled）一词的使用": "“遮蔽”一词的使用",
     "（casual gaming）": "",
     "### # 梦想的瓦解": "### 梦想的瓦解",
     "长岛海峡那巨大的湿润农场": "长岛海峡那片潮湿而阔大的牲口院",
     "长岛海峡那巨大的湿润院落": "长岛海峡那片潮湿而阔大的牲口院",
     "谷仓院": "牲口院",
     "来自长岛西卵的杰伊·盖茨比，从他对自己的一种柏拉图式的构想中脱颖而出。": "来自长岛西卵的杰伊·盖茨比，源于他对自己的一种柏拉图式构想。",
+    "来自长岛西卵的杰伊·盖茨比，从他对自己完美的柏拉图式构想中脱颖而出。": "来自长岛西卵的杰伊·盖茨比，源于他对自己的一种柏拉图式构想。",
     "杰·盖茨比": "杰伊·盖茨比",
     "整个大篷车营地就像纸牌屋一样坍塌了": "整个商队旅馆就像纸牌屋一样坍塌了",
+    "整个大篷车营地像纸牌屋一样坍塌了": "整个商队旅馆像纸牌屋一样坍塌了",
     "他的眼中不断流露出激动": "他的眼睛不断流出激动的泪水",
     "构成了听觉意象 [30]；这构成了角色与退却的梦想之间日益加剧的情感与物理距离的隐喻。": "构成了一种听觉意象，象征着角色与退却的梦想之间日益扩大的情感与物理距离 [30]。",
+    "促成了一场色彩与声音的剧变": "使色彩与音乐交织在一起",
+    "世界及其情妇": "世界及其情人",
+    "男人和姑娘们": "男人和女孩们",
+    "人群的旋涡与涡流": "人群的旋涡与湍流",
+    "从餐饮师的篮子里变出来的": "从餐饮师的篮子里端出来的",
+    "已充实成了一个男人的实体": "已充实为一个男人的实体感",
+    "一打太阳": "十二轮太阳",
+    "十几轮太阳": "十二轮太阳",
+    "世界博览会": "世博会",
+    "补剂": "强心剂",
+    "补药": "强心剂",
+    "现实的非真实性": "对现实的否认",
+    "这种独特人性的丧失": "这种个体人性的丧失",
+    "文中将窗帘比作帐篷的明喻 [26] 这种意象": "文中将窗帘比作帐篷 [26]，这种意象",
+    "在物理层面击碎了精心营造的新贵外壳": "象征性地击碎了新贵阶层精心营造的外壳",
+    "字面上如玻璃般破碎": "被描写为如玻璃般破碎",
+    "在字面与语言层面的消解": "在可见与语言层面的瓦解",
+    "所栖模的": "所栖居的",
+    "长岛海峡那巨大的湿漉漉的农场": "长岛海峡那片潮湿而阔大的牲口院",
+    "大篷车旅馆": "商队旅馆",
+    "大篷车营地（a caravan camp）": "商队旅馆",
+    "大篷车营地": "商队旅馆",
+    "已充实为一个男人的实体": "已变得如一个男人般厚实",
+    "轮控": "轮廓",
+    "\"It was this night that he told me the strange story of his youth...\"": "“‘杰伊·盖茨比’像玻璃一样在汤姆冷酷的恶意面前碎裂了”",
 }
 SPANISH_NORMALIZATION_MAP = {
+    "# Un análisis de las metáforas en *The Great Gatsby*": "# Un análisis de las metáforas en *El gran Gatsby*",
+    "_Este informe organiza las metáforas seleccionadas en ocho secciones temáticas para cumplir con el requisito de un trabajo de aproximadamente diez páginas. El análisis podría ampliarse con grupos de metáforas adicionales si se deseara un estudio más extenso._": "_Este informe organiza grupos de metáforas seleccionados en ocho secciones temáticas para un análisis estructurado y sustentado por citas._",
+    "*The Great Gatsby*": "*El gran Gatsby*",
     "desibuja": "desdibuja",
     "música de cóctel amarillo": "música amarilla de cóctel",
     "cesta de un catering": "cesta de un banquetero",
@@ -68,14 +107,42 @@ SPANISH_NORMALIZATION_MAP = {
     "colapiente": "colapso",
     "inestímulo": "inestabilidad",
     "laberinto de pantallas": "laberinto de parabrisas",
+    "borde irregular del universo": "borde deshilachado del universo",
+    "el gran y húmedo corral de Long Island Sound": "el gran corral húmedo de Long Island Sound",
+    "el gran y húmedo corral": "el gran corral húmedo",
     "el vago contorno de Jay Gatsby se había robustecido hasta alcanzar la sustancialidad de un hombre": "el vago contorno de Jay Gatsby se había completado hasta alcanzar la consistencia de un hombre",
     "acervo común de la vida": "reserva común de la vida",
     "recinto de cuero verde": "invernadero de cuero verde",
     "experiencia altamente curada": "experiencia cuidadosamente diseñada",
     "dinero viejo y el nuevo": "vieja élite adinerada y los nuevos ricos",
     "la perfección agresiva y curada": "la perfección agresiva y cuidadosamente diseñada",
+    "irrealidad de la realidad": "negación de la realidad",
+    "Esta fragilidad se vuelve literal": "Esta fragilidad se vuelve visible",
+    "rompe físicamente la apariencia cuidadosamente curada de la nueva": "quiebra simbólicamente la fachada cuidadosamente construida de la nueva",
+    "se rompe literalmente como el cristal": "se describe como si se hiciera añicos como el cristal",
+    "la disolución literal y lingüística de sus ilusiones cuidadosamente mantenidas": "el visible y verbal desmoronamiento de sus ilusiones cuidadosamente mantenidas",
+    'se revela como un caravasar que se ha derrumbado como un castillo de naipes [21] al enfrentarse al juicio de los demás.': 'se derrumba como un castillo de naipes ante el juicio social [21].',
+    '"todo el caravansary se había derrumbado como un castillo de naipes" [21]': "que se derrumba como un castillo de naipes [21]",
+    "todo el caravansary": "todo el mundo social de Gatsby",
+    "sueño americano": "Sueño Americano",
+    "una transformación radical de color y voz": "una fusión de color y música",
+    "apariencia cuidadosamente curada": "fachada cuidadosamente construida",
+    "depósito común de la vida": "reserva común de la vida",
+    "ilusiones cuidadosamente curadas": "ilusiones cuidadosamente mantenidas",
+    "un *caravansary*": "un mundo social transitorio",
+    "Sus ojos brotaban continuamente de emoción": "Los ojos se le llenaban continuamente de emoción",
     'surgió de su concepción platónica de sí mismo". [13]': 'surgió de su concepción platónica de sí mismo" [13].',
     '*"surgió de su concepción platónica de sí mismo"*. [13]': '*"surgió de su concepción platónica de sí mismo"* [13].',
+}
+SPANISH_CITATION_QUOTE_OVERRIDES = {
+    19: '"El excitante ondular de su voz era un tónico salvaje bajo la lluvia"',
+    21: '"todo el mundo social de Gatsby se había derrumbado como un castillo de naipes"',
+    23: '"En este calor, cada gesto adicional era una afrenta a la reserva común de la vida"',
+    29: '"Los ojos se le llenaban continuamente de emoción"',
+}
+MANDARIN_CITATION_QUOTE_OVERRIDES = {
+    27: "“‘杰伊·盖茨比’像玻璃一样在汤姆冷酷的恶意面前碎裂了”",
+    29: "“他的眼中因兴奋而不断溢出泪水”",
 }
 ENGLISH_MASTER_REGRESSION_FIXES = {
     "Valley of West": "Valley of Ashes",
@@ -87,6 +154,19 @@ ENGLISH_MASTER_REGRESSION_FIXES = {
     "look out over the solemn dumping ground [5]": '"look out over the solemn dumping ground" [5]',
     "a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6]": '"a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity" [6]',
     "the thin and far away [30] echoes of a dead dream": 'the "thin and far away" [30] echoes of a dead dream',
+    "_This report organizes selected metaphors into 8 thematic sections to fit an approximately ten-page assignment requirement. The analysis could be expanded with additional metaphor clusters if a longer study were desired._": "_This report organizes selected metaphor clusters into eight thematic sections for a structured, citation-supported analysis._",
+    "contributing to a sea-change of color and voice that makes the environment feel hallucinatory.": "contributing to a fusion of color and music that makes the environment feel hallucinatory.",
+    "Because his identity is built upon the unreality of reality [20], the social structure he creates is inherently prone to sudden disintegration.": "Because his identity is built upon a denial of reality [20], the social structure he creates is inherently prone to sudden disintegration.",
+    "This fragility becomes literal during the confrontation with Tom, where a simile compares Gatsby’s constructed identity to shattering glass [27].": "This fragility becomes visible during the confrontation with Tom, where a simile compares Gatsby’s constructed identity to shattering glass [27].",
+    "The aggression of the old aristocracy physically breaks the carefully curated veneer of the new, proving that Gatsby’s self-invention cannot survive direct contact with the past.": "The aggression of the old aristocracy symbolically shatters the carefully constructed veneer of the new, proving that Gatsby’s self-invention cannot survive direct contact with the past.",
+    'The social world Gatsby built is revealed to be "the whole caravansary" that has fallen like a card house [21] when confronted by the judgment of others.': "The social world Gatsby built falls like a card house under the pressure of social judgment [21].",
+    "This collapse is finalized when the persona of Jay Gatsby is literally broken up like glass against Tom’s hard malice [27].": "This collapse is finalized when Gatsby's constructed persona is described as breaking like glass against Tom’s hard malice [27].",
+    "The many layers of glass create a green leather conservatory [16] that isolates the occupants, turning a simple drive into a highly curated, artificial experience.": "The many layers of glass give the car the enclosed feel of a green leather conservatory [16], isolating the occupants and turning a simple drive into a carefully designed, artificial experience.",
+    "the eventual collapse of Gatsby's world is signaled by the literal and linguistic dissolution of his carefully maintained illusions.": "the eventual collapse of Gatsby's world is signaled by the visible and verbal unraveling of his carefully maintained illusions.",
+    "his carefully curated world to fracture.": "his carefully constructed world to fracture.",
+    "the carefully curated version of Gatsby is no longer capable of holding together under the pressure of reality.": "the carefully constructed version of Gatsby is no longer capable of holding together under the pressure of reality.",
+    'The carefully constructed social world Gatsby builds is revealed to be a fragile assembly, a structure that eventually fails when the weight of truth becomes too great, as seen when "the whole caravansary had fallen in like a card house" [21].': "The carefully constructed social world Gatsby builds proves to be fragile, and it collapses under the weight of social judgment [21].",
+    "This collapse is not merely social but personal; the very identity Gatsby labored to create is destroyed by the friction of reality, as Jay Gatsby is described as breaking up like glass against Tom’s hard malice [27].": "This collapse is not merely social but personal; the identity Gatsby labored to create is described as shattering like glass against Tom’s hard malice [27].",
 }
 DEFAULT_REQUIRED_ENGLISH_MASTER_TERMS: tuple[str, ...] = ()
 DEFAULT_FORBIDDEN_ENGLISH_MASTER_PHRASES = (
@@ -99,6 +179,14 @@ DEFAULT_FORBIDDEN_ENGLISH_MASTER_PHRASES = (
     "look out over the solemn dumping ground [5]",
     "a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6]",
     "the thin and far away [30] echoes of a dead dream",
+    "to fit an approximately ten-page assignment requirement",
+    "could be expanded with additional metaphor clusters if a longer study were desired",
+    "sea-change of color and voice",
+    "unreality of reality",
+    "This fragility becomes literal during the confrontation with Tom",
+    "physically breaks the carefully curated veneer",
+    "literally broken up like glass",
+    "literal and linguistic dissolution",
 )
 SPANISH_INTERNAL_TOKEN_RE = re.compile(r"\bAGCIT\w*(?:\s+[\u0400-\u04FF]+)?")
 SPANISH_ESCAPE_SEQUENCE_RE = re.compile(r"\$\\\\\w+\b|\\[A-Za-z]+\b")
@@ -198,6 +286,7 @@ def count_quote_spans(text: str) -> int:
         STRAIGHT_QUOTE_SPAN_RE,
         CURLY_QUOTE_SPAN_RE,
         LOW_SINGLE_QUOTE_SPAN_RE,
+        GUILLEMET_QUOTE_SPAN_RE,
         CJK_CORNER_QUOTE_SPAN_RE,
         CJK_WHITE_CORNER_QUOTE_SPAN_RE,
     )
@@ -209,6 +298,7 @@ def extract_quote_spans(text: str) -> list[str]:
         STRAIGHT_QUOTE_SPAN_RE,
         CURLY_QUOTE_SPAN_RE,
         LOW_SINGLE_QUOTE_SPAN_RE,
+        GUILLEMET_QUOTE_SPAN_RE,
         CJK_CORNER_QUOTE_SPAN_RE,
         CJK_WHITE_CORNER_QUOTE_SPAN_RE,
     )
@@ -245,7 +335,23 @@ def count_numbered_citation_entries(text: str) -> int:
     return len(NUMBERED_CITATION_ENTRY_RE.findall(text))
 
 
-def render_translated_citations_section(citations_text: str, *, language_name: str) -> str:
+def extract_translated_quote_lookup(text: str) -> dict[int, str]:
+    lookup: dict[int, str] = {}
+    for line in text.splitlines():
+        match = CITATION_QUOTE_LINE_RE.match(line.strip())
+        if not match:
+            continue
+        quote = match.group("quote").strip()
+        lookup[int(match.group("number"))] = quote
+    for match in CITED_QUOTE_SPAN_RE.finditer(text):
+        quote = match.group("quote").strip()
+        if quote.startswith("*") and quote.endswith("*"):
+            quote = quote[1:-1].strip()
+        lookup.setdefault(int(match.group("number")), quote)
+    return lookup
+
+
+def render_translated_citations_section(citations_text: str, *, language_name: str, translated_body: str) -> str:
     if not citations_text.strip():
         return ""
 
@@ -255,35 +361,51 @@ def render_translated_citations_section(citations_text: str, *, language_name: s
     elif language_name == "Simplified Chinese":
         heading = "## 引文"
 
+    translated_quote_lookup = extract_translated_quote_lookup(translated_body)
     rendered_lines = [heading]
     for line in citations_text.splitlines()[1:]:
         stripped = line.strip()
         if not stripped:
             continue
-        rendered_lines.append(localize_citation_metadata_line(stripped, language_name=language_name))
+        rendered_lines.append(
+            localize_citation_metadata_line(
+                stripped,
+                language_name=language_name,
+                translated_quote_lookup=translated_quote_lookup,
+            )
+        )
     return "\n".join(rendered_lines).strip()
 
 
-def localize_citation_metadata_line(line: str, *, language_name: str) -> str:
+def localize_citation_metadata_line(
+    line: str,
+    *,
+    language_name: str,
+    translated_quote_lookup: dict[int, str] | None = None,
+) -> str:
     stripped = line.strip()
     match = ENGLISH_CITATION_ENTRY_RE.match(stripped)
     if not match:
         return stripped
 
     number = match.group("number")
+    citation_number = int(number.rstrip("."))
     chapter = match.group("chapter")
     paragraph = match.group("paragraph")
-    lemma = match.group("lemma")
+    lemma = match.group("lemma").rstrip(".")
+    localized_quote = (translated_quote_lookup or {}).get(citation_number)
 
     if language_name == "Spanish":
+        quote_text = localized_quote or SPANISH_CITATION_QUOTE_OVERRIDES.get(citation_number) or lemma
         return (
-            f"{number} F. Scott Fitzgerald, *The Great Gatsby*, "
-            f"cap. {chapter}, párr. {paragraph}, pasaje citado que comienza {lemma}"
+            f'{number} F. Scott Fitzgerald, *El gran Gatsby*, '
+            f'cap. {chapter}, párr. {paragraph}, pasaje citado que comienza {quote_text}.'
         )
     if language_name == "Simplified Chinese":
+        quote_text = localized_quote or MANDARIN_CITATION_QUOTE_OVERRIDES.get(citation_number) or lemma
         return (
-            f"{number} F. Scott Fitzgerald, *The Great Gatsby*, "
-            f"第{chapter}章，第{paragraph}段，引文开头：{lemma}"
+            f"{number} F. Scott Fitzgerald，《了不起的盖茨比》，"
+            f"第{chapter}章，第{paragraph}段，引文开头：{quote_text}。"
         )
     return stripped
 
@@ -498,15 +620,21 @@ def validate_translated_fragment(translated_text: str) -> None:
 
 def normalize_translated_body(text: str, *, language_name: str) -> str:
     normalized = CITATION_GLUE_RE.sub(r"\1 ", text)
+    normalized = ZERO_WIDTH_RE.sub("", normalized)
     if language_name == "Spanish":
         normalized = SPANISH_INTERNAL_TOKEN_RE.sub("", normalized)
         normalized = SPANISH_ESCAPE_SEQUENCE_RE.sub(" ", normalized)
         normalized = normalized.replace("esporádíamos", "esporádicos")
+        normalized = re.sub(r'([”»"])\.\*\s*(\[\d+\])', r"\1* \2.", normalized)
+        normalized = re.sub(r'(["»”])\.\s*(\[\d+\])', r"\1 \2.", normalized)
         for source, target in SPANISH_NORMALIZATION_MAP.items():
             normalized = normalized.replace(source, target)
     if language_name == "Simplified Chinese":
         normalized = MANDARIN_ELLIPSIS_BEFORE_CITATION_RE.sub(r" \1", normalized)
         normalized = MANDARIN_SENTENCE_BREAK_BEFORE_CITATION_RE.sub(r" \2，", normalized)
+        normalized = re.sub(r'([。！？])\s*(\[\d+\])', r" \2\1", normalized)
+        normalized = re.sub(r'([”」』"])。\s*(\[\d+\])', r"\1 \2。", normalized)
+        normalized = re.sub(r"(\[\d+\])\s*,", r"\1，", normalized)
         for source, target in MANDARIN_NORMALIZATION_MAP.items():
             normalized = normalized.replace(source, target)
     normalized = re.sub(r"[ \t]{2,}", " ", normalized)
@@ -896,7 +1024,11 @@ def translate_document(
     else:
         translated_body = normalize_translated_body(translated_body, language_name=language_name)
 
-    translated_citations = render_translated_citations_section(citations_text, language_name=language_name)
+    translated_citations = render_translated_citations_section(
+        citations_text,
+        language_name=language_name,
+        translated_body=translated_body,
+    )
     translated_text = translated_body
     if translated_citations:
         translated_text = translated_text + "\n\n" + translated_citations

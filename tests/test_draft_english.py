@@ -7,6 +7,7 @@ import pytest
 
 from agent_gatsby.config import load_config
 from agent_gatsby.draft_english import (
+    build_selection_scope_note,
     build_metaphor_focus_lead,
     build_section_response_validator,
     draft_english,
@@ -293,7 +294,7 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert (repo_root / "artifacts/drafts/analysis_english_draft.md").exists()
     assert (repo_root / "artifacts/drafts/sections/S1.md").exists()
     assert (repo_root / "artifacts/drafts/sections/S2.md").exists()
-    assert "_This report organizes selected metaphors into 2 thematic sections" in draft_text
+    assert "_This report organizes selected metaphor clusters into 2 thematic sections" in draft_text
     assert "## Introduction" in draft_text
     assert "## Desire at a Distance" in draft_text
     assert "## Material Decay and Social Vision" in draft_text
@@ -324,6 +325,14 @@ def test_draft_english_writes_section_files_and_combined_markdown(monkeypatch, t
     assert timing_report["section_count"] == 2
     assert len(timing_report["sections"]) == 4
     assert timing_report["total_elapsed_seconds"] >= 0
+
+
+def test_build_selection_scope_note_drops_assignment_boilerplate() -> None:
+    note = build_selection_scope_note(8)
+
+    assert "approximately ten-page assignment requirement" not in note
+    assert "could be expanded with additional metaphor clusters" not in note
+    assert "structured, citation-supported analysis" in note
 
 
 def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp_path) -> None:

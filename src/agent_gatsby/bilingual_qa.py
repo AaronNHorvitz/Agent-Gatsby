@@ -12,7 +12,6 @@ from pathlib import Path
 from agent_gatsby.config import AppConfig
 from agent_gatsby.data_ingest import utc_now_iso
 from agent_gatsby.translation_common import (
-    count_protected_quote_spans,
     count_numbered_citation_entries,
     extract_quote_spans,
     extract_heading_levels,
@@ -26,6 +25,7 @@ LOGGER = logging.getLogger(__name__)
 
 ENGLISH_MULTIWORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*(?:\s+[a-z][A-Za-z'’.-]*){2,}")
 LATIN_WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*")
+NUMBERED_LIST_LINE_RE = re.compile(r"^\d+\.\s+")
 CITATION_GLUE_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\](?=[A-Za-zÁ-ÿ一-龯])")
 MIXED_CJK_LATIN_RE = re.compile(r"(?:[A-Za-z][A-Za-z'’.-]*[\u4e00-\u9fff]|[\u4e00-\u9fff][A-Za-z][A-Za-z'’.-]*)")
 VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
@@ -33,12 +33,15 @@ INTERNAL_TOKEN_RE = re.compile(r"AGCIT\w*")
 ESCAPE_SEQUENCE_RE = re.compile(r"\$\\\\\w+\b|\\[A-Za-z]+\b")
 CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]+")
 HAN_RE = re.compile(r"[\u4e00-\u9fff]+")
+ZERO_WIDTH_RE = re.compile(r"[\u200b-\u200d\u2060\ufeff]")
 REPEATED_ELLIPSIS_BEFORE_CITATION_RE = re.compile(
     r"[.…]{2,}\s*(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])"
 )
+MANDARIN_TERMINAL_PUNCTUATION_BEFORE_CITATION_RE = re.compile(r"[。！？]\s*\[(?:\d+|\d+\.\d+)\]")
+MANDARIN_ASCII_COMMA_AFTER_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+)\],")
 FORBIDDEN_MANDARIN_VARIANTS = ("菲茨平", "菲茨格拉德")
 LEAKED_MARKDOWN_HEADING_RE = re.compile(r"(?m)^#{1,6}\s+#\s+.+$")
-UNLOCALIZED_BIBLIOGRAPHY_RE = re.compile(r"cited passage beginning")
+UNLOCALIZED_BIBLIOGRAPHY_RE = re.compile(r"cited passage beginning|The Great Gatsby")
 KNOWN_BAD_SPANISH_TOKENS = (
     "esporádíamos",
     "masimvo",
@@ -55,6 +58,11 @@ KNOWN_BAD_SPANISH_TOKENS = (
     "experiencia altamente curada",
     "dinero viejo y el nuevo",
     "la perfección agresiva y curada",
+    "irrealidad de la realidad",
+    "rompe físicamente",
+    "se rompe literalmente como el cristal",
+    "borde irregular del universo",
+    "el gran y húmedo corral de Long Island Sound",
     'surgió de su concepción platónica de sí mismo". [13]',
 )
 KNOWN_BAD_MANDARIN_TOKENS: tuple[str, ...] = (
@@ -75,6 +83,17 @@ KNOWN_BAD_MANDARIN_TOKENS: tuple[str, ...] = (
     "整个大篷车营地就像纸牌屋一样坍塌了",
     "他的眼中不断流露出激动",
     "构成了听觉意象 [30]；这构成了",
+    "现实的非真实性",
+    "字面上",
+    "物理层面",
+    "情妇",
+    "补剂",
+    "男人和姑娘们",
+    "人群的旋涡与涡流",
+    "从餐饮师的篮子里变出来的",
+    "已充实成了一个男人的实体",
+    "一打太阳",
+    "世界博览会",
 )
 ENGLISH_HINT_WORDS = {
     "a",
@@ -161,6 +180,17 @@ def find_untranslated_body_quotes(text: str) -> list[str]:
     return [span for span in extract_quote_spans(text) if span_looks_untranslated_english(span)]
 
 
+def count_protected_quote_units(text: str) -> int:
+    total = 0
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if not (stripped.startswith(">") or NUMBERED_LIST_LINE_RE.match(stripped)):
+            continue
+        if extract_quote_spans(line):
+            total += 1
+    return total
+
+
 def find_citation_glue_issues(text: str) -> list[str]:
     return [match.group(0) for match in CITATION_GLUE_RE.finditer(text)]
 
@@ -179,6 +209,10 @@ def find_internal_token_issues(text: str) -> list[str]:
 
 def find_escape_sequence_issues(text: str) -> list[str]:
     return [match.group(0) for match in ESCAPE_SEQUENCE_RE.finditer(text)]
+
+
+def find_zero_width_issues(text: str) -> list[str]:
+    return [match.group(0) for match in ZERO_WIDTH_RE.finditer(text)]
 
 
 def find_spanish_foreign_script_issues(text: str) -> list[str]:
@@ -224,8 +258,13 @@ def find_citation_neighborhood_issues(
             has_issue = True
         if normalized_language == "spanish" and find_spanish_foreign_script_issues(window):
             has_issue = True
-        if normalized_language == "mandarin" and find_repeated_ellipsis_before_citations(window):
-            has_issue = True
+        if normalized_language == "mandarin":
+            if find_repeated_ellipsis_before_citations(window):
+                has_issue = True
+            if MANDARIN_TERMINAL_PUNCTUATION_BEFORE_CITATION_RE.search(window):
+                has_issue = True
+            if MANDARIN_ASCII_COMMA_AFTER_CITATION_RE.search(window):
+                has_issue = True
         if known_bad_tokens and find_known_bad_tokens(window, known_bad_tokens):
             has_issue = True
         if has_issue:
@@ -245,8 +284,8 @@ def build_translation_qa_report(
     translated_headings = extract_heading_levels(translated_text)
     english_citations = extract_visible_citation_markers(english_master)
     translated_citations = extract_visible_citation_markers(translated_text)
-    english_quote_spans = count_protected_quote_spans(english_master)
-    translated_quote_spans = count_protected_quote_spans(translated_text)
+    english_quote_spans = count_protected_quote_units(english_master)
+    translated_quote_spans = count_protected_quote_units(translated_text)
     untranslated_body_quotes = find_untranslated_body_quotes(translated_body)
     citation_glue_issues = find_citation_glue_issues(translated_body)
     citations_section_present = bool(translated_citations_section.strip())
@@ -256,6 +295,7 @@ def build_translation_qa_report(
     citations_heading_without_entries = citations_section_present and translated_citation_entry_count == 0
     internal_token_issues = find_internal_token_issues(translated_text)
     escape_sequence_issues = find_escape_sequence_issues(translated_text)
+    zero_width_issues = find_zero_width_issues(translated_text)
     foreign_script_issues: list[str] = []
     repeated_ellipsis_issues: list[str] = []
     known_bad_tokens: list[str] = []
@@ -311,6 +351,8 @@ def build_translation_qa_report(
         major_issues.append("Translated output leaked internal placeholder or helper tokens.")
     if escape_sequence_issues:
         major_issues.append("Translated output contains escape-sequence artifacts.")
+    if zero_width_issues:
+        major_issues.append("Translated output contains hidden zero-width characters.")
     if foreign_script_issues:
         major_issues.append("Spanish output contains non-Latin script intrusions.")
     if repeated_ellipsis_issues:
@@ -345,6 +387,7 @@ def build_translation_qa_report(
         "citation_glue_issue_count": len(citation_glue_issues),
         "internal_token_issue_count": len(internal_token_issues),
         "escape_sequence_issue_count": len(escape_sequence_issues),
+        "zero_width_issue_count": len(zero_width_issues),
         "foreign_script_issue_count": len(foreign_script_issues),
         "repeated_ellipsis_issue_count": len(repeated_ellipsis_issues),
         "known_bad_token_count": len(known_bad_tokens),
@@ -424,6 +467,7 @@ def translation_report_is_renderable(report: dict[str, object]) -> bool:
         "citation_glue_issue_count",
         "internal_token_issue_count",
         "escape_sequence_issue_count",
+        "zero_width_issue_count",
         "foreign_script_issue_count",
         "repeated_ellipsis_issue_count",
         "known_bad_token_count",

@@ -120,8 +120,8 @@ drafting:
   master_output_path: "artifacts/final/analysis_english_master.md"
   llm_transport: "ollama_native_chat"
   timing_output_path: "artifacts/qa/english_draft_timing.json"
-  target_word_count_min: 7040
-  target_word_count_max: 7920
+  target_word_count_min: 7360
+  target_word_count_max: 8280
   estimated_page_target: 10
   words_per_page_estimate: 500
   write_section_by_section: true
@@ -147,6 +147,15 @@ verification:
   english_master_forbidden_phrases:
     - "Valley of West"
     - "punctiliously manner"
+    - "theragged edge"
+    - "it actively populating the landscape"
+    - "to fit an approximately ten-page assignment requirement"
+    - "could be expanded with additional metaphor clusters if a longer study were desired"
+    - "sea-change of color and voice"
+    - "unreality of reality"
+    - "This fragility becomes literal during the confrontation with Tom"
+    - "physically breaks the carefully curated veneer"
+    - "literally broken up like glass"
   fail_on_quote_mismatch: true
   fail_on_invalid_citation: true
   invalid_quote_rate_threshold: 0.0
@@ -163,7 +172,7 @@ editorial:
   improve_transitions: true
   improve_topic_sentences: true
   improve_conclusion: true
-  style_simplifier_enabled: true
+  style_simplifier_enabled: false
   style_simplifier_transport: "ollama_native_chat"
   style_simplifier_min_words: 8
   style_simplifier_min_word_ratio: 0.90
@@ -217,6 +226,12 @@ pdf:
   english_pdf_path: "outputs/Gatsby_Analysis_English.pdf"
   spanish_pdf_path: "outputs/Gatsby_Analysis_Spanish.pdf"
   mandarin_pdf_path: "outputs/Gatsby_Analysis_Mandarin.pdf"
+  english_page_count_min: 10
+  english_page_count_max: 13
+  spanish_page_count_min: 10
+  spanish_page_count_max: 14
+  mandarin_page_count_min: 9
+  mandarin_page_count_max: 13
 
 manifest:
   output_path: "outputs/final_manifest.json"
