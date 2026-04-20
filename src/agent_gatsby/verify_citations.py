@@ -25,7 +25,6 @@ from agent_gatsby.schemas import EvidenceRecord, PassageIndex, PassageRecord, Ve
 LOGGER = logging.getLogger(__name__)
 
 DOUBLE_QUOTE_RE = re.compile(r"[\"“](.+?)[\"”]", re.DOTALL)
-SINGLE_QUOTE_RE = re.compile(r"(?<!\w)['‘]([^'\n]{2,}?)['’](?!\w)")
 BLOCKQUOTE_QUOTE_LINE_RE = re.compile(r'^\s*>\s*"(?P<quote>.+)"\s+(?P<citation>\[[^\]]+\])\s*$')
 QUOTE_ISSUE_CODES = {
     "quote_not_in_passage",
@@ -92,11 +91,10 @@ def extract_citation_markers(text: str) -> list[str]:
 
 def extract_quoted_strings(text: str) -> list[str]:
     quotes: list[str] = []
-    for pattern in (DOUBLE_QUOTE_RE, SINGLE_QUOTE_RE):
-        for match in pattern.finditer(text):
-            candidate = collapse_spaces(match.group(1)).strip()
-            if candidate:
-                quotes.append(candidate)
+    for match in DOUBLE_QUOTE_RE.finditer(text):
+        candidate = collapse_spaces(match.group(1)).strip()
+        if candidate:
+            quotes.append(candidate)
     return quotes
 
 

@@ -12,6 +12,7 @@ This repository is meant to demonstrate more than prompt writing. It shows the u
 What this repo proves:
 - local AI execution with no hosted inference dependency in the reference path
 - evidence-first drafting instead of one-shot generation
+- a two-stage critic-correction pass that detects token-level hallucinations and applies surgical fixes before markdown is finalized
 - quote, citation, translation, and final-artifact validation before promotion
 - a small post-PDF forensic blocklist that can fail promotion on prompt leaks or leaked assistant text
 - deterministic PDF packaging and explicit run artifacts on disk
@@ -184,17 +185,20 @@ flowchart TD
     F --> G[Draft English Sections]
     G --> H[Verify Quotes and Citations]
     H --> I[Critic and Edit Pass]
-    I --> J[Freeze Canonical English Draft]
-    J --> O[Render English PDF]
-    J --> K[Translate to Spanish in Chunks]
-    J --> L[Translate to Mandarin in Chunks]
-    K --> M[Spanish QA Pass]
-    L --> N[Mandarin QA Pass]
-    M --> P[Render Spanish PDF]
-    N --> Q[Render Mandarin PDF]
-    O --> R[Write Final Manifest]
-    P --> R
-    Q --> R
+    I --> J[Dynamic Validation on English Master]
+    J --> K[Freeze Canonical English Draft]
+    K --> O[Render English PDF]
+    K --> L[Translate to Spanish in Chunks]
+    K --> M[Translate to Mandarin in Chunks]
+    L --> N[Spanish Critic Audit plus Surgical Replace]
+    M --> P[Mandarin Critic Audit plus Surgical Replace]
+    N --> Q[Spanish QA Pass]
+    P --> R[Mandarin QA Pass]
+    Q --> S[Render Spanish PDF]
+    R --> T[Render Mandarin PDF]
+    O --> U[Write Final Manifest]
+    S --> U
+    T --> U
 ```
 
 At a high level, the system is divided into seven logical layers:
@@ -531,6 +535,22 @@ After English QA is complete, the system freezes the English analysis as the can
 ### Why this matters
 Spanish and Mandarin outputs should derive from the same locked English master, not from independently regenerated essays.
 
+### Last-mile validation before freeze
+Before the English master is written, the pipeline now runs a bounded two-stage validation pass over the finalized markdown:
+
+1. **Forensic audit (detection)**
+   Gemma 4 receives the finalized English markdown and returns strict JSON describing token-level defects such as missing spaces, spelling slips, or simple grammar corruption.
+2. **Target-specific remediation (fix)**
+   The pipeline applies only exact `hallucination -> correction` replacements plus deterministic regex cleanup for known structural artifacts.
+
+This pass is intentionally narrow. It does not rewrite the full essay, does not retry indefinitely, and must preserve:
+- heading structure
+- citation-marker inventory
+- citation-entry count
+
+### Example output artifact
+`artifacts/qa/english_dynamic_validation_report.json`
+
 ### Output artifact
 `artifacts/final/analysis_english_master.md`
 
@@ -553,6 +573,7 @@ A long essay should not be translated in one uncontrolled pass. Chunked translat
 - preserve citation markers and quotation boundaries
 - maintain academic register
 - preserve proper nouns
+- run a critic-correction validation pass before the Spanish markdown is finalized
 
 ### Output artifact
 `artifacts/translations/analysis_spanish_draft.md`
@@ -570,6 +591,7 @@ The system translates the frozen English master into Mandarin rendered in Simpli
 - preserve academic tone
 - preserve proper nouns and title references
 - ensure output is CJK-safe for final PDF rendering
+- run a critic-correction validation pass before the Mandarin markdown is finalized
 
 ### Output artifact
 `artifacts/translations/analysis_mandarin_draft.md`
@@ -593,10 +615,13 @@ Each translation is reviewed against the English master.
 - quote-marker inventory matches English master
 - section order matches English master
 - translated files are non-empty
+- dynamic critic pass repaired token-level hallucinations without changing citation structure
 
 ### Output artifacts
 - `artifacts/qa/spanish_qa_report.json`
 - `artifacts/qa/mandarin_qa_report.json`
+- `artifacts/qa/spanish_dynamic_validation_report.json`
+- `artifacts/qa/mandarin_dynamic_validation_report.json`
 
 ---
 
@@ -831,6 +856,9 @@ Goal: draft one English section at a time from bounded evidence only.
 ### Critic Prompt
 Goal: improve clarity, transitions, and analytical precision without altering quotations.
 
+### Dynamic Validation Critic Prompt
+Goal: detect token-level hallucinations, prompt leaks, spelling slips, and structural noise, then return strict JSON for surgical replacement.
+
 ### Translator Prompt
 Goal: preserve semantics, register, and citation structure.
 
@@ -878,7 +906,43 @@ Before the English draft is finalized, it must pass:
 - **Duplicate/filler check**  
   Repetitive paragraphs and generic literary filler should be flagged.
 
-## 12.2 Translation verification gates
+## 12.2 Dynamic critic-correction gates
+Before the English master or a translated markdown file is treated as canonical, it now passes through a bounded two-stage validation loop:
+
+- **Stage 1: Forensic audit**
+  Gemma 4 receives the generated markdown and returns strict JSON defects shaped like:
+
+```json
+{
+  "defects": [
+    {
+      "hallucination": "theragged edge",
+      "correction": "the ragged edge"
+    }
+  ],
+  "notes": "Found one spacing defect."
+}
+```
+
+- **Stage 2: Surgical remediation**
+  The pipeline replaces only the exact bad spans reported by the critic, then applies deterministic regex cleanup for known structural artifacts such as:
+  - standalone `0` lines
+  - stray commas after citation brackets
+  - leaked assistant prompt text
+
+Guardrails:
+- the loop is not an autonomous rewrite stage
+- it does not retry indefinitely
+- it must preserve heading structure
+- it must preserve citation-marker inventory
+- it must preserve citation-entry counts
+
+Artifacts:
+- `artifacts/qa/english_dynamic_validation_report.json`
+- `artifacts/qa/spanish_dynamic_validation_report.json`
+- `artifacts/qa/mandarin_dynamic_validation_report.json`
+
+## 12.3 Translation verification gates
 Before a translated draft is finalized, it must pass:
 
 - **Section parity check**  
@@ -896,7 +960,7 @@ Before a translated draft is finalized, it must pass:
 - **Manual spot review**
   Intro, middle, and conclusion reviewed by a human against the English master.
 
-## 12.3 PDF verification gates
+## 12.4 PDF verification gates
 Before final delivery, PDFs must pass:
 
 - file exists
@@ -917,6 +981,20 @@ The forensic audit is intentionally not a full autonomous controller. By default
 ## 13. Translation Strategy
 
 Translation is deliberately separated from English authorship.
+
+## 13.1 Two-stage validation before final write
+Each translated markdown document now uses a bounded critic-correction pass immediately before it is written to disk.
+
+Why this is placed here:
+- it catches token-level hallucinations while the text is still markdown
+- it avoids PDF-only cleanup work for defects that started upstream
+- it keeps the expensive post-PDF forensic audit as the final reviewer rather than a perpetual controller
+
+The long-run intent is:
+- cheap deterministic checks at chunk or section boundaries
+- at most a small bounded retry for that local unit
+- one final markdown-level critic pass before the translated document becomes canonical
+- one final post-PDF forensic audit after rendering
 
 ## 13.1 Why translate from a frozen English master
 The English essay is the canonical analytical document. Translating from a stable English master prevents cross-language conceptual divergence.

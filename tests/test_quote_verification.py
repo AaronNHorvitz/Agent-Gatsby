@@ -201,6 +201,27 @@ Gatsby's "green light" turns longing into a visible object of desire [#1, Chapte
     assert registry[0]["passage_id"] == "1.1"
 
 
+def test_verify_english_draft_ignores_single_quoted_emphasis_without_treating_it_as_a_quote(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    draft_text = """
+# Metaphor and the Shape of Desire
+
+## Social Breakdown
+
+Seen side by side, these images make clear that the transition from 'card houses' to 'pigsties' represents social collapse.
+
+The "green light" remains the actual direct quotation under analysis [1.1].
+""".strip() + "\n"
+    config = load_config(write_verification_repo(repo_root, draft_text=draft_text))
+
+    report = verify_english_draft(config)
+
+    assert report.status == "passed"
+    assert not report.issues
+    assert report.quote_checks_total == 1
+    assert report.quote_checks_passed == 1
+
+
 def test_verify_english_draft_accepts_metaphor_text_blockquotes_with_nested_quotes(tmp_path) -> None:
     repo_root = tmp_path / "repo"
     passage_index = {

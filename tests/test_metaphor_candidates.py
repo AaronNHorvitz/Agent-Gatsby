@@ -92,6 +92,7 @@ extraction:
   raw_debug_output_path: "artifacts/evidence/metaphor_candidates_raw.txt"
   minimum_candidate_count: 1
   maximum_candidate_count: 25
+  llm_transport: "ollama_native_chat"
 """
     config_path = repo_root / "config/config.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -162,6 +163,34 @@ def test_extract_metaphor_candidates_saves_raw_output_and_retries_once(monkeypat
     assert calls["count"] == 2
     assert debug_path.exists()
     assert "not json at all" in debug_path.read_text(encoding="utf-8")
+
+
+def test_extract_metaphor_candidates_uses_configured_transport_override(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_extraction_repo(repo_root))
+    seen_transport_overrides: list[str | None] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        seen_transport_overrides.append(kwargs.get("transport_override"))
+        return json.dumps(
+            [
+                {
+                    "candidate_id": "C779",
+                    "label": "green light",
+                    "passage_id": "1.1",
+                    "quote": "green light",
+                    "rationale": "A recurring image that turns Gatsby's longing into a visible object of desire.",
+                    "confidence": 0.93,
+                }
+            ]
+        )
+
+    monkeypatch.setattr("agent_gatsby.extract_metaphors.invoke_text_completion", fake_invoke_text_completion)
+
+    candidates = extract_metaphor_candidates(config)
+
+    assert len(candidates) == 1
+    assert seen_transport_overrides == ["ollama_native_chat"]
 
 
 def test_parse_candidate_response_repairs_common_live_model_key_typos() -> None:

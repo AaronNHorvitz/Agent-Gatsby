@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from agent_gatsby.config import load_config
@@ -7,6 +8,7 @@ from agent_gatsby.llm_client import LLMResponseValidationError
 from agent_gatsby.translate_mandarin import translate_mandarin
 from agent_gatsby.translate_spanish import translate_spanish
 from agent_gatsby.translation_common import (
+    dynamic_validation_loop,
     extract_translated_quote_lookup,
     extract_visible_citation_markers,
     freeze_english_master,
@@ -207,6 +209,90 @@ def test_translate_spanish_uses_fragment_safe_cleanup_when_cleanup_chunk_placeho
     assert any("Existing translated markdown fragment:" in call for call in calls)
 
 
+def test_dynamic_validation_loop_applies_surgical_replacements_and_regex_fallbacks(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    prompt_path = repo_root / "config/prompts/dynamic_validation_critic.md"
+    prompt_path.write_text("Return JSON only.\n", encoding="utf-8")
+    config.prompts["dynamic_validation_prompt_path"] = "config/prompts/dynamic_validation_critic.md"
+    config.verification["dynamic_validation_enabled"] = True
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        return json.dumps(
+            {
+                "defects": [
+                    {"hallucination": "metáían", "correction": "metáforas"},
+                    {"hallucination": "imimita", "correction": "imita"},
+                ],
+                "notes": "Found two token-level defects.",
+            }
+        )
+
+    monkeypatch.setattr("agent_gatsby.translation_common.invoke_text_completion", fake_invoke_text_completion)
+
+    original_text = (
+        "# Título\n\n"
+        "metáían [1]\n\n"
+        "0\n\n"
+        "La casa imimita el orden [2],\n\n"
+        "## Citas\n\n"
+        '1. F. Scott Fitzgerald, *El gran Gatsby*, cap. 1, párr. 1, pasaje citado que comienza "metáían".\n'
+    )
+
+    sanitized_text, report = dynamic_validation_loop(
+        config,
+        text=original_text,
+        language_name="Spanish",
+        stage_name="dynamic_validate_spanish_translation",
+    )
+
+    assert report["status"] == "fixed"
+    assert "metáían" not in sanitized_text
+    assert "imimita" not in sanitized_text
+    assert "metáforas" in sanitized_text
+    assert "imita" in sanitized_text
+    assert "\n0\n" not in sanitized_text
+    assert "[2]," not in sanitized_text
+    assert extract_visible_citation_markers(sanitized_text) == extract_visible_citation_markers(original_text)
+
+
+def test_translate_spanish_runs_dynamic_validation_before_writing_output(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    prompt_path = repo_root / "config/prompts/dynamic_validation_critic.md"
+    prompt_path.write_text("Return JSON only.\n", encoding="utf-8")
+    config.prompts["dynamic_validation_prompt_path"] = "config/prompts/dynamic_validation_critic.md"
+    config.verification["dynamic_validation_enabled"] = True
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        stage_name = kwargs["stage_name"]
+        user_prompt = kwargs["user_prompt"]
+        if stage_name == "dynamic_validate_english_master":
+            return json.dumps({"defects": [], "notes": "No defects found."})
+        if stage_name == "translate_spanish":
+            return extract_chunk_from_prompt(user_prompt).replace("green light", "metáían")
+        if stage_name == "translate_spanish_cleanup":
+            return extract_chunk_from_prompt(user_prompt)
+        if stage_name == "dynamic_validate_spanish_translation":
+            return json.dumps(
+                {
+                    "defects": [
+                        {"hallucination": "metáían", "correction": "metáforas"},
+                    ],
+                    "notes": "Found one token-level defect.",
+                }
+            )
+        return extract_chunk_from_prompt(user_prompt)
+
+    monkeypatch.setattr("agent_gatsby.translation_common.invoke_text_completion", fake_invoke_text_completion)
+
+    translated_text = translate_spanish(config)
+
+    assert "metáían" not in translated_text
+    assert "metáforas" in translated_text
+    assert config.spanish_translation_output_path.exists()
+
+
 def test_freeze_english_master_applies_known_regression_fixes_and_writes_report(tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_translation_repo(repo_root))
@@ -276,6 +362,23 @@ def test_freeze_english_master_quotes_additional_exact_quote_reuse_patterns(tmp_
     assert '"a man’s voice, very thin and far away" [30]' in frozen
 
 
+def test_freeze_english_master_fixes_denial_of_reality_and_quotes_ragged_edge_reference(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    config.final_draft_output_path.write_text(
+        "# Title\n\n"
+        "By framing his ascent as a spiritual and fated event, Gatsby attempts to insulate his fragile identity from the unreality of reality that haunts his early years.\n\n"
+        "In conclusion, the Middle West seemed like the ragged edge of the universe [2] when Nick looked back on it.\n",
+        encoding="utf-8",
+    )
+
+    frozen = freeze_english_master(config)
+
+    assert "unreality of reality" not in frozen
+    assert "denial of reality" in frozen
+    assert '*"the ragged edge of the universe"* [2]' in frozen
+
+
 def test_extract_translated_quote_lookup_reads_inline_cited_quotes() -> None:
     translated = '\n'.join(
         [
@@ -306,17 +409,40 @@ def test_localize_citation_metadata_line_uses_language_overrides_when_quote_look
 
 
 def test_normalize_translated_body_fixes_remaining_spanish_and_mandarin_overliteral_phrases() -> None:
-    spanish = "La confrontación entre Gatsby y Tom proporciona el momento en que esta artificialidad se rompe físicamente."
-    mandarin = "灰烬是如此普遍，以至于它在物理层面上改变了生活其中的人，而这种虚假性也在物理层面发生破碎的时刻显现出来。"
+    spanish = (
+        "La confrontación entre Gatsby y Tom proporciona el momento en que esta artificialidad se rompe físicamente. "
+        "El impacto del antagonismo de Tom no solo hiere a Gatsby; rompe físicamente la imagen que él ha pasado años perfeccionando."
+    )
+    mandarin = (
+        "Please provide the markdown fragment you would like me to revise. "
+        "I am ready to apply the professional academic copyediting standards described in your instructions. "
+        "灰烬是如此普遍，以至于它在物理层面上改变了生活其中的人，而这种虚假性也在物理层面发生破碎的时刻显现出来。 "
+        "因为环境在物理层面上吞噬了角色。 "
+        "因为环境在物理层面已然吞噬了角色。 "
+        "汤姆所带来的敌意冲击更在物理层面上粉碎了他多年来苦心经营的形象。 "
+        "汤姆的敌意所带来的冲击更在物理层面上击碎了他多年来致力于完善的形象。 "
+        "盖茨比社会地位的崩塌，始于其庄园在物理层面的荒废。 "
+        "这也反映在他庄园物理层面的退化中。 "
+        ">*“整个商队旅馆像纸牌屋一样倒塌了”* AGColog[18]"
+    )
 
     normalized_spanish = normalize_translated_body(spanish, language_name="Spanish")
     normalized_mandarin = normalize_translated_body(mandarin, language_name="Simplified Chinese")
 
     assert "rompe físicamente" not in normalized_spanish
     assert "quiebra de forma visible" in normalized_spanish
+    assert "quiebra simbólicamente la imagen" in normalized_spanish
     assert "物理层面" not in normalized_mandarin
+    assert "Please provide the markdown fragment" not in normalized_mandarin
     assert "切实地改变了生活其中的人" in normalized_mandarin
     assert "明显走向破碎的时刻" in normalized_mandarin
+    assert "逐渐吞噬了角色" in normalized_mandarin
+    assert "已然吞噬了角色" in normalized_mandarin
+    assert "象征性地粉碎了他多年来苦心经营的形象" in normalized_mandarin
+    assert "更象征性地击碎了他多年来致力于完善的形象" in normalized_mandarin
+    assert "其庄园明显可见的荒废" in normalized_mandarin
+    assert "庄园明显可见的退化" in normalized_mandarin
+    assert '>*“整个商队旅馆像纸牌屋一样倒塌了”* [18]' in normalized_mandarin
 
 
 def test_normalize_translated_body_removes_prompt_leaks_and_current_spanish_mandarin_corruptions() -> None:

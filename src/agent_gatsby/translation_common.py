@@ -41,6 +41,18 @@ TRANSLATED_CITATIONS_SECTION_RE = re.compile(r"(?m)^##\s+(?:Citations|Citas|引�
 ENGLISH_MULTIWORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*(?:\s+[a-z][A-Za-z'’.-]*){2,}")
 CITATION_GLUE_RE = re.compile(r"(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])(?=[A-Za-zÁ-ÿ一-龯])")
 ZERO_WIDTH_RE = re.compile(r"[\u200b-\u200d\u2060\ufeff]")
+ASSISTANT_PROMPT_LEAK_RE = re.compile(
+    r"Please provide the .*?fragment you would like me to revise\.\s*"
+    r"I am ready to apply .*?instructions\.",
+    re.IGNORECASE,
+)
+LEAKED_AGC_CITATION_RE = re.compile(r"\bAGC\w*\[(\d+)\]")
+DYNAMIC_VALIDATION_JSON_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE)
+DYNAMIC_VALIDATION_JSON_OBJECT_RE = re.compile(r"{.*}", re.DOTALL)
+STANDALONE_ZERO_LINE_RE = re.compile(r"(?m)^[ \t]*0[ \t]*$\n?")
+ASCII_COMMA_AFTER_CITATION_RE = re.compile(
+    r"(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])\s*,"
+)
 MANDARIN_NORMALIZATION_MAP = {
     "菲茨平": "菲茨杰拉德",
     "菲茨格拉德": "菲茨杰拉德",
@@ -98,6 +110,12 @@ MANDARIN_NORMALIZATION_MAP = {
     "在物理层面击碎了精心营造的新贵外壳": "象征性地击碎了新贵阶层精心营造的外壳",
     "在物理层面上改变了生活其中的人": "切实地改变了生活其中的人",
     "在物理层面发生破碎的时刻": "明显走向破碎的时刻",
+    "因为环境在物理层面上吞噬了角色": "因为环境逐渐吞噬了角色",
+    "因为环境在物理层面已然吞噬了角色": "因为环境已然吞噬了角色",
+    "更在物理层面上粉碎了他多年来苦心经营的形象": "更象征性地粉碎了他多年来苦心经营的形象",
+    "更在物理层面上击碎了他多年来致力于完善的形象": "更象征性地击碎了他多年来致力于完善的形象",
+    "其庄园在物理层面的荒废": "其庄园明显可见的荒废",
+    "庄园物理层面的退化": "庄园明显可见的退化",
     "字面上如玻璃般破碎": "被描写为如玻璃般破碎",
     "在字面与语言层面的消解": "在可见与语言层面的瓦解",
     "所栖模的": "所栖居的",
@@ -151,6 +169,7 @@ SPANISH_NORMALIZATION_MAP = {
     "Esta fragilidad se vuelve literal": "Esta fragilidad se vuelve visible",
     "rompe físicamente la apariencia cuidadosamente curada de la nueva": "quiebra simbólicamente la fachada cuidadosamente construida de la nueva",
     "esta artificialidad se rompe físicamente": "esta artificialidad se quiebra de forma visible",
+    "rompe físicamente la imagen que él ha pasado años perfeccionando": "quiebra simbólicamente la imagen que él ha pasado años perfeccionando",
     "se rompe literalmente como el cristal": "se describe como si se hiciera añicos como el cristal",
     "la disolución literal y lingüística de sus ilusiones cuidadosamente mantenidas": "el visible y verbal desmoronamiento de sus ilusiones cuidadosamente mantenidas",
     'se revela como un caravasar que se ha derrumbado como un castillo de naipes [21] al enfrentarse al juicio de los demás.': 'se derrumba como un castillo de naipes ante el juicio social [21].',
@@ -218,6 +237,9 @@ ENGLISH_MASTER_REGRESSION_FIXES = {
     "_This report organizes selected metaphors into 8 thematic sections to fit an approximately ten-page assignment requirement. The analysis could be expanded with additional metaphor clusters if a longer study were desired._": "_This report organizes selected metaphor clusters into eight thematic sections for a structured, citation-supported analysis._",
     "contributing to a sea-change of color and voice that makes the environment feel hallucinatory.": "contributing to a fusion of color and music that makes the environment feel hallucinatory.",
     "Because his identity is built upon the unreality of reality [20], the social structure he creates is inherently prone to sudden disintegration.": "Because his identity is built upon a denial of reality [20], the social structure he creates is inherently prone to sudden disintegration.",
+    "By framing his ascent as a spiritual and fated event, Gatsby attempts to insulate his fragile identity from the unreality of reality that haunts his early years.": "By framing his ascent as a spiritual and fated event, Gatsby attempts to insulate his fragile identity from the denial of reality that haunts his early years.",
+    "which seemed like the ragged edge of the universe [2]": 'which seemed like *"the ragged edge of the universe"* [2]',
+    "seemed like the ragged edge of the universe [2]": 'seemed like *"the ragged edge of the universe"* [2]',
     "This fragility becomes literal during the confrontation with Tom, where a simile compares Gatsby’s constructed identity to shattering glass [27].": "This fragility becomes visible during the confrontation with Tom, where a simile compares Gatsby’s constructed identity to shattering glass [27].",
     "The aggression of the old aristocracy physically breaks the carefully curated veneer of the new, proving that Gatsby’s self-invention cannot survive direct contact with the past.": "The aggression of the old aristocracy symbolically shatters the carefully constructed veneer of the new, proving that Gatsby’s self-invention cannot survive direct contact with the past.",
     'The social world Gatsby built is revealed to be "the whole caravansary" that has fallen like a card house [21] when confronted by the judgment of others.': "The social world Gatsby built falls like a card house under the pressure of social judgment [21].",
@@ -577,6 +599,12 @@ def write_english_master_regression_report(config: AppConfig, report: dict[str, 
 
 def validate_english_master_regressions(config: AppConfig, text: str) -> str:
     normalized_text, applied_fixes = normalize_english_master_regressions(text)
+    normalized_text, _ = dynamic_validation_loop(
+        config,
+        text=normalized_text,
+        language_name="English",
+        stage_name="dynamic_validate_english_master",
+    )
     report = build_english_master_regression_report(config, normalized_text, applied_fixes=applied_fixes)
     write_english_master_regression_report(config, report)
     if report["major_issues"]:
@@ -616,6 +644,233 @@ def load_english_master(config: AppConfig, *, freeze_if_missing: bool = True) ->
 
 def load_translation_prompt(config: AppConfig, prompt_key: str) -> str:
     return config.resolve_prompt_path(prompt_key).read_text(encoding="utf-8")
+
+
+def dynamic_validation_enabled(config: AppConfig) -> bool:
+    return bool(config.verification.get("dynamic_validation_enabled", False))
+
+
+def dynamic_validation_max_defects(config: AppConfig) -> int:
+    return int(config.verification.get("dynamic_validation_max_defects", 20))
+
+
+def dynamic_validation_transport(config: AppConfig) -> str | None:
+    transport = (
+        str(config.verification.get("dynamic_validation_transport", "")).strip()
+        or str(config.translation.get("llm_transport", "")).strip()
+        or str(config.drafting.get("llm_transport", "")).strip()
+    )
+    return transport or None
+
+
+def dynamic_validation_language_key(language_name: str) -> str:
+    if language_name == "English":
+        return "english"
+    if language_name == "Spanish":
+        return "spanish"
+    if language_name == "Simplified Chinese":
+        return "mandarin"
+    return re.sub(r"[^a-z0-9]+", "_", language_name.lower()).strip("_") or "document"
+
+
+def dynamic_validation_report_path(config: AppConfig, language_name: str):
+    language_key = dynamic_validation_language_key(language_name)
+    configured = str(
+        config.verification.get(
+            f"{language_key}_dynamic_validation_report_path",
+            f"artifacts/qa/{language_key}_dynamic_validation_report.json",
+        )
+    )
+    return config.resolve_repo_path(configured)
+
+
+def load_dynamic_validation_prompt(config: AppConfig) -> str:
+    return config.resolve_prompt_path("dynamic_validation_prompt_path").read_text(encoding="utf-8")
+
+
+def build_dynamic_validation_user_prompt(text: str, *, language_name: str) -> str:
+    return "\n".join(
+        [
+            f"Document language: {language_name}",
+            "Audit the markdown below and return JSON only.",
+            "Do not rewrite the full document.",
+            "Only report exact bad text spans that should be replaced surgically.",
+            "",
+            "Markdown to audit:",
+            text.strip(),
+        ]
+    )
+
+
+def normalize_dynamic_validation_json(response_text: str) -> str:
+    text = DYNAMIC_VALIDATION_JSON_FENCE_RE.sub("", response_text).strip()
+    match = DYNAMIC_VALIDATION_JSON_OBJECT_RE.search(text)
+    if match:
+        return match.group(0)
+    return text
+
+
+def parse_dynamic_validation_response(response_text: str, *, language_name: str) -> dict[str, object]:
+    try:
+        payload = json.loads(normalize_dynamic_validation_json(response_text))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Dynamic validation response for {language_name} was not valid JSON: {exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise ValueError(f"Dynamic validation response for {language_name} must be a JSON object")
+
+    defects = payload.get("defects", [])
+    if not isinstance(defects, list):
+        raise ValueError(f"Dynamic validation response for {language_name} must include a defects list")
+
+    parsed_defects: list[dict[str, str]] = []
+    for index, defect in enumerate(defects, start=1):
+        if not isinstance(defect, dict):
+            raise ValueError(f"Dynamic validation defect {index} for {language_name} must be an object")
+        hallucination = str(defect.get("hallucination", "")).strip()
+        correction = defect.get("correction", "")
+        if not hallucination:
+            raise ValueError(f"Dynamic validation defect {index} for {language_name} is missing hallucination")
+        if correction is None:
+            raise ValueError(f"Dynamic validation defect {index} for {language_name} is missing correction")
+        parsed_defects.append(
+            {
+                "hallucination": hallucination,
+                "correction": str(correction),
+            }
+        )
+
+    notes = str(payload.get("notes", "")).strip()
+    return {"defects": parsed_defects, "notes": notes}
+
+
+def validate_dynamic_validation_response(response_text: str, *, language_name: str) -> None:
+    parse_dynamic_validation_response(response_text, language_name=language_name)
+
+
+def apply_dynamic_validation_replacements(text: str, defects: list[dict[str, str]]) -> tuple[str, list[dict[str, object]]]:
+    sanitized = text
+    applied: list[dict[str, object]] = []
+    for defect in defects:
+        hallucination = defect["hallucination"]
+        correction = defect["correction"]
+        count = sanitized.count(hallucination)
+        if count == 0:
+            continue
+        sanitized = sanitized.replace(hallucination, correction)
+        applied.append(
+            {
+                "hallucination": hallucination,
+                "correction": correction,
+                "replacement_count": count,
+            }
+        )
+    return sanitized, applied
+
+
+def apply_dynamic_validation_regex_fallbacks(text: str, *, language_name: str) -> str:
+    sanitized = STANDALONE_ZERO_LINE_RE.sub("", text)
+    if language_name == "Simplified Chinese":
+        sanitized = ASCII_COMMA_AFTER_CITATION_RE.sub(r"\1，", sanitized)
+    else:
+        sanitized = ASCII_COMMA_AFTER_CITATION_RE.sub(r"\1", sanitized)
+    sanitized = re.sub(r"\n{3,}", "\n\n", sanitized)
+    return sanitized
+
+
+def validate_dynamic_validation_structure(original_text: str, revised_text: str) -> None:
+    if extract_heading_levels(revised_text) != extract_heading_levels(original_text):
+        raise ValueError("Dynamic validation changed the markdown heading structure")
+    if extract_visible_citation_markers(revised_text) != extract_visible_citation_markers(original_text):
+        raise ValueError("Dynamic validation changed the citation marker inventory")
+    _, original_citations = split_translated_output_and_citations(original_text)
+    _, revised_citations = split_translated_output_and_citations(revised_text)
+    if count_numbered_citation_entries(revised_citations) != count_numbered_citation_entries(original_citations):
+        raise ValueError("Dynamic validation changed the citation entry count")
+
+
+def write_dynamic_validation_report(output_path, report: dict[str, object]) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    LOGGER.info("Wrote %s dynamic validation report to %s", report["language"], output_path)
+
+
+def dynamic_validation_loop(
+    config: AppConfig,
+    *,
+    text: str,
+    language_name: str,
+    stage_name: str,
+) -> tuple[str, dict[str, object]]:
+    report_path = dynamic_validation_report_path(config, language_name)
+    original_text = text.strip()
+    if not dynamic_validation_enabled(config):
+        report = {
+            "stage": stage_name,
+            "language": dynamic_validation_language_key(language_name),
+            "generated_at": utc_now_iso(),
+            "status": "skipped",
+            "defect_count": 0,
+            "applied_replacement_count": 0,
+            "defects": [],
+            "applied_replacements": [],
+            "notes": "Dynamic validation disabled in config.",
+        }
+        write_dynamic_validation_report(report_path, report)
+        return original_text, report
+
+    defects: list[dict[str, str]] = []
+    applied_replacements: list[dict[str, object]] = []
+    sanitized_text = original_text
+    notes = ""
+    status = "passed"
+    try:
+        response_text = invoke_text_completion(
+            config,
+            stage_name=stage_name,
+            system_prompt=load_dynamic_validation_prompt(config),
+            user_prompt=build_dynamic_validation_user_prompt(original_text, language_name=language_name),
+            output_path=str(report_path),
+            model_name=str(config.models.get("final_critic", config.models.get("primary_reasoner", ""))),
+            response_validator=lambda value: validate_dynamic_validation_response(value, language_name=language_name),
+            transport_override=dynamic_validation_transport(config),
+        )
+        parsed = parse_dynamic_validation_response(response_text, language_name=language_name)
+        notes = str(parsed.get("notes", "")).strip()
+        defects = list(parsed["defects"])[: dynamic_validation_max_defects(config)]
+        sanitized_text, applied_replacements = apply_dynamic_validation_replacements(original_text, defects)
+        sanitized_text = apply_dynamic_validation_regex_fallbacks(sanitized_text, language_name=language_name)
+        if language_name != "English":
+            sanitized_text = normalize_translated_body(sanitized_text, language_name=language_name)
+        validate_dynamic_validation_structure(original_text, sanitized_text)
+        if applied_replacements:
+            status = "fixed"
+    except Exception as exc:
+        LOGGER.warning("Dynamic validation failed for %s: %s", language_name, exc)
+        notes = str(exc)
+        status = "error"
+        fallback_text = apply_dynamic_validation_regex_fallbacks(original_text, language_name=language_name)
+        if language_name != "English":
+            fallback_text = normalize_translated_body(fallback_text, language_name=language_name)
+        try:
+            validate_dynamic_validation_structure(original_text, fallback_text)
+            sanitized_text = fallback_text
+        except Exception:
+            sanitized_text = original_text
+
+    report = {
+        "stage": stage_name,
+        "language": dynamic_validation_language_key(language_name),
+        "generated_at": utc_now_iso(),
+        "status": status,
+        "defect_count": len(defects),
+        "applied_replacement_count": len(applied_replacements),
+        "defects": defects,
+        "applied_replacements": applied_replacements,
+        "notes": notes or ("No defects found." if not defects else "Applied critic-guided replacements."),
+    }
+    write_dynamic_validation_report(report_path, report)
+    return sanitized_text, report
 
 
 def build_translation_user_prompt(chunk_text: str, *, chunk_index: int, total_chunks: int, language_name: str) -> str:
@@ -703,6 +958,8 @@ def validate_translated_fragment(translated_text: str) -> None:
 def normalize_translated_body(text: str, *, language_name: str) -> str:
     normalized = CITATION_GLUE_RE.sub(r"\1 ", text)
     normalized = ZERO_WIDTH_RE.sub("", normalized)
+    normalized = ASSISTANT_PROMPT_LEAK_RE.sub("", normalized)
+    normalized = LEAKED_AGC_CITATION_RE.sub(r"[\1]", normalized)
     if language_name == "Spanish":
         normalized = SPANISH_INTERNAL_TOKEN_RE.sub("", normalized)
         normalized = SPANISH_ESCAPE_SEQUENCE_RE.sub(" ", normalized)
@@ -1117,6 +1374,12 @@ def translate_document(
     if translated_citations:
         translated_text = translated_text + "\n\n" + translated_citations
     translated_text = translated_text.strip() + "\n"
+    translated_text, _ = dynamic_validation_loop(
+        config,
+        text=translated_text,
+        language_name=language_name,
+        stage_name=f"dynamic_validate_{dynamic_validation_language_key(language_name)}_translation",
+    )
     validate_translation_chunk(master_text, translated_text)
     validate_citations_section_parity(master_text, translated_text)
     write_translation_output(output_path, translated_text, language_name=language_name)

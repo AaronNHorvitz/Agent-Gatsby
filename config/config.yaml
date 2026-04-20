@@ -75,6 +75,7 @@ prompts:
   translator_zh_cleanup_prompt_path: "config/prompts/translator_zh_cleanup.md"
   qa_prompt_path: "config/prompts/translation_qa.md"
   final_forensic_audit_prompt_path: "config/prompts/final_forensic_audit.md"
+  dynamic_validation_prompt_path: "config/prompts/dynamic_validation_critic.md"
 
 indexing:
   output_path: "artifacts/manifests/passage_index.json"
@@ -88,6 +89,7 @@ extraction:
   raw_debug_output_path: "artifacts/evidence/metaphor_candidates_raw.txt"
   minimum_candidate_count: 8
   maximum_candidate_count: 25
+  llm_transport: "ollama_native_chat"
   require_json_output: true
   include_confidence_scores: true
   include_exact_quote_strings: true
@@ -143,6 +145,9 @@ verification:
   output_path: "artifacts/qa/english_verification_report.json"
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
   english_master_regression_output_path: "artifacts/qa/english_master_regression_report.json"
+  dynamic_validation_enabled: true
+  dynamic_validation_max_defects: 20
+  dynamic_validation_transport: "ollama_native_chat"
   llm_forensic_audit_enabled: true
   llm_forensic_blocklist_categories:
     - "system_leak"

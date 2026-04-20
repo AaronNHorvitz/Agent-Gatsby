@@ -277,6 +277,7 @@ def extract_batch_candidates(
     total_batches: int,
 ) -> list[MetaphorCandidate]:
     output_path = str(config.metaphor_candidates_path)
+    transport_override = str(config.extraction.get("llm_transport", "")).strip() or None
     initial_prompt = build_extraction_user_prompt(passages, batch_index=batch_index, total_batches=total_batches)
 
     try:
@@ -287,6 +288,7 @@ def extract_batch_candidates(
             user_prompt=initial_prompt,
             output_path=output_path,
             response_validator=validate_candidate_response,
+            transport_override=transport_override,
         )
         return parse_candidate_response(raw_response)
     except LLMResponseValidationError as exc:
@@ -305,6 +307,7 @@ def extract_batch_candidates(
                 user_prompt=stricter_prompt,
                 output_path=output_path,
                 response_validator=validate_candidate_response,
+                transport_override=transport_override,
             )
             return parse_candidate_response(raw_response)
         except LLMResponseValidationError as retry_exc:
