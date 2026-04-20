@@ -28,7 +28,17 @@ ENGLISH_MULTIWORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*(?:\s+[a-z][A-Za-z'�
 LATIN_WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’.-]*")
 CITATION_GLUE_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\](?=[A-Za-zÁ-ÿ一-龯])")
 MIXED_CJK_LATIN_RE = re.compile(r"(?:[A-Za-z][A-Za-z'’.-]*[\u4e00-\u9fff]|[\u4e00-\u9fff][A-Za-z][A-Za-z'’.-]*)")
+VISIBLE_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\]")
+INTERNAL_TOKEN_RE = re.compile(r"AGCIT\w*")
+ESCAPE_SEQUENCE_RE = re.compile(r"\$\\\\\w+\b|\\[A-Za-z]+\b")
+CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]+")
+HAN_RE = re.compile(r"[\u4e00-\u9fff]+")
+REPEATED_ELLIPSIS_BEFORE_CITATION_RE = re.compile(
+    r"[.…]{2,}\s*(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])"
+)
 FORBIDDEN_MANDARIN_VARIANTS = ("菲茨平", "菲茨格拉德")
+KNOWN_BAD_SPANISH_TOKENS = ("esporádíamos",)
+KNOWN_BAD_MANDARIN_TOKENS: tuple[str, ...] = ()
 ENGLISH_HINT_WORDS = {
     "a",
     "an",
@@ -126,6 +136,58 @@ def find_forbidden_mandarin_variants(text: str) -> list[str]:
     return [variant for variant in FORBIDDEN_MANDARIN_VARIANTS if variant in text]
 
 
+def find_internal_token_issues(text: str) -> list[str]:
+    return [match.group(0) for match in INTERNAL_TOKEN_RE.finditer(text)]
+
+
+def find_escape_sequence_issues(text: str) -> list[str]:
+    return [match.group(0) for match in ESCAPE_SEQUENCE_RE.finditer(text)]
+
+
+def find_spanish_foreign_script_issues(text: str) -> list[str]:
+    issues: list[str] = []
+    issues.extend(match.group(0) for match in CYRILLIC_RE.finditer(text))
+    issues.extend(match.group(0) for match in HAN_RE.finditer(text))
+    return issues
+
+
+def find_repeated_ellipsis_before_citations(text: str) -> list[str]:
+    return [match.group(0) for match in REPEATED_ELLIPSIS_BEFORE_CITATION_RE.finditer(text)]
+
+
+def find_known_bad_tokens(text: str, tokens: tuple[str, ...]) -> list[str]:
+    issues: list[str] = []
+    for token in tokens:
+        issues.extend(token for _ in range(text.count(token)))
+    return issues
+
+
+def find_citation_neighborhood_issues(
+    text: str,
+    *,
+    language: str,
+    known_bad_tokens: tuple[str, ...] = (),
+) -> list[str]:
+    issues: list[str] = []
+    normalized_language = language.lower()
+    for match in VISIBLE_CITATION_RE.finditer(text):
+        start = max(0, match.start() - 24)
+        end = min(len(text), match.end() + 24)
+        window = text[start:end]
+        has_issue = False
+        if find_internal_token_issues(window) or find_escape_sequence_issues(window):
+            has_issue = True
+        if normalized_language == "spanish" and find_spanish_foreign_script_issues(window):
+            has_issue = True
+        if normalized_language == "mandarin" and find_repeated_ellipsis_before_citations(window):
+            has_issue = True
+        if known_bad_tokens and find_known_bad_tokens(window, known_bad_tokens):
+            has_issue = True
+        if has_issue:
+            issues.append(window)
+    return issues
+
+
 def build_translation_qa_report(
     *,
     language: str,
@@ -147,11 +209,26 @@ def build_translation_qa_report(
     translated_citation_entry_count = count_numbered_citation_entries(translated_citations_section)
     citation_entry_count_match = english_citation_entry_count == translated_citation_entry_count
     citations_heading_without_entries = citations_section_present and translated_citation_entry_count == 0
+    internal_token_issues = find_internal_token_issues(translated_text)
+    escape_sequence_issues = find_escape_sequence_issues(translated_text)
+    foreign_script_issues: list[str] = []
+    repeated_ellipsis_issues: list[str] = []
+    known_bad_tokens: list[str] = []
     mixed_script_issues: list[str] = []
     forbidden_mandarin_variants: list[str] = []
+    if language.lower() == "spanish":
+        foreign_script_issues = find_spanish_foreign_script_issues(translated_text)
+        known_bad_tokens = find_known_bad_tokens(translated_text, KNOWN_BAD_SPANISH_TOKENS)
     if language.lower() == "mandarin":
         mixed_script_issues = find_mixed_script_issues(translated_body)
         forbidden_mandarin_variants = find_forbidden_mandarin_variants(translated_body)
+        repeated_ellipsis_issues = find_repeated_ellipsis_before_citations(translated_text)
+        known_bad_tokens = find_known_bad_tokens(translated_text, KNOWN_BAD_MANDARIN_TOKENS)
+    citation_neighborhood_issues = find_citation_neighborhood_issues(
+        translated_text,
+        language=language,
+        known_bad_tokens=KNOWN_BAD_SPANISH_TOKENS if language.lower() == "spanish" else KNOWN_BAD_MANDARIN_TOKENS,
+    )
 
     heading_count_match = len(english_headings) == len(translated_headings)
     section_order_match = english_headings == translated_headings
@@ -180,6 +257,18 @@ def build_translation_qa_report(
         major_issues.append("Translated body still contains untranslated English quotation spans.")
     if citation_glue_issues:
         major_issues.append("Translated body has citations glued directly to surrounding prose.")
+    if internal_token_issues:
+        major_issues.append("Translated output leaked internal placeholder or helper tokens.")
+    if escape_sequence_issues:
+        major_issues.append("Translated output contains escape-sequence artifacts.")
+    if foreign_script_issues:
+        major_issues.append("Spanish output contains non-Latin script intrusions.")
+    if repeated_ellipsis_issues:
+        major_issues.append("Mandarin output contains repeated ellipsis directly before citation markers.")
+    if known_bad_tokens:
+        major_issues.append("Translated output contains known bad regression tokens.")
+    if citation_neighborhood_issues:
+        major_issues.append("Translated output contains malformed text adjacent to citation markers.")
     if mixed_script_issues:
         major_issues.append("Mandarin body contains mixed Chinese-English artifacts.")
     if forbidden_mandarin_variants:
@@ -200,6 +289,12 @@ def build_translation_qa_report(
         "citations_heading_without_entries": citations_heading_without_entries,
         "untranslated_body_quote_count": len(untranslated_body_quotes),
         "citation_glue_issue_count": len(citation_glue_issues),
+        "internal_token_issue_count": len(internal_token_issues),
+        "escape_sequence_issue_count": len(escape_sequence_issues),
+        "foreign_script_issue_count": len(foreign_script_issues),
+        "repeated_ellipsis_issue_count": len(repeated_ellipsis_issues),
+        "known_bad_token_count": len(known_bad_tokens),
+        "citation_neighborhood_issue_count": len(citation_neighborhood_issues),
         "mixed_script_issue_count": len(mixed_script_issues),
         "forbidden_mandarin_variant_count": len(forbidden_mandarin_variants),
         "non_empty_translation": non_empty_translation,
@@ -266,4 +361,18 @@ def translation_report_is_renderable(report: dict[str, object]) -> bool:
     translated_entry_count = int(report.get("translated_citation_entry_count", 0) or 0)
     if english_entry_count <= 0 or translated_entry_count <= 0:
         return False
-    return english_entry_count == translated_entry_count
+    if english_entry_count != translated_entry_count:
+        return False
+    required_zero_fields = (
+        "untranslated_body_quote_count",
+        "citation_glue_issue_count",
+        "internal_token_issue_count",
+        "escape_sequence_issue_count",
+        "foreign_script_issue_count",
+        "repeated_ellipsis_issue_count",
+        "known_bad_token_count",
+        "citation_neighborhood_issue_count",
+        "mixed_script_issue_count",
+        "forbidden_mandarin_variant_count",
+    )
+    return all(int(report.get(field, 0) or 0) == 0 for field in required_zero_fields)

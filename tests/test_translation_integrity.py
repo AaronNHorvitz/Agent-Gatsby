@@ -6,7 +6,11 @@ from agent_gatsby.config import load_config
 from agent_gatsby.llm_client import LLMResponseValidationError
 from agent_gatsby.translate_mandarin import translate_mandarin
 from agent_gatsby.translate_spanish import translate_spanish
-from agent_gatsby.translation_common import extract_visible_citation_markers, split_markdown_into_chunks
+from agent_gatsby.translation_common import (
+    extract_visible_citation_markers,
+    freeze_english_master,
+    split_markdown_into_chunks,
+)
 
 
 def write_translation_repo(repo_root: Path) -> Path:
@@ -194,3 +198,21 @@ def test_translate_spanish_uses_fragment_safe_cleanup_when_cleanup_chunk_placeho
     assert extract_visible_citation_markers(translated_text) == ["[1]", "[1]"]
     assert any("Existing translated markdown chunk:" in call for call in calls)
     assert any("Existing translated markdown fragment:" in call for call in calls)
+
+
+def test_freeze_english_master_applies_known_regression_fixes_and_writes_report(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_translation_repo(repo_root))
+    config.final_draft_output_path.write_text(
+        '# Title\n\nThe Valley of West was a mistake, and Gatsby tried to maintain a punctiliously manner.\n',
+        encoding="utf-8",
+    )
+
+    frozen = freeze_english_master(config)
+
+    assert "Valley of Ashes" in frozen
+    assert "punctilious manner" in frozen
+    report_path = repo_root / "artifacts/qa/english_master_regression_report.json"
+    assert report_path.exists()
+    report_text = report_path.read_text(encoding="utf-8")
+    assert '"status": "passed"' in report_text

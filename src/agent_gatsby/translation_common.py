@@ -4,10 +4,12 @@ Shared translation helpers for Agent Gatsby.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 
 from agent_gatsby.config import AppConfig
+from agent_gatsby.data_ingest import utc_now_iso
 from agent_gatsby.llm_client import LLMResponseValidationError, invoke_text_completion
 
 LOGGER = logging.getLogger(__name__)
@@ -38,6 +40,17 @@ MANDARIN_NORMALIZATION_MAP = {
     "盖失比": "盖茨比",
     "盖茨模": "盖茨比",
 }
+ENGLISH_MASTER_REGRESSION_FIXES = {
+    "Valley of West": "Valley of Ashes",
+    "punctiliously manner": "punctilious manner",
+}
+DEFAULT_REQUIRED_ENGLISH_MASTER_TERMS: tuple[str, ...] = ()
+DEFAULT_FORBIDDEN_ENGLISH_MASTER_PHRASES = ("Valley of West", "punctiliously manner")
+SPANISH_INTERNAL_TOKEN_RE = re.compile(r"\bAGCIT\w*(?:\s+[\u0400-\u04FF]+)?")
+SPANISH_ESCAPE_SEQUENCE_RE = re.compile(r"\$\\\\\w+\b|\\[A-Za-z]+\b")
+MANDARIN_ELLIPSIS_BEFORE_CITATION_RE = re.compile(
+    r"[.…]{2,}\s*(\[(?:\d+|\d+\.\d+|#\d+,\s*Chapter\s+\d+,\s*Paragraph\s+\d+)\])"
+)
 
 
 def paragraph_blocks(text: str) -> list[str]:
@@ -196,12 +209,88 @@ def validate_citations_section_parity(english_master: str, translated_text: str)
         raise ValueError("Translated output changed the citation entry count")
 
 
+def english_master_regression_report_path(config: AppConfig):
+    return config.resolve_repo_path(
+        str(
+            config.verification.get(
+                "english_master_regression_output_path",
+                "artifacts/qa/english_master_regression_report.json",
+            )
+        )
+    )
+
+
+def normalize_english_master_regressions(text: str) -> tuple[str, list[dict[str, str]]]:
+    normalized = text
+    applied_fixes: list[dict[str, str]] = []
+    for source, target in ENGLISH_MASTER_REGRESSION_FIXES.items():
+        if source not in normalized:
+            continue
+        normalized = normalized.replace(source, target)
+        applied_fixes.append({"from": source, "to": target})
+    return normalized, applied_fixes
+
+
+def build_english_master_regression_report(config: AppConfig, text: str, *, applied_fixes: list[dict[str, str]] | None = None):
+    required_terms = tuple(
+        str(term)
+        for term in config.verification.get("english_master_required_terms", DEFAULT_REQUIRED_ENGLISH_MASTER_TERMS)
+        if str(term).strip()
+    )
+    forbidden_phrases = tuple(
+        str(phrase)
+        for phrase in config.verification.get(
+            "english_master_forbidden_phrases",
+            DEFAULT_FORBIDDEN_ENGLISH_MASTER_PHRASES,
+        )
+        if str(phrase).strip()
+    )
+    missing_required_terms = [term for term in required_terms if term not in text]
+    forbidden_phrase_hits = [phrase for phrase in forbidden_phrases if phrase in text]
+    major_issues: list[str] = []
+    if missing_required_terms:
+        major_issues.append("English master is missing required terminology.")
+    if forbidden_phrase_hits:
+        major_issues.append("English master still contains forbidden regression phrases.")
+    return {
+        "stage": "freeze_english",
+        "generated_at": utc_now_iso(),
+        "status": "passed" if not major_issues else "failed",
+        "required_terms": list(required_terms),
+        "missing_required_terms": missing_required_terms,
+        "forbidden_phrases": list(forbidden_phrases),
+        "forbidden_phrase_hits": forbidden_phrase_hits,
+        "applied_fixes": applied_fixes or [],
+        "major_issues": major_issues,
+    }
+
+
+def write_english_master_regression_report(config: AppConfig, report: dict[str, object]) -> None:
+    output_path = english_master_regression_report_path(config)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    LOGGER.info("Wrote English master regression report to %s", output_path)
+
+
+def validate_english_master_regressions(config: AppConfig, text: str) -> str:
+    normalized_text, applied_fixes = normalize_english_master_regressions(text)
+    report = build_english_master_regression_report(config, normalized_text, applied_fixes=applied_fixes)
+    write_english_master_regression_report(config, report)
+    if report["major_issues"]:
+        raise ValueError("English master failed terminology/regression validation")
+    return normalized_text
+
+
 def freeze_english_master(config: AppConfig) -> str:
     source_path = config.final_draft_output_path
     if not source_path.exists():
         raise FileNotFoundError(f"Final English report not found: {source_path}")
 
-    master_text = source_path.read_text(encoding="utf-8").strip() + "\n"
+    raw_text = source_path.read_text(encoding="utf-8").strip() + "\n"
+    master_text = validate_english_master_regressions(config, raw_text).strip() + "\n"
+    if master_text != raw_text:
+        source_path.write_text(master_text, encoding="utf-8")
+        LOGGER.info("Applied deterministic English regression fixes to %s", source_path)
     output_path = config.english_master_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(master_text, encoding="utf-8")
@@ -306,9 +395,15 @@ def validate_translated_fragment(translated_text: str) -> None:
 
 def normalize_translated_body(text: str, *, language_name: str) -> str:
     normalized = CITATION_GLUE_RE.sub(r"\1 ", text)
+    if language_name == "Spanish":
+        normalized = SPANISH_INTERNAL_TOKEN_RE.sub("", normalized)
+        normalized = SPANISH_ESCAPE_SEQUENCE_RE.sub(" ", normalized)
+        normalized = normalized.replace("esporádíamos", "esporádicos")
     if language_name == "Simplified Chinese":
+        normalized = MANDARIN_ELLIPSIS_BEFORE_CITATION_RE.sub(r" \1", normalized)
         for source, target in MANDARIN_NORMALIZATION_MAP.items():
             normalized = normalized.replace(source, target)
+    normalized = re.sub(r"[ \t]{2,}", " ", normalized)
     return normalized
 
 

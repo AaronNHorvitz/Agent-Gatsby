@@ -76,6 +76,7 @@ pdf:
   heading_spacing_before: 6
   heading_spacing_after: 6
   citation_entry_spacing: 0
+  section_min_following_sentences: 5
   english_font_regular: "NotoSerif-Regular.ttf"
   english_font_bold: "NotoSerif-Bold.ttf"
   spanish_font_regular: "NotoSerif-Regular.ttf"
@@ -113,7 +114,9 @@ class FakePDF:
         self.l_margin = 25
         self.r_margin = 25
         self.w = 210
+        self.page_break_trigger = 272
         self.page_count = 1
+        self.current_y = 25.0
         self.font_calls: list[tuple[str, float]] = []
         self.multi_cell_calls: list[str] = []
         self.ln_calls: list[float] = []
@@ -123,11 +126,26 @@ class FakePDF:
     def set_font(self, family: str, size: float, style: str = "") -> None:
         self.font_calls.append((family or style, size))
 
-    def multi_cell(self, w: float, h: float, text: str, align: str = "J") -> None:
+    def multi_cell(
+        self,
+        w: float,
+        h: float,
+        text: str,
+        align: str = "J",
+        dry_run: bool = False,
+        output: str | None = None,
+        **_: object,
+    ):
+        lines = [line for line in text.split("\n") if line] or [text]
+        if dry_run and output == "LINES":
+            return lines
         self.multi_cell_calls.append(text)
+        self.current_y += max(len(lines), 1) * h
 
     def ln(self, h: float | None = None) -> None:
-        self.ln_calls.append(0.0 if h is None else float(h))
+        delta = 0.0 if h is None else float(h)
+        self.ln_calls.append(delta)
+        self.current_y += delta
 
     def set_x(self, value: float) -> None:
         self.x_positions.append(value)
@@ -135,9 +153,13 @@ class FakePDF:
     def add_page(self) -> None:
         self.add_page_calls += 1
         self.page_count += 1
+        self.current_y = 25.0
 
     def page_no(self) -> int:
         return self.page_count
+
+    def get_y(self) -> float:
+        return self.current_y
 
 
 def test_render_markdown_blocks_keeps_citations_on_separate_lines_and_adds_spacing(tmp_path) -> None:
@@ -196,3 +218,19 @@ Body paragraph.
     assert "Citas" in pdf.multi_cell_calls
     assert "1. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 1, cited passage beginning \"Alpha\"." in pdf.multi_cell_calls
     assert "2. F. Scott Fitzgerald, The Great Gatsby, ch. 1, para. 2, cited passage beginning \"Beta\"." in pdf.multi_cell_calls
+
+
+def test_render_markdown_blocks_moves_section_to_new_page_when_space_is_too_tight(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_pdf_repo(repo_root))
+    pdf = FakePDF()
+    pdf.current_y = pdf.page_break_trigger - 8
+    text = """### Tight Section
+
+Sentence one. Sentence two. Sentence three. Sentence four. Sentence five.
+"""
+
+    render_markdown_blocks(pdf, config, text)
+
+    assert pdf.add_page_calls == 1
+    assert "Tight Section" in pdf.multi_cell_calls

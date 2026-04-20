@@ -17,6 +17,11 @@ from agent_gatsby.critique_and_edit import critique_and_edit
 from agent_gatsby.data_ingest import ingest_source
 from agent_gatsby.draft_english import draft_english
 from agent_gatsby.extract_metaphors import extract_metaphor_candidates
+from agent_gatsby.final_artifact_audit import (
+    audit_rendered_pdfs,
+    pdf_audit_report_paths,
+    pdf_audit_reports_are_renderable,
+)
 from agent_gatsby.index_text import index_normalized_text
 from agent_gatsby.logging_utils import configure_logging
 from agent_gatsby.manifest_writer import write_manifest
@@ -219,6 +224,9 @@ def stage_render_pdfs(config: AppConfig, context: StageContext) -> None:
         )
 
     context["pdf_outputs"] = render_pdfs(config)
+    context["pdf_audit_reports"] = audit_rendered_pdfs(config)
+    if not pdf_audit_reports_are_renderable(context["pdf_audit_reports"]):
+        raise ValueError("Cannot promote PDFs: final artifact audit failed")
 
 
 def stage_write_manifest(config: AppConfig, context: StageContext) -> None:
@@ -230,6 +238,7 @@ def stage_write_manifest(config: AppConfig, context: StageContext) -> None:
         config.english_pdf_output_path.exists()
         and config.spanish_pdf_output_path.exists()
         and config.mandarin_pdf_output_path.exists()
+        and all(path.exists() for path in pdf_audit_report_paths(config))
     ):
         stage_render_pdfs(config, context)
 

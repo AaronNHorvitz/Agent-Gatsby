@@ -110,3 +110,49 @@ def test_build_translation_qa_report_flags_mandarin_mixed_script_and_forbidden_n
     assert report["mixed_script_issue_count"] >= 1
     assert report["forbidden_mandarin_variant_count"] >= 1
     assert report["major_issues"]
+
+
+def test_build_translation_qa_report_flags_spanish_internal_tokens_scripts_and_escape_artifacts() -> None:
+    english = '# Title\n\nBody text [10].\n\n## Citations\n\n1. Ref.\n'
+    translated = '# Titulo\n\nla luna prematura AGCIT себя [10] y como si la casa hubiera guiñado un$\\\\un ojo [12].\n\n## Citas\n\n1. Ref.\n'
+
+    report = build_translation_qa_report(
+        language="spanish",
+        english_master=english,
+        translated_text=translated,
+    )
+
+    assert report["internal_token_issue_count"] >= 1
+    assert report["foreign_script_issue_count"] >= 1
+    assert report["escape_sequence_issue_count"] >= 1
+    assert report["citation_neighborhood_issue_count"] >= 1
+    assert translation_report_is_renderable(report) is False
+
+
+def test_build_translation_qa_report_flags_known_bad_spanish_token() -> None:
+    english = '# Title\n\nBody text [15].\n\n## Citations\n\n1. Ref.\n'
+    translated = '# Titulo\n\njuegos nerviosos y esporádíamos [15].\n\n## Citas\n\n1. Ref.\n'
+
+    report = build_translation_qa_report(
+        language="spanish",
+        english_master=english,
+        translated_text=translated,
+    )
+
+    assert report["known_bad_token_count"] >= 1
+    assert translation_report_is_renderable(report) is False
+
+
+def test_build_translation_qa_report_flags_repeated_mandarin_ellipsis_before_citation() -> None:
+    english = '# Title\n\nBody text [30].\n\n## Citations\n\n1. Ref.\n'
+    translated = '# 标题\n\n这构成了听觉意象……………… [30]\n\n## 引文\n\n1. Ref.\n'
+
+    report = build_translation_qa_report(
+        language="mandarin",
+        english_master=english,
+        translated_text=translated,
+    )
+
+    assert report["repeated_ellipsis_issue_count"] >= 1
+    assert report["citation_neighborhood_issue_count"] >= 1
+    assert translation_report_is_renderable(report) is False

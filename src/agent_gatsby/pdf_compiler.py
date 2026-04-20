@@ -19,6 +19,7 @@ LOGGER = logging.getLogger(__name__)
 
 NUMBERED_LIST_LINE_RE = re.compile(r"^\d+\.\s+")
 CITATION_SECTION_HEADINGS = {"Citations", "Citas", "引文"}
+SENTENCE_END_RE = re.compile(r'[.!?](?:["”’)\]]+)?|[。！？]')
 
 FONT_HINTS = {
     "NotoSerif-Regular.ttf": "Noto Serif",
@@ -53,6 +54,100 @@ def is_label_plus_blockquote_block(lines: list[str]) -> bool:
         return False
     trailing_lines = [line for line in lines[1:] if line.strip()]
     return bool(trailing_lines) and all(line.lstrip().startswith(">") for line in trailing_lines)
+
+
+def count_sentences(text: str) -> int:
+    stripped = text.strip()
+    if not stripped:
+        return 0
+    count = len(SENTENCE_END_RE.findall(stripped))
+    return count if count > 0 else 1
+
+
+def flatten_block_text(lines: list[str]) -> str:
+    cleaned_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith(">"):
+            stripped = stripped.lstrip(">").strip()
+        cleaned_lines.append(strip_markdown_formatting(stripped))
+    return " ".join(cleaned_lines).strip()
+
+
+def collect_section_preview_text(
+    blocks: list[str],
+    *,
+    start_index: int,
+    current_lines: list[str],
+    min_sentences: int,
+) -> str:
+    preview_parts: list[str] = []
+    sentence_count = 0
+
+    def append_preview(lines: list[str]) -> None:
+        nonlocal sentence_count
+        text = flatten_block_text(lines)
+        if not text:
+            return
+        preview_parts.append(text)
+        sentence_count += count_sentences(text)
+
+    append_preview(current_lines)
+    if sentence_count >= min_sentences:
+        return " ".join(preview_parts).strip()
+
+    for block in blocks[start_index + 1 :]:
+        lines = block.splitlines()
+        first_line = lines[0].strip()
+        if first_line.startswith("# "):
+            break
+        if first_line.startswith("## ") or first_line.startswith("### "):
+            break
+        append_preview(lines)
+        if sentence_count >= min_sentences:
+            break
+
+    return " ".join(preview_parts).strip()
+
+
+def usable_page_width(pdf: NumberedPDF, *, indent: float = 0) -> float:
+    return pdf.w - pdf.l_margin - pdf.r_margin - indent
+
+
+def estimate_rendered_height(
+    pdf: NumberedPDF,
+    *,
+    text: str,
+    width: float,
+    line_height: float,
+    align: str,
+) -> float:
+    if not text.strip():
+        return 0.0
+    try:
+        lines = pdf.multi_cell(
+            width,
+            line_height,
+            text,
+            align=align,
+            dry_run=True,
+            output="LINES",
+        )
+        if isinstance(lines, tuple):
+            lines = next((item for item in lines if isinstance(item, list)), [text])
+        if isinstance(lines, list):
+            return max(len(lines), 1) * line_height
+    except TypeError:
+        pass
+    return max(len(text.splitlines()), 1) * line_height
+
+
+def remaining_page_space(pdf: NumberedPDF) -> float:
+    if hasattr(pdf, "get_y") and hasattr(pdf, "page_break_trigger"):
+        return float(pdf.page_break_trigger - pdf.get_y())
+    return float("inf")
 
 
 def resolve_font_path(config: AppConfig, font_name: str) -> Path:
@@ -113,6 +208,7 @@ def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str) -> No
     heading_spacing_after = float(config.pdf.get("heading_spacing_after", line_height * 2))
     citation_entry_spacing = float(config.pdf.get("citation_entry_spacing", 0))
     blockquote_indent = 8
+    section_min_following_sentences = int(config.pdf.get("section_min_following_sentences", 5))
 
     def render_paragraph(paragraph_text: str) -> None:
         pdf.set_font("Body", size=body_font_size)
@@ -132,7 +228,7 @@ def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str) -> No
         pdf.ln(paragraph_spacing)
 
     blocks = [block.strip() for block in text.split("\n\n") if block.strip()]
-    for block in blocks:
+    for index, block in enumerate(blocks):
         lines = block.splitlines()
         first_line = lines[0].strip()
 
@@ -150,7 +246,33 @@ def render_markdown_blocks(pdf: NumberedPDF, config: AppConfig, text: str) -> No
             if heading_text in CITATION_SECTION_HEADINGS and pdf.page_no() > 0:
                 pdf.add_page()
             else:
-                pdf.ln(heading_spacing_before)
+                preview_text = collect_section_preview_text(
+                    blocks,
+                    start_index=index,
+                    current_lines=lines[1:],
+                    min_sentences=section_min_following_sentences,
+                )
+                pdf.set_font(pdf.heading_font_family, size=heading_font_size)
+                heading_height = estimate_rendered_height(
+                    pdf,
+                    text=strip_markdown_formatting(heading_text),
+                    width=usable_page_width(pdf),
+                    line_height=line_height,
+                    align="L",
+                )
+                pdf.set_font("Body", size=body_font_size)
+                preview_height = estimate_rendered_height(
+                    pdf,
+                    text=preview_text,
+                    width=usable_page_width(pdf),
+                    line_height=line_height,
+                    align="L",
+                )
+                required_height = heading_spacing_before + heading_height + heading_spacing_after + preview_height
+                if remaining_page_space(pdf) < required_height:
+                    pdf.add_page()
+                else:
+                    pdf.ln(heading_spacing_before)
             pdf.set_font(pdf.heading_font_family, size=heading_font_size)
             pdf.multi_cell(0, line_height, strip_markdown_formatting(heading_text), align="L")
             pdf.ln(heading_spacing_after)

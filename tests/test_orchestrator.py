@@ -276,7 +276,20 @@ def test_orchestrator_runs_all_stages_and_writes_artifacts(monkeypatch, tmp_path
         config.final_manifest_output_path.write_text(json.dumps(payload), encoding="utf-8")
         return payload
 
+    def fake_audit_rendered_pdfs(config):
+        reports = {
+            "english": {"status": "passed"},
+            "spanish": {"status": "passed"},
+            "mandarin": {"status": "passed"},
+        }
+        for language in reports:
+            path = repo_root / f"artifacts/qa/{language}_pdf_audit_report.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(reports[language]), encoding="utf-8")
+        return reports
+
     monkeypatch.setattr("agent_gatsby.orchestrator.render_pdfs", fake_render_pdfs)
+    monkeypatch.setattr("agent_gatsby.orchestrator.audit_rendered_pdfs", fake_audit_rendered_pdfs)
     monkeypatch.setattr("agent_gatsby.orchestrator.write_manifest", fake_write_manifest)
     exit_code = main(["--config", str(config_path), "--run", "all"])
 
@@ -365,9 +378,17 @@ def test_stage_render_pdfs_requires_structurally_renderable_translation_reports(
         render_called = True
         return []
 
+    def fake_audit_rendered_pdfs(config):
+        return {
+            "english": {"status": "passed"},
+            "spanish": {"status": "passed"},
+            "mandarin": {"status": "passed"},
+        }
+
     monkeypatch.setattr("agent_gatsby.orchestrator.stage_qa_spanish", fake_stage_qa_spanish)
     monkeypatch.setattr("agent_gatsby.orchestrator.stage_qa_mandarin", fake_stage_qa_mandarin)
     monkeypatch.setattr("agent_gatsby.orchestrator.render_pdfs", fake_render_pdfs)
+    monkeypatch.setattr("agent_gatsby.orchestrator.audit_rendered_pdfs", fake_audit_rendered_pdfs)
 
     with pytest.raises(ValueError, match="Spanish translation failed required structural QA"):
         stage_render_pdfs(
@@ -380,3 +401,86 @@ def test_stage_render_pdfs_requires_structurally_renderable_translation_reports(
         )
 
     assert render_called is False
+
+
+def test_stage_render_pdfs_requires_passing_pdf_audit(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_test_repo(repo_root))
+    render_called = False
+
+    def fake_stage_qa_spanish(config, context):
+        context["spanish_qa_report"] = {
+            "non_empty_translation": True,
+            "heading_count_match": True,
+            "section_order_match": True,
+            "citation_count_match": True,
+            "quote_marker_count_match": True,
+            "citations_section_present": True,
+            "english_citation_entry_count": 1,
+            "translated_citation_entry_count": 1,
+            "citation_entry_count_match": True,
+            "citations_heading_without_entries": False,
+            "untranslated_body_quote_count": 0,
+            "citation_glue_issue_count": 0,
+            "internal_token_issue_count": 0,
+            "escape_sequence_issue_count": 0,
+            "foreign_script_issue_count": 0,
+            "repeated_ellipsis_issue_count": 0,
+            "known_bad_token_count": 0,
+            "citation_neighborhood_issue_count": 0,
+            "mixed_script_issue_count": 0,
+            "forbidden_mandarin_variant_count": 0,
+        }
+
+    def fake_stage_qa_mandarin(config, context):
+        context["mandarin_qa_report"] = {
+            "non_empty_translation": True,
+            "heading_count_match": True,
+            "section_order_match": True,
+            "citation_count_match": True,
+            "quote_marker_count_match": True,
+            "citations_section_present": True,
+            "english_citation_entry_count": 1,
+            "translated_citation_entry_count": 1,
+            "citation_entry_count_match": True,
+            "citations_heading_without_entries": False,
+            "untranslated_body_quote_count": 0,
+            "citation_glue_issue_count": 0,
+            "internal_token_issue_count": 0,
+            "escape_sequence_issue_count": 0,
+            "foreign_script_issue_count": 0,
+            "repeated_ellipsis_issue_count": 0,
+            "known_bad_token_count": 0,
+            "citation_neighborhood_issue_count": 0,
+            "mixed_script_issue_count": 0,
+            "forbidden_mandarin_variant_count": 0,
+        }
+
+    def fake_render_pdfs(config):
+        nonlocal render_called
+        render_called = True
+        return []
+
+    def fake_audit_rendered_pdfs(config):
+        return {
+            "english": {"status": "passed"},
+            "spanish": {"status": "failed"},
+            "mandarin": {"status": "passed"},
+        }
+
+    monkeypatch.setattr("agent_gatsby.orchestrator.stage_qa_spanish", fake_stage_qa_spanish)
+    monkeypatch.setattr("agent_gatsby.orchestrator.stage_qa_mandarin", fake_stage_qa_mandarin)
+    monkeypatch.setattr("agent_gatsby.orchestrator.render_pdfs", fake_render_pdfs)
+    monkeypatch.setattr("agent_gatsby.orchestrator.audit_rendered_pdfs", fake_audit_rendered_pdfs)
+
+    with pytest.raises(ValueError, match="final artifact audit failed"):
+        stage_render_pdfs(
+            config,
+            {
+                "english_master": "# Title\n",
+                "spanish_translation": "# Titulo\n",
+                "mandarin_translation": "# 标题\n",
+            },
+        )
+
+    assert render_called is True

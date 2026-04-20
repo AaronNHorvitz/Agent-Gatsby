@@ -141,6 +141,12 @@ drafting:
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
+  english_master_regression_output_path: "artifacts/qa/english_master_regression_report.json"
+  english_master_required_terms:
+    - "Valley of Ashes"
+  english_master_forbidden_phrases:
+    - "Valley of West"
+    - "punctiliously manner"
   fail_on_quote_mismatch: true
   fail_on_invalid_citation: true
   invalid_quote_rate_threshold: 0.0
@@ -201,6 +207,7 @@ pdf:
   heading_spacing_before: 6
   heading_spacing_after: 6
   citation_entry_spacing: 0
+  section_min_following_sentences: 5
   english_font_regular: "NotoSerif-Regular.ttf"
   english_font_bold: "NotoSerif-Bold.ttf"
   spanish_font_regular: "NotoSerif-Regular.ttf"
