@@ -1,0 +1,34 @@
+{
+  "generated_at": "2026-04-20T21:15:40.631542Z",
+  "source_hash": "64d7d37f0aee02626d9dc17e8372928be5c2b7d6c6c53c3b40c48cb236304981",
+  "config_path": "/var/home/aaronnhorvitz/dev/Agent-Gatsby/config/config.yaml",
+  "output_files": [
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/final/analysis_english_master.md",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/drafts/analysis_english_final.md",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/final/citation_text.md",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/translations/analysis_spanish_draft.md",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/translations/analysis_mandarin_draft.md",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/outputs/Gatsby_Analysis_English.pdf",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/outputs/Gatsby_Analysis_Spanish.pdf",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/outputs/Gatsby_Analysis_Mandarin.pdf"
+  ],
+  "qa_reports": [
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/english_verification_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/english_master_regression_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/spanish_qa_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/mandarin_qa_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/citation_registry.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/english_pdf_audit_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/spanish_pdf_audit_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/mandarin_pdf_audit_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/english_llm_forensic_audit_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/spanish_llm_forensic_audit_report.json",
+    "/var/home/aaronnhorvitz/dev/Agent-Gatsby/artifacts/qa/mandarin_llm_forensic_audit_report.json"
+  ],
+  "models": {
+    "primary_reasoner": "gemma4:26b",
+    "final_critic": "gemma4:26b",
+    "translator_es": "gemma4:26b",
+    "translator_zh": "gemma4:26b"
+  }
+}
