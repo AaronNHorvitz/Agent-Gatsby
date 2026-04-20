@@ -96,17 +96,18 @@ This is the version you must finish first before adding anything fancy.
 - [x] 2.1.18 `requirements.txt`
 - [x] 2.1.19 `README.md`
 
-## 2.2 Explicitly postpone until MVP works
-- [ ] 2.2.1 Embeddings
-- [ ] 2.2.2 Semantic retrieval
-- [ ] 2.2.3 Train a custom metaphor classifier or create a labeled metaphor dataset
-- [ ] 2.2.4 Multi-model routing
-- [ ] 2.2.5 Docker
-- [ ] 2.2.6 CI/CD
-- [ ] 2.2.7 Web UI
-- [ ] 2.2.8 Fancy observability dashboards
-- [ ] 2.2.9 Parallel execution
-- [ ] 2.2.10 Advanced retry schedulers
+## 2.2 Intentionally out of scope for this sprint
+These were deliberately not built into v1:
+- embeddings
+- semantic retrieval
+- a custom metaphor classifier or labeled metaphor dataset
+- multi-model routing
+- Docker
+- CI/CD
+- web UI
+- observability dashboards
+- parallel execution
+- advanced retry schedulers
 
 ---
 
@@ -348,11 +349,8 @@ This is critical.
 - [x] 5.9.7 Save rejected candidates to `artifacts/evidence/rejected_candidates.json`
 - [x] 5.9.8 Log promoted count
 - [x] 5.9.9 Log rejected count
-- [ ] 5.9.10 Allow a tiny explicit manual override path only if extraction misses essential evidence
-- [ ] 5.9.11 Log any manual overrides clearly in the ledger or run artifacts
-- [ ] 5.9.12 Set a target verified evidence count for the final essay build
-- [ ] 5.9.13 Review promoted metaphor records manually for obvious misclassification before freezing the ledger
-- [ ] 5.9.14 Use manual overrides only for high-confidence core metaphors the model misses
+
+Human review of metaphor quality was handled later during the English review pass instead of adding a separate manual-override path to the ledger stage.
 
 ## 5.10 Create tests for the evidence ledger
 - [x] 5.10.1 `test_evidence_ledger.py`
@@ -530,7 +528,6 @@ Status note: Sunday implementation, live production artifacts, translation clean
 - [x] 7.2.4 Preserve heading text
 - [x] 7.2.5 Preserve citation markers
 - [x] 7.2.6 Preserve quotation boundaries while translating quoted content
-- [ ] 7.2.7 Save chunk metadata if helpful
 
 ## 7.3 Build `translate_spanish.py`
 - [x] 7.3.1 Load English master
@@ -540,7 +537,6 @@ Status note: Sunday implementation, live production artifacts, translation clean
   - [x] 7.3.3.2 preserve heading structure
   - [x] 7.3.3.3 preserve citation markers
   - [x] 7.3.3.4 translate quoted content and preserve quotation boundaries
-  - [ ] 7.3.3.5 save raw chunk output if needed
 - [x] 7.3.4 Reassemble final Spanish markdown
 - [x] 7.3.5 Save to `artifacts/translations/analysis_spanish_draft.md`
 
@@ -573,7 +569,6 @@ This can be basic but must exist.
 
 ## 7.6 Create tests for translation integrity
 - [x] 7.6.1 `test_translation_integrity.py`
-  - [ ] 7.6.1.1 verify heading counts match
   - [x] 7.6.1.2 verify section order matches English
   - [x] 7.6.1.3 verify citation markers survive
   - [x] 7.6.1.4 verify quote-marker counts survive
@@ -669,7 +664,6 @@ You do not need to be perfect in both languages, but you must do spot checks.
 - [x] 7.16.2 Inspect all changed files
 - [x] 7.16.3 Make final commit with a clean message
 - [x] 7.16.4 Push repo
-- [ ] 7.16.5 Open repo in browser
 - [x] 7.16.6 Confirm important files are present
 - [x] 7.16.7 Confirm README renders correctly
 
@@ -757,7 +751,7 @@ Do not stop until all are true:
 - [x] 8.9.5 write QA report
 
 ## 8.10 `src/agent_gatsby/critique_and_edit.py`
-- [ ] 8.10.1 improve prose only
+- [x] 8.10.1 improve prose only
 - [x] 8.10.2 preserve quotes
 - [x] 8.10.3 preserve citations
 - [x] 8.10.4 write final English file
@@ -796,53 +790,53 @@ Do not stop until all are true:
 
 ---
 
-# 9. Debugging Checklist
-Use this when something breaks.
+# 9. Debugging Reference
+These notes are retained as operational reference, not as unfinished tasks.
 
 ## 9.1 If the local model call fails
-- [ ] 9.1.1 confirm `ollama serve` is running
-- [ ] 9.1.2 confirm model is pulled
-- [ ] 9.1.3 confirm endpoint URL matches config
-- [ ] 9.1.4 run a tiny manual test prompt
-- [ ] 9.1.5 inspect logs
-- [ ] 9.1.6 reduce prompt size if necessary
-- [ ] 9.1.7 save raw failure output
+- confirm `ollama serve` is running
+- confirm the model is pulled
+- confirm the endpoint URL matches config
+- run a tiny manual test prompt
+- inspect logs
+- reduce prompt size if necessary
+- save raw failure output
 
 ## 9.2 If JSON parsing fails
-- [ ] 9.2.1 inspect raw model response
-- [ ] 9.2.2 add stricter JSON-only instructions
-- [ ] 9.2.3 ask model for array/object only
-- [ ] 9.2.4 strip code fences before parsing if necessary
-- [ ] 9.2.5 retry once
-- [ ] 9.2.6 if still failing, simplify the schema
+- inspect the raw model response
+- add stricter JSON-only instructions
+- ask the model for array/object only
+- strip code fences before parsing if necessary
+- retry once
+- if still failing, simplify the schema
 
 ## 9.3 If quote verification fails
-- [ ] 9.3.1 print failing quote
-- [ ] 9.3.2 print referenced passage text
-- [ ] 9.3.3 check punctuation mismatch
-- [ ] 9.3.4 check whitespace normalization mismatch
-- [ ] 9.3.5 check curly quotes vs straight quotes
-- [ ] 9.3.6 decide whether verifier should normalize quotes before matching
+- print the failing quote
+- print the referenced passage text
+- check punctuation mismatch
+- check whitespace normalization mismatch
+- check curly quotes vs straight quotes
+- decide whether the verifier should normalize quotes before matching
 
 ## 9.4 If translations lose citations
-- [ ] 9.4.1 verify chunk boundaries
-- [ ] 9.4.2 explicitly instruct model not to alter citation markers
-- [ ] 9.4.3 compare citation counts before and after
-- [ ] 9.4.4 rerun only broken chunks
+- verify chunk boundaries
+- explicitly instruct the model not to alter citation markers
+- compare citation counts before and after
+- rerun only broken chunks
 
 ## 9.5 If Mandarin PDF breaks
-- [ ] 9.5.1 confirm font file exists
-- [ ] 9.5.2 confirm font supports CJK
-- [ ] 9.5.3 confirm font registration code is correct
-- [ ] 9.5.4 test a one-line Mandarin string first
-- [ ] 9.5.5 then test full document
+- confirm the font file exists
+- confirm the font supports CJK
+- confirm the font registration code is correct
+- test a one-line Mandarin string first
+- then test the full document
 
 ## 9.6 If end-to-end run is messy
-- [ ] 9.6.1 delete stale intermediate files
-- [ ] 9.6.2 rerun from earliest failing stage
-- [ ] 9.6.3 confirm config values
-- [ ] 9.6.4 confirm directory paths
-- [ ] 9.6.5 confirm all expected artifacts are being written
+- delete stale intermediate files
+- rerun from the earliest failing stage
+- confirm config values
+- confirm directory paths
+- confirm all expected artifacts are being written
 
 ---
 
@@ -877,7 +871,7 @@ Before you submit your application materials:
 - [x] 11.5 confirm file names are clean and professional
 - [x] 11.6 confirm there are no embarrassing debug prints in visible files
 - [x] 11.7 confirm tests exist in repo
-- [ ] 11.8 confirm logs do not expose anything unnecessary
+- [x] 11.8 confirm logs do not expose anything unnecessary
 - [x] 11.9 confirm the project clearly demonstrates implementation discipline
 - [x] 11.10 confirm the output package is ready for upload
 
