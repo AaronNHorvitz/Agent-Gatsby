@@ -25,6 +25,7 @@ def write_manifest_repo(repo_root: Path) -> Path:
         repo_root / "artifacts/translations/analysis_spanish_draft.md",
         repo_root / "artifacts/translations/analysis_mandarin_draft.md",
         repo_root / "artifacts/qa/english_verification_report.json",
+        repo_root / "artifacts/qa/english_llm_forensic_audit_report.json",
         repo_root / "artifacts/qa/spanish_qa_report.json",
         repo_root / "artifacts/qa/mandarin_qa_report.json",
         repo_root / "outputs/Gatsby_Analysis_English.pdf",
@@ -68,6 +69,7 @@ translation_outputs:
 verification:
   output_path: "artifacts/qa/english_verification_report.json"
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
+  english_llm_forensic_audit_output_path: "artifacts/qa/english_llm_forensic_audit_report.json"
 pdf:
   english_pdf_path: "outputs/Gatsby_Analysis_English.pdf"
   spanish_pdf_path: "outputs/Gatsby_Analysis_Spanish.pdf"
@@ -96,4 +98,5 @@ def test_write_manifest_records_existing_outputs(tmp_path) -> None:
     assert payload["source_hash"] == "abc123"
     assert str(config.english_master_output_path) in payload["output_files"]
     assert str(config.english_verification_report_path) in payload["qa_reports"]
+    assert str(repo_root / "artifacts/qa/english_llm_forensic_audit_report.json") in payload["qa_reports"]
     assert manifest.models["translator_es"] == "gemma4:26b"

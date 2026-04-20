@@ -10,7 +10,7 @@ from pathlib import Path
 
 from agent_gatsby.config import AppConfig
 from agent_gatsby.data_ingest import utc_now_iso
-from agent_gatsby.final_artifact_audit import pdf_audit_report_paths
+from agent_gatsby.final_artifact_audit import llm_forensic_audit_report_paths, pdf_audit_report_paths
 from agent_gatsby.schemas import FinalManifest
 from agent_gatsby.translation_common import english_master_regression_report_path
 
@@ -50,6 +50,7 @@ def build_final_manifest(config: AppConfig) -> FinalManifest:
             config.mandarin_qa_report_path,
             config.citation_registry_output_path,
             *pdf_audit_report_paths(config),
+            *llm_forensic_audit_report_paths(config),
         ]
     )
     models = {

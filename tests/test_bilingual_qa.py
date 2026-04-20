@@ -129,6 +129,24 @@ def test_build_translation_qa_report_flags_spanish_internal_tokens_scripts_and_e
     assert translation_report_is_renderable(report) is False
 
 
+def test_build_translation_qa_report_flags_assistant_prompt_leak() -> None:
+    english = '# Title\n\nBody text [6].\n\n## Citations\n\n1. Ref.\n'
+    translated = (
+        '# Titulo\n\nTexto [6]. Please provide the Spanish markdown fragment you would like me to revise. '
+        'I am ready to apply the professional academic copyediting standards described in your instructions.\n\n'
+        '## Citas\n\n1. Ref.\n'
+    )
+
+    report = build_translation_qa_report(
+        language="spanish",
+        english_master=english,
+        translated_text=translated,
+    )
+
+    assert report["prompt_leak_issue_count"] >= 1
+    assert translation_report_is_renderable(report) is False
+
+
 def test_build_translation_qa_report_flags_known_bad_spanish_token() -> None:
     english = '# Title\n\nBody text [15].\n\n## Citations\n\n1. Ref.\n'
     translated = '# Titulo\n\njuegos nerviosos y esporádíamos [15].\n\n## Citas\n\n1. Ref.\n'

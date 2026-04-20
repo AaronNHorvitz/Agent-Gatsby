@@ -42,6 +42,12 @@ MANDARIN_ASCII_COMMA_AFTER_CITATION_RE = re.compile(r"\[(?:\d+|\d+\.\d+)\],")
 FORBIDDEN_MANDARIN_VARIANTS = ("菲茨平", "菲茨格拉德")
 LEAKED_MARKDOWN_HEADING_RE = re.compile(r"(?m)^#{1,6}\s+#\s+.+$")
 UNLOCALIZED_BIBLIOGRAPHY_RE = re.compile(r"cited passage beginning|The Great Gatsby")
+ASSISTANT_PROMPT_LEAK_RE = re.compile(
+    r"Please provide the .*?fragment you would like me to revise|"
+    r"I am ready to apply .*?instructions|"
+    r"professional academic copyediting standards",
+    re.IGNORECASE,
+)
 KNOWN_BAD_SPANISH_TOKENS = (
     "esporádíamos",
     "masimvo",
@@ -62,7 +68,16 @@ KNOWN_BAD_SPANISH_TOKENS = (
     "rompe físicamente",
     "se rompe literalmente como el cristal",
     "borde irregular del universo",
+    "episodio deshilachado del universo",
     "el gran y húmedo corral de Long Island Sound",
+    "Please provide the Spanish markdown fragment you would like me to revise.",
+    "professional academic copyediting standards",
+    "emocionante murmullo de su voz",
+    "pierta",
+    "ilustcionar",
+    "metáfor yas",
+    "apogeencia",
+    "servicio de catering",
     'surgió de su concepción platónica de sí mismo". [13]',
 )
 KNOWN_BAD_MANDARIN_TOKENS: tuple[str, ...] = (
@@ -88,6 +103,16 @@ KNOWN_BAD_MANDARIN_TOKENS: tuple[str, ...] = (
     "物理层面",
     "情妇",
     "补剂",
+    "菲茨杰是否存在",
+    "长显长岛海峡",
+    "餐饮承包园",
+    "构想中的杰伊·盖茨比",
+    "厚实感",
+    "实体感感",
+    "叙骗手段",
+    "盖盖茨比",
+    "鸿望",
+    "世界及其女主人",
     "男人和姑娘们",
     "人群的旋涡与涡流",
     "从餐饮师的篮子里变出来的",
@@ -241,6 +266,10 @@ def find_bibliography_localization_issues(text: str) -> list[str]:
     return [match.group(0) for match in UNLOCALIZED_BIBLIOGRAPHY_RE.finditer(text)]
 
 
+def find_assistant_prompt_leaks(text: str) -> list[str]:
+    return [match.group(0) for match in ASSISTANT_PROMPT_LEAK_RE.finditer(text)]
+
+
 def find_citation_neighborhood_issues(
     text: str,
     *,
@@ -303,6 +332,7 @@ def build_translation_qa_report(
     forbidden_mandarin_variants: list[str] = []
     markdown_heading_leaks: list[str] = []
     bibliography_localization_issues: list[str] = []
+    prompt_leak_issues = find_assistant_prompt_leaks(translated_text)
     if language.lower() == "spanish":
         foreign_script_issues = find_spanish_foreign_script_issues(translated_text)
         known_bad_tokens = find_known_bad_tokens(translated_text, KNOWN_BAD_SPANISH_TOKENS)
@@ -369,6 +399,8 @@ def build_translation_qa_report(
         major_issues.append("Translated output leaked markdown heading markers into visible text.")
     if bibliography_localization_issues:
         major_issues.append("Translated bibliography metadata was not localized.")
+    if prompt_leak_issues:
+        major_issues.append("Translated output leaked assistant or prompt-revision text into the document.")
 
     notes = "No major structural mismatch detected." if not major_issues else " ".join(major_issues)
     return {
@@ -396,6 +428,7 @@ def build_translation_qa_report(
         "forbidden_mandarin_variant_count": len(forbidden_mandarin_variants),
         "markdown_heading_leak_count": len(markdown_heading_leaks),
         "bibliography_localization_issue_count": len(bibliography_localization_issues),
+        "prompt_leak_issue_count": len(prompt_leak_issues),
         "non_empty_translation": non_empty_translation,
         "major_issues": major_issues,
         "notes": notes,
@@ -476,5 +509,6 @@ def translation_report_is_renderable(report: dict[str, object]) -> bool:
         "forbidden_mandarin_variant_count",
         "markdown_heading_leak_count",
         "bibliography_localization_issue_count",
+        "prompt_leak_issue_count",
     )
     return all(int(report.get(field, 0) or 0) == 0 for field in required_zero_fields)

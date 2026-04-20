@@ -211,14 +211,25 @@ def test_freeze_english_master_applies_known_regression_fixes_and_writes_report(
     repo_root = tmp_path / "repo"
     config = load_config(write_translation_repo(repo_root))
     config.final_draft_output_path.write_text(
-        '# Title\n\nThe Valley of West was a mistake, and Gatsby tried to maintain a punctiliously manner. He could still look out over the solemn dumping ground [5], hear the thin and far away [30] echoes of a dead dream, and note that a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6]. The ash-grey men, who move dimly and already crumbling through the powdery air [4], remain part of the landscape.\n',
+        '# Title\n\nThe novel follows Nick Carrawical, and Fitzgerald says the Valley of West was a mistake, and Gatsby tried to maintain a punctiliously manner. '
+        'He does not use metaphor merely as a decorative layer. '
+        'The outline leans too hard on literal and figurative heat. '
+        'Nick remarks, Your place looks like the Es World’s Fair [18]. '
+        'He could still look out over the solemn dumping ground [5], hear the thin and far away [30] echoes of a dead dream, '
+        'and note that a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity [6]. '
+        'The ash-grey men, who move dimly and already crumbling through the powdery air [4], remain part of the landscape while grotesleque gardens rise nearby.\n',
         encoding="utf-8",
     )
 
     frozen = freeze_english_master(config)
 
+    assert "Nick Carraway" in frozen
     assert "Valley of Ashes" in frozen
     assert "punctilious manner" in frozen
+    assert "He does not use metaphors merely" in frozen
+    assert "rising heat and social pressure" in frozen
+    assert '*"Your place looks like the World’s Fair"* [18].' in frozen
+    assert "grotesque gardens" in frozen
     assert '"look out over the solemn dumping ground" [5]' in frozen
     assert 'the "thin and far away" [30] echoes of a dead dream' in frozen
     assert '"a white ashen dust veiled his dark suit and his pale hair as it veiled everything in the vicinity" [6]' in frozen
@@ -306,3 +317,54 @@ def test_normalize_translated_body_fixes_remaining_spanish_and_mandarin_overlite
     assert "物理层面" not in normalized_mandarin
     assert "切实地改变了生活其中的人" in normalized_mandarin
     assert "明显走向破碎的时刻" in normalized_mandarin
+
+
+def test_normalize_translated_body_removes_prompt_leaks_and_current_spanish_mandarin_corruptions() -> None:
+    spanish = (
+        "Fitzgerald utiliza metáfor yas para ilustcionar el problema. "
+        "Esto ocurre durante el apogeencia de la fiesta, y el narración describe la cesta de un servicio de catering [10]. "
+        "Please provide the Spanish markdown fragment you would like me to revise. "
+        "I am ready to apply the professional academic copyediting standards described in your instructions. "
+        "Los personajes pierta la capacidad de seguir adelante, y El emocionante murmullo de su voz era un tónico salvaje bajo la lluvia."
+    )
+    mandarin = (
+        "菲茨杰是否存在利用地质和空间隐喻，建立了一个人物与景观都不具备固定、可靠中心的的世界。 "
+        "他将长显长岛海峡那巨大的湿漉漉的牲口棚写成从餐饮承包园的篮子里产出的景象。 "
+        "来自长岛西卵的杰伊·构想中的杰伊·盖茨比随即出现，杰伊·盖茨比那模糊的轮廓已变得如一个男人般厚实感。 "
+        "他的轮廓后来又被误写成实体感感。 "
+        "这套叙骗手段最终压在盖盖茨比身上。"
+    )
+
+    normalized_spanish = normalize_translated_body(spanish, language_name="Spanish")
+    normalized_mandarin = normalize_translated_body(mandarin, language_name="Simplified Chinese")
+
+    assert "metáfor yas" not in normalized_spanish
+    assert "ilustcionar" not in normalized_spanish
+    assert "apogeencia" not in normalized_spanish
+    assert "servicio de catering" not in normalized_spanish
+    assert "Please provide the Spanish markdown fragment" not in normalized_spanish
+    assert "professional academic copyediting standards" not in normalized_spanish
+    assert "pierta" not in normalized_spanish
+    assert "emocionante murmullo de su voz" not in normalized_spanish
+    assert "metáforas" in normalized_spanish
+    assert "ilustrar" in normalized_spanish
+    assert "apogeo" in normalized_spanish
+    assert "servicio de banquetes" in normalized_spanish
+    assert "pierden" in normalized_spanish
+    assert "El excitante ondular de su voz" in normalized_spanish
+
+    assert "菲茨杰是否存在" not in normalized_mandarin
+    assert "长显长岛海峡" not in normalized_mandarin
+    assert "餐饮承包园" not in normalized_mandarin
+    assert "构想中的杰伊·盖茨比" not in normalized_mandarin
+    assert "厚实感" not in normalized_mandarin
+    assert "叙骗手段" not in normalized_mandarin
+    assert "盖盖茨比" not in normalized_mandarin
+    assert "菲茨杰拉德利用地质和空间隐喻" in normalized_mandarin
+    assert "长岛海峡那片潮湿而阔大的牲口院" in normalized_mandarin
+    assert "餐饮承包商" in normalized_mandarin
+    assert "来自长岛西卵的杰伊·盖茨比" in normalized_mandarin
+    assert "已充实为一个男人的实体感" in normalized_mandarin
+    assert "实体感感" not in normalized_mandarin
+    assert "叙事手段" in normalized_mandarin
+    assert "盖茨比" in normalized_mandarin

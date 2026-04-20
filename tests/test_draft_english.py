@@ -342,12 +342,18 @@ def test_draft_english_applies_regression_fixes_before_writing(monkeypatch, tmp_
     def fake_invoke_text_completion(*args, **kwargs) -> str:
         user_prompt = kwargs.get("user_prompt", "")
         if "Section heading: Desire at a Distance" in user_prompt:
-            return "Nick keeps returning to the ragged horizon, the place that once felt like theragged edge of the universe [1.2]."
+            return "Nick Carrawical keeps returning to the ragged horizon, the place that once felt like theragged edge of the universe [1.2]."
         if "Section heading: Material Decay and Social Vision" in user_prompt:
-            return "The valley shows that decay does not merely sit stagnant; it actively populating the landscape [2.2]."
+            return (
+                "The valley shows that decay does not merely sit stagnant; it actively populating the landscape [2.2]. "
+                "Its grotesleque gardens continue to spread."
+            )
         if "Section type: introduction" in user_prompt:
-            return "Nick enters a world that already feels like theragged edge of the universe."
-        return "By the end, Gatsby can no longer maintain a punctiliously manner."
+            return (
+                "He does not use metaphor merely as a decorative layer, and Nick enters a world that already feels like theragged edge of the universe. "
+                "By the end, the essay drifts into literal and figurative heat that leads to the story's tragic conclusion."
+            )
+        return "By the end, Gatsby can no longer maintain a punctiliously manner, and Nick remarks, Your place looks like the Es World’s Fair [18]."
 
     monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
 
@@ -356,11 +362,21 @@ def test_draft_english_applies_regression_fixes_before_writing(monkeypatch, tmp_
     section_two = (repo_root / "artifacts/drafts/sections/S2.md").read_text(encoding="utf-8")
 
     assert "theragged edge" not in draft_text
+    assert "Nick Carrawical" not in draft_text
+    assert "He does not use metaphor merely" not in draft_text
+    assert "grotesleque" not in draft_text
     assert "it actively populating the landscape" not in draft_text
     assert "punctiliously manner" not in draft_text
+    assert "literal and figurative heat" not in draft_text
+    assert "Es World’s Fair" not in draft_text
+    assert "Nick Carraway" in draft_text
     assert "the ragged edge" in draft_text
+    assert "He does not use metaphors merely" in draft_text
+    assert "grotesque gardens" in draft_text
     assert "it actively populates the landscape" in draft_text
     assert "punctilious manner" in draft_text
+    assert "rising heat and social pressure" in draft_text
+    assert '"Your place looks like the World’s Fair"' in draft_text
     assert "theragged edge" not in section_one
     assert "it actively populating the landscape" not in section_two
 
