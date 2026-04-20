@@ -525,6 +525,68 @@ def test_draft_english_continues_when_one_section_expansion_fails(monkeypatch, t
     assert timing_report["word_count"] >= 340
 
 
+def test_draft_english_uses_near_target_top_off_when_still_slightly_short(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_draft_repo(repo_root))
+    config.drafting["expansion_pass_enabled"] = True
+    config.drafting["expansion_pass_max_rounds"] = 1
+    config.drafting["expansion_pass_min_increase_words"] = 40
+    config.drafting["near_target_top_off_enabled"] = True
+    config.drafting["near_target_top_off_tolerance_words"] = 50
+    config.drafting["near_target_top_off_min_increase_words"] = 15
+    config.drafting["fail_below_target_word_count"] = True
+    config.drafting["target_word_count_min"] = 165
+    config.drafting["target_word_count_max"] = 900
+    top_off_calls: list[tuple[str, int | None]] = []
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        user_prompt = kwargs.get("user_prompt", "")
+        if "Section type: introduction" in user_prompt:
+            return "Fitzgerald uses metaphors to make longing and social decay visible in the novel."
+        if "Section heading: Desire at a Distance" in user_prompt:
+            return "This section argues that the green light turns desire into a visible object [1.2]."
+        if "Section heading: Material Decay and Social Vision" in user_prompt:
+            return "This section argues that the valley of ashes gives decay a visible landscape [2.2]."
+        return "The conclusion closes the argument by returning to collapse and failed aspiration."
+
+    def fake_expand_section(
+        config,
+        *,
+        section_type,
+        heading,
+        current_text,
+        minimum_increase_words=None,
+        **kwargs,
+    ) -> str:
+        top_off_calls.append((section_type, minimum_increase_words))
+        if minimum_increase_words is None:
+            return current_text
+        if section_type == "introduction":
+            return (
+                current_text
+                + " It also frames the essay's scope, Fitzgerald's method, and the stakes of tracing these metaphor clusters across the novel."
+            )
+        if section_type == "conclusion":
+            return (
+                current_text
+                + " The ending now adds one more concise judgment about how those recurring images expose the fragility of Gatsby's dream."
+            )
+        return current_text
+
+    monkeypatch.setattr("agent_gatsby.draft_english.invoke_text_completion", fake_invoke_text_completion)
+    monkeypatch.setattr("agent_gatsby.draft_english.expand_section", fake_expand_section)
+
+    draft_text = draft_english(config)
+
+    assert "It also frames the essay's scope" in draft_text
+    assert "The ending now adds one more concise judgment" in draft_text
+    timing_report = json.loads((repo_root / "artifacts/qa/english_draft_timing.json").read_text(encoding="utf-8"))
+    assert timing_report["near_target_top_off_used"] is True
+    assert timing_report["word_count"] >= 165
+    assert ("introduction", 15) in top_off_calls
+    assert any(section_type == "conclusion" and minimum_increase_words is not None for section_type, minimum_increase_words in top_off_calls)
+
+
 def test_draft_english_retries_introduction_with_compact_prompt(monkeypatch, tmp_path) -> None:
     repo_root = tmp_path / "repo"
     config = load_config(write_draft_repo(repo_root))

@@ -853,6 +853,7 @@ def expand_section(
     output_path: str,
     require_citation: bool,
     completed_body_sections: list[tuple[str, str]] | None = None,
+    minimum_increase_words: int | None = None,
 ) -> str:
     current_body_text = strip_metaphor_focus_block(current_text) if section_type == "body" else current_text.strip()
     current_word_count = count_words(current_body_text)
@@ -861,7 +862,11 @@ def expand_section(
         outline=outline,
         section_type=section_type,
     )
-    minimum_increase = int(config.drafting.get("expansion_pass_min_increase_words", 120))
+    minimum_increase = (
+        minimum_increase_words
+        if minimum_increase_words is not None
+        else int(config.drafting.get("expansion_pass_min_increase_words", 120))
+    )
     minimum_progress_word_count = current_word_count + minimum_increase
     response_validator = build_section_expansion_response_validator(
         current_body_text,
@@ -1163,6 +1168,18 @@ def expansion_pass_max_rounds(config: AppConfig) -> int:
     return max(0, int(config.drafting.get("expansion_pass_max_rounds", 1)))
 
 
+def near_target_top_off_enabled(config: AppConfig) -> bool:
+    return bool(config.drafting.get("near_target_top_off_enabled", False))
+
+
+def near_target_top_off_tolerance_words(config: AppConfig) -> int:
+    return max(0, int(config.drafting.get("near_target_top_off_tolerance_words", 0)))
+
+
+def near_target_top_off_min_increase_words(config: AppConfig) -> int:
+    return max(1, int(config.drafting.get("near_target_top_off_min_increase_words", 1)))
+
+
 def draft_english(
     config: AppConfig,
     *,
@@ -1432,6 +1449,82 @@ def draft_english(
             if word_count >= minimum_words:
                 break
 
+    top_off_used = False
+    if (
+        minimum_words > 0
+        and word_count < minimum_words
+        and expansion_pass_enabled(config)
+        and near_target_top_off_enabled(config)
+        and (minimum_words - word_count) <= near_target_top_off_tolerance_words(config)
+    ):
+        shortfall_words = minimum_words - word_count
+        LOGGER.info(
+            "Starting near-threshold English top-off because draft is only %d words short of the minimum",
+            shortfall_words,
+        )
+        for section_type, heading, section_notes, current_text, output_filename in (
+            ("introduction", "Introduction", loaded_outline.intro_notes, introduction_text, "00_introduction.md"),
+            ("conclusion", "Conclusion", loaded_outline.conclusion_notes, conclusion_text, "99_conclusion.md"),
+        ):
+            if word_count >= minimum_words:
+                break
+            remaining_shortfall = minimum_words - word_count
+            minimum_increase_words = min(
+                near_target_top_off_min_increase_words(config),
+                remaining_shortfall,
+            )
+            try:
+                expanded_text = expand_section(
+                    config,
+                    outline=loaded_outline,
+                    section_type=section_type,
+                    heading=heading,
+                    section_notes=section_notes,
+                    current_text=current_text,
+                    evidence_records=outline_records,
+                    passage_index=loaded_index,
+                    output_path=str(config.section_drafts_dir_path / output_filename),
+                    require_citation=False,
+                    completed_body_sections=section_texts,
+                    minimum_increase_words=minimum_increase_words,
+                )
+            except ValueError as exc:
+                LOGGER.warning("Skipping %s top-off expansion after validation failure: %s", section_type, exc)
+                continue
+            if count_words(expanded_text) <= count_words(current_text):
+                continue
+            top_off_used = True
+            if section_type == "introduction":
+                introduction_text = expanded_text
+            else:
+                conclusion_text = expanded_text
+            write_section_file(
+                config,
+                filename=output_filename,
+                heading=heading,
+                text=expanded_text,
+            )
+            draft_text = compose_full_draft(
+                loaded_outline,
+                introduction_text=introduction_text,
+                section_texts=section_texts,
+                conclusion_text=conclusion_text,
+            )
+            draft_text = apply_draft_regression_fixes(
+                draft_text,
+                label=f"near-threshold top-off after {section_type}",
+            )
+            validate_combined_draft(draft_text, loaded_outline)
+            write_english_draft(config, draft_text)
+            word_count = count_words(draft_text)
+            estimated_pages = estimate_page_count(word_count, words_per_page)
+            LOGGER.info(
+                "English draft length after %s top-off: %d words, %.2f estimated pages",
+                section_type,
+                word_count,
+                estimated_pages,
+            )
+
     if maximum_words > 0 and word_count > maximum_words:
         LOGGER.warning("English draft is above target word count: %d > %d", word_count, maximum_words)
 
@@ -1445,6 +1538,7 @@ def draft_english(
             "word_count": word_count,
             "estimated_pages": estimated_pages,
             "expansion_rounds_used": expansion_rounds_used,
+            "near_target_top_off_used": top_off_used,
             "total_elapsed_seconds": total_elapsed_seconds,
             "transport": str(config.drafting.get("llm_transport", "")).strip()
             or str(config.models.get("provider", "")).strip()

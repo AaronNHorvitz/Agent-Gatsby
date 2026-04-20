@@ -125,6 +125,9 @@ drafting:
   expansion_pass_enabled: true
   expansion_pass_max_rounds: 3
   expansion_pass_min_increase_words: 60
+  near_target_top_off_enabled: true
+  near_target_top_off_tolerance_words: 120
+  near_target_top_off_min_increase_words: 30
   expansion_pass_transport: "ollama_native_chat"
   timing_output_path: "artifacts/qa/english_draft_timing.json"
   target_word_count_min: 7360
