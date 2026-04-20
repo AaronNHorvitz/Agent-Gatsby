@@ -15,15 +15,17 @@ Build, test, debug, and package a working local AI pipeline that:
 ## Current Snapshot
 - `Status:` shipped
 - `Primary result:` a local AI pipeline that produces a cited English analysis, Spanish and Mandarin translations, three PDFs, QA artifacts, and a final manifest
-- `Implementation signal:` evidence-first drafting, quote and citation verification, translation QA, deterministic PDF rendering, and final artifact audits
+- `Implementation signal:` evidence-first drafting, bounded English expansion, quote and citation verification, dynamic critic-correction, translation QA, deterministic PDF rendering, and final artifact audits
 - `Current outputs:` `outputs/Gatsby_Analysis_English.pdf`, `outputs/Gatsby_Analysis_Spanish.pdf`, `outputs/Gatsby_Analysis_Mandarin.pdf`, and `outputs/final_manifest.json`
 - `Remaining work:` only optional hardening and presentation cleanup, not missing core functionality
+- `Operational reference:` `README.md` is the current implementation and execution guide; `PRD.md` is retained as the planning artifact
 
 ## Implemented Capabilities
 - locked source text with manifest and hash tracking
 - deterministic passage indexing and evidence ledger generation
-- English drafting, verification, and frozen master promotion
-- Spanish and Mandarin translation from the frozen English master
+- English drafting, bounded expansion/top-off recovery, verification, and frozen master promotion
+- English, Spanish, and Mandarin dynamic critic-correction before markdown finalization
+- Spanish and Mandarin translation from the frozen English master with bounded chunk fallback when placeholders drift
 - structural QA and final PDF audit gates before promotion
 - post-PDF forensic audit reports with a small blocking list for prompt leaks and leaked assistant text
 - deterministic PDF rendering with Unicode-safe font configuration

@@ -1,7 +1,7 @@
 # Sprintboard
 ## Weekend Execution Dashboard
 
-**Objective:** design, implement, validate, and package a local AI pipeline for Treasury's Gatsby screening task.
+**Objective:** design, implement, validate, and package a local AI pipeline for Treasury's supplemental *Great Gatsby* challenge.
 
 **Status:** shipped
 
@@ -16,10 +16,10 @@
 **What shipped**
 - locked source text, source manifest, and deterministic passage index
 - evidence ledger, citation registry, and citation text artifact
-- English draft, verification pass, and frozen English master
-- Spanish and Mandarin translations from the frozen English master
+- English draft, bounded expansion path, verification pass, dynamic validation reports, and frozen English master
+- Spanish and Mandarin translations from the frozen English master with bounded chunk fallback and document-level dynamic validation
 - deterministic PDF rendering for English, Spanish, and Mandarin
-- translation QA reports, PDF audit reports, and final manifest
+- translation QA reports, PDF audit reports, LLM forensic audit reports, and final manifest
 
 **Current outputs**
 - `outputs/Gatsby_Analysis_English.pdf`
@@ -30,6 +30,7 @@
 **Validation completed**
 - unit tests for source integrity, indexing, citation handling, translation QA, and PDF rendering
 - English master regression checks before promotion
+- dynamic critic-correction reports for English, Spanish, and Mandarin markdown finalization
 - Spanish and Mandarin structural QA before rendering
 - post-PDF audit reports for English, Spanish, and Mandarin
 - post-PDF LLM forensic audit reports, with a small blocking list for prompt leaks and leaked assistant text
@@ -38,6 +39,7 @@
 **What this repo demonstrates**
 - AI implementation in a real local test environment
 - explicit evidence grounding instead of one-shot generation
+- bounded retry and fallback behavior around translation placeholder drift
 - verification gates before artifact promotion
 - multilingual generation with structure preservation
 - deterministic packaging of final outputs

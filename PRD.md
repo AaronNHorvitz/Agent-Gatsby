@@ -2,6 +2,8 @@
 ## Agent Gatsby
 ### Local, Citation-Verified Literary Analysis and Translation Pipeline
 
+This PRD is retained as the planning artifact for the project. `README.md` is the current operational reference for architecture, setup, failure handling, and shipped behavior.
+
 ---
 
 ## 1. Document Control
@@ -40,6 +42,13 @@ The repository itself is part of the deliverable. Therefore, the product is both
 
 1. the generated documents, and  
 2. the engineering system used to produce them.
+
+In the current implemented system, that engineering path also includes:
+
+- a two-stage critic-correction pass that detects token-level defects and applies surgical replacements before markdown is finalized
+- bounded chunk-level translation fallback logic when citation placeholders drift
+- deterministic PDF audits before promotion
+- a post-PDF LLM forensic audit with a small explicit blocking list for prompt leaks and leaked assistant text
 
 ---
 
@@ -280,16 +289,19 @@ The baseline implementation should run locally on the target workstation.
 4. Extract candidate metaphors
 5. Validate and promote evidence into ledger
 6. Generate thesis and outline
-7. Draft English essay section by section
+7. Draft English essay section by section, with bounded expansion if the assembled draft undershoots the target length
 8. Verify quotes and citation markers
-9. Run editorial refinement on English
-10. Freeze English master
-11. Translate English master to Spanish
-12. Translate English master to Mandarin
-13. Perform structural QA on translations
-14. Render 3 PDFs
-15. Write final manifest
-16. Run tests and dry-run validation
+9. Run bounded editorial refinement on English, with fallback to the verified draft if protected structure drifts
+10. Apply dynamic validation and freeze the canonical English master
+11. Translate the English master to Spanish in bounded chunks
+12. Run Spanish cleanup, dynamic validation, and structural QA
+13. Translate the English master to Mandarin in bounded chunks
+14. Run Mandarin cleanup, dynamic validation, and structural QA
+15. Render 3 PDFs
+16. Run deterministic PDF audits
+17. Run post-PDF LLM forensic audits with a small blocking list
+18. Write final manifest
+19. Run tests and dry-run validation
 
 ---
 
@@ -463,7 +475,9 @@ The system shall generate the English essay section by section using only eviden
 - academic tone required
 - citations must use bracketed chapter.paragraph locators such as `[5.18]`
 - page-number citations are out of scope for v1
-- the English draft should target roughly 2800-3200 words, using about 280 words per page as a planning heuristic
+- the English draft should target roughly 7360-8280 words, using about 500 words per page as the current planning heuristic
+- the outline should expand broad themes into smaller argumentative sections rather than relying on a few oversized sections
+- if the initial draft undershoots the minimum target, the system may run bounded section expansion and near-threshold top-off passes before failing closed
 - the draft should not be frozen as the English master until the verified evidence ledger is broad enough to support a full-length essay
 
 ### Acceptance Criteria
@@ -520,6 +534,7 @@ The system shall refine the English draft for clarity and coherence without alte
 - direct quotes may not be changed
 - citation markers may not be changed
 - no new evidence may be introduced
+- if the editorial pass changes protected quote or citation structure, the system must fall back to the verified draft instead of promoting the edited version
 
 ### Acceptance Criteria
 - final English file exists
@@ -531,16 +546,19 @@ The system shall refine the English draft for clarity and coherence without alte
 ## 13.10 Frozen English Master
 
 ### Requirement
-The system shall freeze the verified final English analysis as the canonical translation source.
+The system shall run dynamic validation and regression checks, then freeze the verified final English analysis as the canonical translation source.
 
 ### Inputs
-- English final
+- English final or verified-draft fallback
 
 ### Outputs
 - `artifacts/final/analysis_english_master.md`
+- `artifacts/qa/english_dynamic_validation_report.json`
+- `artifacts/qa/english_master_regression_report.json`
 
 ### Acceptance Criteria
 - English master exists
+- dynamic validation and regression reports exist
 - downstream translation stages use this file only
 
 ---
@@ -548,7 +566,7 @@ The system shall freeze the verified final English analysis as the canonical tra
 ## 13.11 Spanish Translation
 
 ### Requirement
-The system shall translate the frozen English master into Spanish in bounded chunks.
+The system shall translate the frozen English master into Spanish in bounded chunks, then apply bounded cleanup and dynamic validation before the translated markdown is finalized.
 
 ### Inputs
 - English master
@@ -563,19 +581,22 @@ The system shall translate the frozen English master into Spanish in bounded chu
 - preserve quotation boundaries
 - preserve structural order
 - maintain academic tone
+- if chunk-level placeholder preservation fails, use bounded retry and fragment-safe fallback paths rather than silently accepting drift
+- run document-level dynamic validation after the localized citations section is reassembled
 
 ### Acceptance Criteria
 - Spanish file exists
 - Spanish file is non-empty
 - heading count matches English
 - citation structure preserved
+- localized citations section is present
 
 ---
 
 ## 13.12 Mandarin Translation
 
 ### Requirement
-The system shall translate the frozen English master into Mandarin rendered in Simplified Chinese.
+The system shall translate the frozen English master into Mandarin rendered in Simplified Chinese, then apply bounded cleanup and dynamic validation before the translated markdown is finalized.
 
 ### Inputs
 - English master
@@ -591,12 +612,15 @@ The system shall translate the frozen English master into Mandarin rendered in S
 - preserve structure
 - output in Simplified Chinese
 - remain compatible with PDF rendering
+- if chunk-level placeholder preservation fails, use bounded retry and fragment-safe fallback paths rather than silently accepting drift
+- run document-level dynamic validation after the localized citations section is reassembled
 
 ### Acceptance Criteria
 - Mandarin file exists
 - Mandarin file is non-empty
 - heading count matches English
 - citation structure preserved
+- localized citations section is present
 
 ---
 
@@ -621,6 +645,7 @@ The system shall generate structural QA reports for Spanish and Mandarin outputs
 - section order parity
 - quote marker parity after full translation
 - non-empty output checks
+- citations-section parity against the English master
 
 ### Acceptance Criteria
 - both QA reports exist
@@ -653,12 +678,16 @@ The system shall render three separate PDFs from finalized text artifacts.
 - Unicode-safe rendering for Mandarin
 - separate files per language
 - no decorative layout
+- rendering promotion must be blocked if translation QA fails
+- rendered PDFs must pass deterministic audit before promotion
+- a post-PDF LLM forensic audit may block promotion on configured prompt-leak or system-leak categories
 
 ### Acceptance Criteria
 - all three PDF files exist
 - all three files open successfully
 - Mandarin PDF renders without broken characters
 - file size is non-zero
+- deterministic PDF audit reports exist and pass before promotion
 
 ---
 
@@ -792,13 +821,20 @@ The system must be buildable and stabilizable over a weekend.
 - `rejected_candidates.json` if applicable
 - `outline.json`
 - `analysis_english_draft.md`
+- `english_draft_timing.json`
 - `english_verification_report.json`
+- `citation_registry.json`
 - `analysis_english_final.md`
 - `analysis_english_master.md`
+- `citation_text.md`
+- `english_dynamic_validation_report.json`
+- `english_master_regression_report.json`
 - `analysis_spanish_draft.md`
 - `analysis_mandarin_draft.md`
 - `spanish_qa_report.json`
 - `mandarin_qa_report.json`
+- PDF audit reports
+- LLM forensic audit reports
 - final PDFs
 - `final_manifest.json`
 
@@ -820,6 +856,8 @@ Artifacts must exist not just for debugging, but to demonstrate that the pipelin
 - English verification report generated successfully
 - translation QA reports generated successfully
 - all PDFs open without errors
+- deterministic PDF audits pass before promotion
+- post-PDF forensic audits do not contain blocking defects
 
 ### 17.3 Engineering Metrics
 - unit tests pass
@@ -873,8 +911,11 @@ The system must fail clearly on:
 - broken model endpoint
 - invalid JSON from model
 - quote verification failure
+- dynamic validation structure drift
 - missing font file for Mandarin PDF
 - translation QA failures if severe
+- deterministic PDF audit failure
+- post-PDF forensic audit failure on configured blocking categories
 
 ### 19.3 Recovery Behavior
 The system should support restarting from the failed stage whenever possible.
@@ -953,7 +994,7 @@ The repo should be navigable by a reviewer within a few minutes.
 **Mitigation:** force outline-from-evidence and perform one strong human review pass.
 
 ## 23.4 Risk: Translation drift
-**Mitigation:** translate from frozen English master and run structural QA.
+**Mitigation:** translate from frozen English master, preserve citation placeholders through bounded retries and fallback paths, run dynamic validation on the reassembled translation, and require structural QA before rendering.
 
 ## 23.5 Risk: Mandarin PDF rendering fails
 **Mitigation:** use a known working Unicode/CJK font and test rendering early.
