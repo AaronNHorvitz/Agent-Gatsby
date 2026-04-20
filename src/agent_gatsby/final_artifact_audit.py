@@ -136,6 +136,11 @@ KNOWN_BAD_MANDARIN_TOKENS: tuple[str, ...] = (
 )
 AUDIT_LANGUAGE_NAMES = ("english", "spanish", "mandarin")
 FORENSIC_AUDIT_SEVERITIES = {"high", "medium", "low"}
+DEFAULT_LLM_FORENSIC_BLOCKLIST_CATEGORIES = ("system_leak", "prompt_leak")
+DEFAULT_LLM_FORENSIC_BLOCKLIST_PATTERNS = (
+    "please provide the spanish markdown fragment",
+    "professional academic copyediting standards described in your instructions",
+)
 
 
 def pdf_audit_report_path(config: AppConfig, language: str) -> Path:
@@ -172,6 +177,26 @@ def llm_forensic_audit_report_paths(config: AppConfig) -> list[Path]:
 
 def llm_forensic_audit_enabled(config: AppConfig) -> bool:
     return bool(config.verification.get("llm_forensic_audit_enabled", False))
+
+
+def llm_forensic_blocklist_categories(config: AppConfig) -> set[str]:
+    configured = config.verification.get(
+        "llm_forensic_blocklist_categories",
+        list(DEFAULT_LLM_FORENSIC_BLOCKLIST_CATEGORIES),
+    )
+    if not isinstance(configured, list):
+        return set(DEFAULT_LLM_FORENSIC_BLOCKLIST_CATEGORIES)
+    return {str(category).strip().lower() for category in configured if str(category).strip()}
+
+
+def llm_forensic_blocklist_patterns(config: AppConfig) -> list[str]:
+    configured = config.verification.get(
+        "llm_forensic_blocklist_patterns",
+        list(DEFAULT_LLM_FORENSIC_BLOCKLIST_PATTERNS),
+    )
+    if not isinstance(configured, list):
+        return list(DEFAULT_LLM_FORENSIC_BLOCKLIST_PATTERNS)
+    return [str(pattern).strip().lower() for pattern in configured if str(pattern).strip()]
 
 
 def load_forensic_audit_prompt(config: AppConfig) -> str:
@@ -236,6 +261,24 @@ def validate_forensic_audit_response(response_text: str, *, language: str) -> No
     parse_forensic_audit_response(response_text, language=language)
 
 
+def find_blocking_forensic_defects(
+    config: AppConfig,
+    defects: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    blocked_categories = llm_forensic_blocklist_categories(config)
+    blocked_patterns = llm_forensic_blocklist_patterns(config)
+    blocking_defects: list[dict[str, str]] = []
+    for defect in defects:
+        category = str(defect.get("category", "")).strip().lower()
+        original_text = str(defect.get("original_text", "")).strip().lower()
+        proposed_correction = str(defect.get("proposed_correction", "")).strip().lower()
+        if category in blocked_categories or any(
+            pattern in original_text or pattern in proposed_correction for pattern in blocked_patterns
+        ):
+            blocking_defects.append(defect)
+    return blocking_defects
+
+
 def build_forensic_audit_user_prompt(
     *,
     language: str,
@@ -287,7 +330,9 @@ def run_llm_forensic_audit(
             "status": "skipped",
             "page_count": page_count,
             "defect_count": 0,
+            "blocking_defect_count": 0,
             "defects": [],
+            "blocking_defects": [],
             "notes": "LLM forensic audit disabled in config.",
         }
         write_llm_forensic_audit_report(output_path, report)
@@ -312,15 +357,18 @@ def run_llm_forensic_audit(
             transport_override="ollama_native_chat",
         )
         parsed = parse_forensic_audit_response(response_text, language=language)
+        blocking_defects = find_blocking_forensic_defects(config, parsed["defects"])
         report = {
             "stage": "llm_forensic_pdf_audit",
             "language": language,
             "generated_at": utc_now_iso(),
             "pdf_path": str(pdf_path),
-            "status": "passed" if not parsed["defects"] else "defects_found",
+            "status": "passed" if not parsed["defects"] else "blocked" if blocking_defects else "defects_found",
             "page_count": page_count,
             "defect_count": len(parsed["defects"]),
+            "blocking_defect_count": len(blocking_defects),
             "defects": parsed["defects"],
+            "blocking_defects": blocking_defects,
             "notes": parsed["notes"],
         }
     except Exception as exc:
@@ -333,7 +381,9 @@ def run_llm_forensic_audit(
             "status": "error",
             "page_count": page_count,
             "defect_count": 0,
+            "blocking_defect_count": 0,
             "defects": [],
+            "blocking_defects": [],
             "notes": str(exc),
         }
 
@@ -489,6 +539,22 @@ def write_pdf_audit_report(output_path: Path, report: dict[str, object]) -> None
     LOGGER.info("Wrote %s PDF audit report to %s", report["language"], output_path)
 
 
+def merge_llm_forensic_audit_result(
+    pdf_report: dict[str, object],
+    llm_report: dict[str, object],
+) -> dict[str, object]:
+    merged = dict(pdf_report)
+    merged["llm_forensic_status"] = llm_report.get("status", "unknown")
+    merged["llm_forensic_defect_count"] = int(llm_report.get("defect_count", 0) or 0)
+    merged["llm_forensic_blocking_defect_count"] = int(llm_report.get("blocking_defect_count", 0) or 0)
+    if llm_report.get("status") == "blocked":
+        major_issues = list(merged.get("major_issues", []))
+        major_issues.append("LLM forensic audit detected blocklisted defects.")
+        merged["major_issues"] = major_issues
+        merged["status"] = "failed"
+    return merged
+
+
 def audit_rendered_pdfs(config: AppConfig) -> dict[str, dict[str, object]]:
     reports: dict[str, dict[str, object]] = {}
     pdf_paths = {
@@ -515,13 +581,14 @@ def audit_rendered_pdfs(config: AppConfig) -> dict[str, dict[str, object]]:
         page_counts[language] = page_count
 
     for language, pdf_path in pdf_paths.items():
-        run_llm_forensic_audit(
+        llm_report = run_llm_forensic_audit(
             config,
             language=language,
             pdf_path=pdf_path,
             extracted_text=extracted_texts[language],
             page_count=page_counts[language],
         )
+        reports[language] = merge_llm_forensic_audit_result(reports[language], llm_report)
     return reports
 
 

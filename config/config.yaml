@@ -144,6 +144,12 @@ verification:
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
   english_master_regression_output_path: "artifacts/qa/english_master_regression_report.json"
   llm_forensic_audit_enabled: true
+  llm_forensic_blocklist_categories:
+    - "system_leak"
+    - "prompt_leak"
+  llm_forensic_blocklist_patterns:
+    - "Please provide the Spanish markdown fragment"
+    - "professional academic copyediting standards described in your instructions"
   english_llm_forensic_audit_output_path: "artifacts/qa/english_llm_forensic_audit_report.json"
   spanish_llm_forensic_audit_output_path: "artifacts/qa/spanish_llm_forensic_audit_report.json"
   mandarin_llm_forensic_audit_output_path: "artifacts/qa/mandarin_llm_forensic_audit_report.json"

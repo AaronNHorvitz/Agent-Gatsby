@@ -15,6 +15,7 @@ Rules:
 - Treat properly localized labels such as `pasaje citado que comienza` and `引文开头` as acceptable.
 - Do not flag page-count differences by themselves; page-range checks are handled elsewhere.
 - If a phrase is acceptable but slightly stylistic, do not report it as a defect.
+- Use stable category labels. For leaked assistant or revision-instruction text, prefer `system_leak` or `prompt_leak`.
 - Return JSON only.
 
 Return a JSON object with this schema:
@@ -39,6 +40,7 @@ Allowed severity values:
 
 Allowed category examples:
 - `system_leak`
+- `prompt_leak`
 - `citation_corruption`
 - `linguistic_hallucination`
 - `source_accuracy`

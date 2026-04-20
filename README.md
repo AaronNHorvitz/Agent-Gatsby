@@ -13,6 +13,7 @@ What this repo proves:
 - local AI execution with no hosted inference dependency in the reference path
 - evidence-first drafting instead of one-shot generation
 - quote, citation, translation, and final-artifact validation before promotion
+- a small post-PDF forensic blocklist that can fail promotion on prompt leaks or leaked assistant text
 - deterministic PDF packaging and explicit run artifacts on disk
 - production-minded controls around auditability, recoverability, and scope
 
@@ -903,6 +904,13 @@ Before final delivery, PDFs must pass:
 - expected page count range
 - no Unicode rendering failures
 - fonts embedded correctly for CJK output
+- deterministic extracted-text audit for citation corruption, bad tokens, and prompt leaks
+- post-PDF LLM forensic audit with a small configured blocklist for critical findings such as `system_leak` or `prompt_leak`
+
+The forensic audit is intentionally not a full autonomous controller. By default:
+- deterministic PDF audit failures are blocking
+- LLM forensic findings are written to JSON reports for review
+- only blocklisted forensic findings fail promotion
 
 ---
 
@@ -1017,6 +1025,8 @@ Examples:
 - if English verification fails, rerun from drafting or critique
 - if Mandarin PDF rendering fails, rerun only the render stage
 - if one translation chunk fails QA, rerun only that chunk
+
+The post-PDF forensic audit is the last reviewer, not an unbounded retry loop. In the long run, cheap deterministic checks should happen as soon as a section or chunk is produced, with at most a small bounded retry for that section. The full-document forensic audit should stay at the end and only block promotion on a small explicit list of critical defects, such as leaked assistant text.
 
 ## 16.4 Logging outputs
 - human-readable console logs

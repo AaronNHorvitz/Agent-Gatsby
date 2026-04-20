@@ -7,6 +7,7 @@ from agent_gatsby.config import load_config
 from agent_gatsby.final_artifact_audit import (
     build_pdf_audit_report,
     llm_forensic_audit_report_path,
+    merge_llm_forensic_audit_result,
     pdf_audit_reports_are_renderable,
     run_llm_forensic_audit,
 )
@@ -138,6 +139,16 @@ models:
   api_key: "ollama"
   primary_reasoner: "gemma4:26b"
   final_critic: "gemma4:26b"
+verification:
+  output_path: "artifacts/qa/english_verification_report.json"
+  citation_registry_output_path: "artifacts/qa/citation_registry.json"
+  llm_forensic_audit_enabled: true
+  llm_forensic_blocklist_categories:
+    - "system_leak"
+    - "prompt_leak"
+  llm_forensic_blocklist_patterns:
+    - "Please provide the Spanish markdown fragment"
+    - "professional academic copyediting standards described in your instructions"
 pdf:
   english_pdf_path: "outputs/Gatsby_Analysis_English.pdf"
   spanish_pdf_path: "outputs/Gatsby_Analysis_Spanish.pdf"
@@ -182,7 +193,67 @@ def test_run_llm_forensic_audit_writes_advisory_report(monkeypatch, tmp_path) ->
     )
 
     saved = json.loads(llm_forensic_audit_report_path(config, "spanish").read_text(encoding="utf-8"))
-    assert report["status"] == "defects_found"
+    assert report["status"] == "blocked"
     assert report["defect_count"] == 1
+    assert report["blocking_defect_count"] == 1
     assert saved["defects"][0]["severity"] == "High"
     assert saved["defects"][0]["category"] == "system_leak"
+
+
+def test_run_llm_forensic_audit_keeps_non_blocklisted_findings_advisory(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_forensic_audit_repo(repo_root))
+
+    def fake_invoke_text_completion(*args, **kwargs) -> str:
+        return json.dumps(
+            {
+                "defects": [
+                    {
+                        "language": "english",
+                        "original_text": "the cement colour of their surroundings",
+                        "proposed_correction": "the cement color of their surroundings",
+                        "severity": "Low",
+                        "category": "source_accuracy",
+                    }
+                ],
+                "notes": "Found one low-severity style inconsistency.",
+            }
+        )
+
+    monkeypatch.setattr(
+        "agent_gatsby.final_artifact_audit.invoke_text_completion",
+        fake_invoke_text_completion,
+    )
+
+    report = run_llm_forensic_audit(
+        config,
+        language="english",
+        pdf_path=Path("outputs/Gatsby_Analysis_English.pdf"),
+        extracted_text="the cement colour of their surroundings",
+        page_count=12,
+    )
+
+    assert report["status"] == "defects_found"
+    assert report["defect_count"] == 1
+    assert report["blocking_defect_count"] == 0
+
+
+def test_merge_llm_forensic_audit_result_only_blocks_on_blocklisted_defects() -> None:
+    pdf_report = {"language": "spanish", "status": "passed", "major_issues": []}
+
+    advisory = merge_llm_forensic_audit_result(
+        pdf_report,
+        {"status": "defects_found", "defect_count": 1, "blocking_defect_count": 0},
+    )
+    assert advisory["status"] == "passed"
+    assert advisory["llm_forensic_status"] == "defects_found"
+    assert advisory["llm_forensic_blocking_defect_count"] == 0
+
+    blocked = merge_llm_forensic_audit_result(
+        pdf_report,
+        {"status": "blocked", "defect_count": 1, "blocking_defect_count": 1},
+    )
+    assert blocked["status"] == "failed"
+    assert blocked["llm_forensic_status"] == "blocked"
+    assert blocked["llm_forensic_blocking_defect_count"] == 1
+    assert "LLM forensic audit detected blocklisted defects." in blocked["major_issues"]

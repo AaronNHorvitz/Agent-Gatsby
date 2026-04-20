@@ -25,6 +25,7 @@ Build, test, debug, and package a working local AI pipeline that:
 - English drafting, verification, and frozen master promotion
 - Spanish and Mandarin translation from the frozen English master
 - structural QA and final PDF audit gates before promotion
+- post-PDF forensic audit reports with a small blocking list for prompt leaks and leaked assistant text
 - deterministic PDF rendering with Unicode-safe font configuration
 - unit tests, smoke checks, logs, and explicit run artifacts on disk
 

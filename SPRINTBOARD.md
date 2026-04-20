@@ -32,6 +32,7 @@
 - English master regression checks before promotion
 - Spanish and Mandarin structural QA before rendering
 - post-PDF audit reports for English, Spanish, and Mandarin
+- post-PDF LLM forensic audit reports, with a small blocking list for prompt leaks and leaked assistant text
 - deterministic artifact generation with logs and manifests written to disk
 
 **What this repo demonstrates**
