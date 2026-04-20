@@ -1,5 +1,9 @@
-"""
-Verified evidence ledger construction for Agent Gatsby.
+"""Evidence-ledger construction and candidate promotion rules.
+
+This module validates extracted metaphor candidates against the deterministic
+passage index, rejects weak or mismatched records, optionally applies manual
+overrides, and writes the verified evidence ledger that all downstream English
+planning and drafting stages depend on.
 """
 
 from __future__ import annotations
@@ -21,6 +25,22 @@ DEFAULT_MANUAL_OVERRIDE_PATH = "artifacts/evidence/manual_overrides.json"
 
 
 class ManualEvidenceOverride(BaseModel):
+    """Manual evidence record used to supplement model extraction.
+
+    Attributes
+    ----------
+    metaphor : str
+        Normalized metaphor label to promote.
+    passage_id : str
+        Passage identifier for the source quote.
+    quote : str
+        Exact quote to promote from the passage.
+    interpretation : str
+        Short explanatory interpretation for the quote.
+    supporting_theme_tags : list of str
+        Optional thematic tags attached to the record.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     metaphor: str
@@ -31,14 +51,54 @@ class ManualEvidenceOverride(BaseModel):
 
 
 def collapse_spaces(text: str) -> str:
+    """Collapse repeated whitespace to single spaces.
+
+    Parameters
+    ----------
+    text : str
+        Raw text to normalize.
+
+    Returns
+    -------
+    str
+        Whitespace-normalized text.
+    """
+
     return " ".join(text.split())
 
 
 def normalize_label(label: str) -> str:
+    """Normalize a candidate or override metaphor label.
+
+    Parameters
+    ----------
+    label : str
+        Raw metaphor label.
+
+    Returns
+    -------
+    str
+        Lowercased, whitespace-normalized label.
+    """
+
     return collapse_spaces(label).strip().lower()
 
 
 def rationale_is_too_vague(rationale: str) -> bool:
+    """Return whether a rationale is too weak for promotion.
+
+    Parameters
+    ----------
+    rationale : str
+        Candidate rationale or manual interpretation.
+
+    Returns
+    -------
+    bool
+        ``True`` when the rationale is too short or too generic to support the
+        evidence-ledger standard.
+    """
+
     normalized = collapse_spaces(rationale).strip()
     if len(normalized) < 20:
         return True
@@ -50,10 +110,38 @@ def rationale_is_too_vague(rationale: str) -> bool:
 
 
 def build_passage_lookup(passage_index: PassageIndex) -> dict[str, PassageRecord]:
+    """Build a passage lookup keyed by passage identifier.
+
+    Parameters
+    ----------
+    passage_index : PassageIndex
+        Loaded passage index.
+
+    Returns
+    -------
+    dict of str to PassageRecord
+        Lookup table keyed by ``passage_id``.
+    """
+
     return {passage.passage_id: passage for passage in passage_index.passages}
 
 
 def candidate_rejection(candidate: MetaphorCandidate, reason: str) -> RejectedCandidate:
+    """Build a rejected-candidate record from a failed candidate.
+
+    Parameters
+    ----------
+    candidate : MetaphorCandidate
+        Candidate that failed validation.
+    reason : str
+        Human-readable rejection reason.
+
+    Returns
+    -------
+    RejectedCandidate
+        Rejection record written to the rejected-candidates artifact.
+    """
+
     return RejectedCandidate(
         candidate_id=candidate.candidate_id,
         reason=reason,
@@ -69,6 +157,24 @@ def validate_candidate(
     passage_lookup: dict[str, PassageRecord],
     config: AppConfig,
 ) -> tuple[bool, str | None, PassageRecord | None]:
+    """Validate a candidate against the passage index and ledger rules.
+
+    Parameters
+    ----------
+    candidate : MetaphorCandidate
+        Candidate to validate.
+    passage_lookup : dict of str to PassageRecord
+        Passage lookup keyed by ``passage_id``.
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    tuple of (bool, str or None, PassageRecord or None)
+        Validation success flag, optional rejection reason, and the resolved
+        passage record when available.
+    """
+
     passage = passage_lookup.get(candidate.passage_id)
     if passage is None:
         return False, "Passage ID does not exist in passage index", None
@@ -96,6 +202,25 @@ def promote_candidate(
     passage: PassageRecord,
     status: str,
 ) -> EvidenceRecord:
+    """Promote a validated model candidate into a verified evidence record.
+
+    Parameters
+    ----------
+    candidate : MetaphorCandidate
+        Validated candidate to promote.
+    evidence_id : str
+        New stable evidence identifier.
+    passage : PassageRecord
+        Source passage backing the candidate.
+    status : str
+        Promotion status to store on the record.
+
+    Returns
+    -------
+    EvidenceRecord
+        Promoted evidence record.
+    """
+
     return EvidenceRecord(
         evidence_id=evidence_id,
         metaphor=normalize_label(candidate.label),
@@ -117,6 +242,25 @@ def promote_manual_override(
     passage: PassageRecord,
     status: str,
 ) -> EvidenceRecord:
+    """Promote a manual override into a verified evidence record.
+
+    Parameters
+    ----------
+    override : ManualEvidenceOverride
+        Manual override definition.
+    evidence_id : str
+        New stable evidence identifier.
+    passage : PassageRecord
+        Source passage backing the override.
+    status : str
+        Promotion status to store on the record.
+
+    Returns
+    -------
+    EvidenceRecord
+        Promoted manual evidence record.
+    """
+
     return EvidenceRecord(
         evidence_id=evidence_id,
         metaphor=normalize_label(override.metaphor),
@@ -131,10 +275,42 @@ def promote_manual_override(
 
 
 def manual_override_path(config: AppConfig) -> Path:
+    """Return the configured manual-override file path.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    Path
+        Resolved manual override path.
+    """
+
     return config.resolve_repo_path(DEFAULT_MANUAL_OVERRIDE_PATH)
 
 
 def load_manual_overrides(config: AppConfig) -> list[ManualEvidenceOverride]:
+    """Load manual evidence overrides from disk when present.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    list of ManualEvidenceOverride
+        Loaded override records. Returns an empty list when no override file is
+        present.
+
+    Raises
+    ------
+    ValueError
+        If the override file exists but does not contain a JSON array.
+    """
+
     path = manual_override_path(config)
     if not path.exists():
         return []
@@ -146,6 +322,21 @@ def load_manual_overrides(config: AppConfig) -> list[ManualEvidenceOverride]:
 
 
 def write_evidence_ledger(config: AppConfig, evidence_records: list[EvidenceRecord]) -> None:
+    """Write the evidence ledger artifact to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    evidence_records : list of EvidenceRecord
+        Promoted evidence records to serialize.
+
+    Returns
+    -------
+    None
+        The evidence ledger is written to the configured artifact path.
+    """
+
     output_path = config.evidence_ledger_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
@@ -156,6 +347,21 @@ def write_evidence_ledger(config: AppConfig, evidence_records: list[EvidenceReco
 
 
 def write_rejections(config: AppConfig, rejected_candidates: list[RejectedCandidate]) -> None:
+    """Write rejected candidates to disk or remove stale rejection output.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    rejected_candidates : list of RejectedCandidate
+        Rejection records to serialize.
+
+    Returns
+    -------
+    None
+        The rejection artifact is updated in place on disk.
+    """
+
     output_path = config.rejected_candidates_path
     if not rejected_candidates:
         if output_path.exists():
@@ -176,6 +382,31 @@ def build_evidence_ledger(
     candidates: list[MetaphorCandidate] | None = None,
     passage_index: PassageIndex | None = None,
 ) -> tuple[list[EvidenceRecord], list[RejectedCandidate]]:
+    """Validate candidates, apply overrides, and build the evidence ledger.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    candidates : list of MetaphorCandidate or None, optional
+        Preloaded extraction candidates. When omitted, the stage loads the
+        serialized candidate artifact from disk.
+    passage_index : PassageIndex or None, optional
+        Preloaded passage index. When omitted, the stage loads the serialized
+        passage index from disk.
+
+    Returns
+    -------
+    tuple of (list of EvidenceRecord, list of RejectedCandidate)
+        Promoted evidence records and rejected candidate records.
+
+    Raises
+    ------
+    ValueError
+        If a manual override references a missing passage, does not exact-match
+        its passage, or contains a too-vague interpretation.
+    """
+
     loaded_candidates = candidates or load_metaphor_candidates(config)
     loaded_index = passage_index or load_passage_index(config)
     passage_lookup = build_passage_lookup(loaded_index)

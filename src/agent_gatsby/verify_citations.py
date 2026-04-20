@@ -1,5 +1,10 @@
-"""
-Deterministic English quote and citation verification for Agent Gatsby.
+"""Deterministic English quote and citation verification.
+
+This module verifies that the drafted English analysis remains grounded in the
+locked source text and verified evidence ledger. It aligns near-miss direct
+quotes to canonical evidence when safe, validates citation resolution, writes a
+verification report, and emits a machine-readable citation registry for later
+rendering stages.
 """
 
 from __future__ import annotations
@@ -41,6 +46,19 @@ CITATION_ISSUE_CODES = {
 
 
 def load_english_draft(source: AppConfig | str | Path) -> str:
+    """Load the English draft from disk.
+
+    Parameters
+    ----------
+    source : AppConfig or str or Path
+        Configuration object or direct path to the draft artifact.
+
+    Returns
+    -------
+    str
+        English draft markdown.
+    """
+
     if isinstance(source, AppConfig):
         path = source.draft_output_path
     else:
@@ -49,10 +67,36 @@ def load_english_draft(source: AppConfig | str | Path) -> str:
 
 
 def build_passage_lookup(passage_index: PassageIndex) -> dict[str, PassageRecord]:
+    """Build a passage lookup keyed by passage identifier.
+
+    Parameters
+    ----------
+    passage_index : PassageIndex
+        Loaded passage index.
+
+    Returns
+    -------
+    dict of str to PassageRecord
+        Lookup table keyed by ``passage_id``.
+    """
+
     return {passage.passage_id: passage for passage in passage_index.passages}
 
 
 def build_evidence_lookup(evidence_records: list[EvidenceRecord]) -> dict[str, list[EvidenceRecord]]:
+    """Group evidence records by passage identifier.
+
+    Parameters
+    ----------
+    evidence_records : list of EvidenceRecord
+        Verified evidence ledger.
+
+    Returns
+    -------
+    dict of str to list of EvidenceRecord
+        Evidence records grouped by ``passage_id``.
+    """
+
     lookup: dict[str, list[EvidenceRecord]] = {}
     for record in evidence_records:
         lookup.setdefault(record.passage_id, []).append(record)
@@ -60,21 +104,77 @@ def build_evidence_lookup(evidence_records: list[EvidenceRecord]) -> dict[str, l
 
 
 def collapse_spaces(text: str) -> str:
+    """Collapse repeated whitespace to single spaces.
+
+    Parameters
+    ----------
+    text : str
+        Source text.
+
+    Returns
+    -------
+    str
+        Whitespace-normalized text.
+    """
+
     return " ".join(text.split())
 
 
 def count_words(text: str) -> int:
+    """Count words in draft text while ignoring markdown brackets and headings.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to count.
+
+    Returns
+    -------
+    int
+        Approximate word count.
+    """
+
     cleaned = ANY_BRACKET_RE.sub("", text.replace("#", " ").replace("_", " "))
     return len(re.findall(r"\b[\w'-]+\b", cleaned, flags=re.UNICODE))
 
 
 def estimate_page_count(word_count: int, words_per_page: int) -> float:
+    """Estimate page count from a word-count heuristic.
+
+    Parameters
+    ----------
+    word_count : int
+        Total word count.
+    words_per_page : int
+        Configured words-per-page heuristic.
+
+    Returns
+    -------
+    float
+        Estimated page count rounded to two decimals.
+    """
+
     if words_per_page <= 0:
         return 0.0
     return round(word_count / words_per_page, 2)
 
 
 def normalize_match_text(text: str, *, normalize_curly_quotes: bool) -> str:
+    """Normalize text for exact quote comparison.
+
+    Parameters
+    ----------
+    text : str
+        Text to normalize.
+    normalize_curly_quotes : bool
+        Whether curly quotes should be converted to straight quotes first.
+
+    Returns
+    -------
+    str
+        Whitespace-normalized comparison string.
+    """
+
     normalized = text
     if normalize_curly_quotes:
         normalized = (
@@ -87,14 +187,55 @@ def normalize_match_text(text: str, *, normalize_curly_quotes: bool) -> str:
 
 
 def normalize_loose_quote_match(text: str, *, normalize_curly_quotes: bool) -> str:
+    """Normalize text for case-insensitive loose quote matching.
+
+    Parameters
+    ----------
+    text : str
+        Text to normalize.
+    normalize_curly_quotes : bool
+        Whether curly quotes should be converted to straight quotes first.
+
+    Returns
+    -------
+    str
+        Lowercased normalization used for loose similarity matching.
+    """
+
     return normalize_match_text(text, normalize_curly_quotes=normalize_curly_quotes).lower()
 
 
 def extract_citation_markers(text: str) -> list[str]:
+    """Extract resolved passage identifiers from citation markers.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to scan.
+
+    Returns
+    -------
+    list of str
+        Passage identifiers referenced by citations in source order.
+    """
+
     return extract_citation_passage_ids(text)
 
 
 def extract_quoted_strings(text: str) -> list[str]:
+    """Extract double-quoted strings from draft text.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to scan.
+
+    Returns
+    -------
+    list of str
+        Whitespace-normalized quoted spans.
+    """
+
     quotes: list[str] = []
     for match in DOUBLE_QUOTE_RE.finditer(text):
         candidate = collapse_spaces(match.group(1)).strip()
@@ -104,10 +245,37 @@ def extract_quoted_strings(text: str) -> list[str]:
 
 
 def paragraph_blocks(text: str) -> list[str]:
+    """Split markdown text into paragraph-like blocks.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to split.
+
+    Returns
+    -------
+    list of str
+        Non-empty blocks separated by blank lines.
+    """
+
     return [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
 
 
 def quote_validation_blocks(text: str) -> list[str]:
+    """Split text into blocks used for quote validation.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to inspect.
+
+    Returns
+    -------
+    list of str
+        Paragraph blocks, with ``Metaphor text`` block quotes split into
+        line-level validation units where appropriate.
+    """
+
     blocks: list[str] = []
     for block in paragraph_blocks(text):
         if "Metaphor text:" not in block:
@@ -126,6 +294,19 @@ def quote_validation_blocks(text: str) -> list[str]:
 
 
 def extract_validation_quotes(block: str) -> list[str]:
+    """Extract quotes from a validation block.
+
+    Parameters
+    ----------
+    block : str
+        Block returned by :func:`quote_validation_blocks`.
+
+    Returns
+    -------
+    list of str
+        Quotes that should be checked against source passages.
+    """
+
     stripped = block.strip()
     blockquote_match = BLOCKQUOTE_QUOTE_LINE_RE.match(stripped)
     if blockquote_match:
@@ -135,6 +316,21 @@ def extract_validation_quotes(block: str) -> list[str]:
 
 
 def split_main_text_and_appendix(text: str, *, appendix_heading: str) -> tuple[str, str | None]:
+    """Split report text into main body and citations appendix.
+
+    Parameters
+    ----------
+    text : str
+        Full draft text.
+    appendix_heading : str
+        Heading used for the citations appendix.
+
+    Returns
+    -------
+    tuple of (str, str or None)
+        Main report body and the appendix block when present.
+    """
+
     appendix_marker = f"## {appendix_heading}"
     if appendix_marker not in text:
         return text, None
@@ -149,6 +345,26 @@ def find_canonical_quote_replacement(
     evidence_lookup: dict[str, list[EvidenceRecord]],
     normalize_curly_quotes: bool,
 ) -> str | None:
+    """Find a safe canonical quote replacement for a cited near-match.
+
+    Parameters
+    ----------
+    quote : str
+        Quoted text found in the draft.
+    cited_passage_ids : list of str
+        Passage identifiers cited by the enclosing block.
+    evidence_lookup : dict of str to list of EvidenceRecord
+        Verified evidence records grouped by passage identifier.
+    normalize_curly_quotes : bool
+        Whether curly quotes should be normalized before matching.
+
+    Returns
+    -------
+    str or None
+        Canonical replacement quote when a single safe match can be inferred,
+        otherwise ``None``.
+    """
+
     normalized_quote = normalize_match_text(quote, normalize_curly_quotes=normalize_curly_quotes)
     loose_quote = normalize_loose_quote_match(quote, normalize_curly_quotes=normalize_curly_quotes)
     candidates: list[str] = []
@@ -207,6 +423,27 @@ def repair_cited_quote_alignment(
     appendix_heading: str,
     normalize_curly_quotes: bool,
 ) -> tuple[str, list[dict[str, str]]]:
+    """Repair near-miss direct quotes against cited evidence when safe.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to repair.
+    evidence_records : list of EvidenceRecord
+        Verified evidence ledger.
+    passage_index : PassageIndex
+        Loaded passage index.
+    appendix_heading : str
+        Heading used for the citations appendix.
+    normalize_curly_quotes : bool
+        Whether curly quotes should be normalized before matching.
+
+    Returns
+    -------
+    tuple of (str, list of dict of str to str)
+        Repaired draft text and a list of applied quote replacements.
+    """
+
     main_text, appendix_text = split_main_text_and_appendix(text, appendix_heading=appendix_heading)
     evidence_lookup = build_evidence_lookup(evidence_records)
     passage_lookup = build_passage_lookup(passage_index)
@@ -258,6 +495,20 @@ def repair_cited_quote_alignment(
 
 
 def prose_paragraph_blocks(text: str) -> list[str]:
+    """Return prose-only paragraph blocks for unsupported-claim heuristics.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to inspect.
+
+    Returns
+    -------
+    list of str
+        Paragraph blocks that look like prose rather than headings or note
+        metadata.
+    """
+
     prose_blocks: list[str] = []
     for block in paragraph_blocks(text):
         normalized = collapse_spaces(block.strip().strip("_"))
@@ -272,6 +523,19 @@ def prose_paragraph_blocks(text: str) -> list[str]:
 
 
 def split_sentences(text: str) -> list[str]:
+    """Split a prose block into approximate sentences.
+
+    Parameters
+    ----------
+    text : str
+        Prose block to split.
+
+    Returns
+    -------
+    list of str
+        Sentence-like spans with trivial fragments removed.
+    """
+
     cleaned = collapse_spaces(ANY_BRACKET_RE.sub("", text)).strip(" _")
     if not cleaned:
         return []
@@ -289,6 +553,24 @@ def paragraph_has_resolved_citation(
     passage_lookup: dict[str, PassageRecord],
     evidence_lookup: dict[str, list[EvidenceRecord]],
 ) -> bool:
+    """Return whether a prose paragraph resolves to verified evidence.
+
+    Parameters
+    ----------
+    paragraph : str
+        Prose paragraph to inspect.
+    passage_lookup : dict of str to PassageRecord
+        Passage lookup keyed by ``passage_id``.
+    evidence_lookup : dict of str to list of EvidenceRecord
+        Evidence records grouped by passage identifier.
+
+    Returns
+    -------
+    bool
+        ``True`` when the paragraph includes at least one citation that maps to
+        both a known passage and verified evidence.
+    """
+
     for marker in extract_citation_markers(paragraph):
         if marker in passage_lookup and marker in evidence_lookup:
             return True
@@ -301,6 +583,24 @@ def compute_unsupported_sentence_metrics(
     passage_lookup: dict[str, PassageRecord],
     evidence_lookup: dict[str, list[EvidenceRecord]],
 ) -> tuple[int, int, float]:
+    """Compute unsupported-claim heuristic metrics for the draft.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to inspect.
+    passage_lookup : dict of str to PassageRecord
+        Passage lookup keyed by ``passage_id``.
+    evidence_lookup : dict of str to list of EvidenceRecord
+        Evidence records grouped by passage identifier.
+
+    Returns
+    -------
+    tuple of (int, int, float)
+        Prose sentence count, unsupported sentence count, and unsupported
+        sentence ratio.
+    """
+
     prose_sentence_count = 0
     unsupported_sentence_count = 0
 
@@ -327,6 +627,25 @@ def compute_unsupported_sentence_metrics(
 
 
 def build_issue(code: str, message: str, *, passage_id: str | None = None, evidence_id: str | None = None) -> VerificationIssue:
+    """Build a structured verification issue record.
+
+    Parameters
+    ----------
+    code : str
+        Stable issue code.
+    message : str
+        Human-readable issue description.
+    passage_id : str or None, optional
+        Source passage implicated in the issue.
+    evidence_id : str or None, optional
+        Evidence record implicated in the issue.
+
+    Returns
+    -------
+    VerificationIssue
+        Structured verification issue.
+    """
+
     return VerificationIssue(
         code=code,
         message=message,
@@ -341,6 +660,23 @@ def validate_citations(
     passage_lookup: dict[str, PassageRecord],
     evidence_lookup: dict[str, list[EvidenceRecord]],
 ) -> list[VerificationIssue]:
+    """Validate citation syntax and passage/evidence resolution.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to validate.
+    passage_lookup : dict of str to PassageRecord
+        Passage lookup keyed by ``passage_id``.
+    evidence_lookup : dict of str to list of EvidenceRecord
+        Evidence records grouped by passage identifier.
+
+    Returns
+    -------
+    list of VerificationIssue
+        Citation-related verification issues.
+    """
+
     issues: list[VerificationIssue] = []
 
     invalid_markers = extract_invalid_bracket_markers(text)
@@ -369,6 +705,25 @@ def validate_quotes(
     evidence_lookup: dict[str, list[EvidenceRecord]],
     normalize_curly_quotes: bool,
 ) -> list[VerificationIssue]:
+    """Validate quoted text against cited passages and verified evidence.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to validate.
+    passage_lookup : dict of str to PassageRecord
+        Passage lookup keyed by ``passage_id``.
+    evidence_lookup : dict of str to list of EvidenceRecord
+        Evidence records grouped by passage identifier.
+    normalize_curly_quotes : bool
+        Whether curly quotes should be normalized before comparison.
+
+    Returns
+    -------
+    list of VerificationIssue
+        Quote-related verification issues.
+    """
+
     issues: list[VerificationIssue] = []
 
     for block in quote_validation_blocks(text):
@@ -420,10 +775,40 @@ def validate_quotes(
 
 
 def count_issues_for_codes(issues: list[VerificationIssue], issue_codes: set[str]) -> int:
+    """Count issues belonging to a selected issue-code set.
+
+    Parameters
+    ----------
+    issues : list of VerificationIssue
+        Issues to count.
+    issue_codes : set of str
+        Codes considered part of the target category.
+
+    Returns
+    -------
+    int
+        Count of matching issues.
+    """
+
     return sum(1 for issue in issues if issue.code in issue_codes)
 
 
 def capped_rate(failure_count: int, total_count: int) -> float:
+    """Compute a bounded failure rate.
+
+    Parameters
+    ----------
+    failure_count : int
+        Number of failures.
+    total_count : int
+        Number of attempted checks.
+
+    Returns
+    -------
+    float
+        Failure rate capped to the inclusive range ``[0.0, 1.0]``.
+    """
+
     if failure_count <= 0:
         return 0.0
     if total_count <= 0:
@@ -432,6 +817,21 @@ def capped_rate(failure_count: int, total_count: int) -> float:
 
 
 def write_verification_report(config: AppConfig, report: VerificationReport) -> None:
+    """Write the English verification report to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    report : VerificationReport
+        Verification report to serialize.
+
+    Returns
+    -------
+    None
+        The report is written to the configured artifact path.
+    """
+
     output_path = config.english_verification_report_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
@@ -448,6 +848,34 @@ def verify_english_draft(
     evidence_records: list[EvidenceRecord] | None = None,
     passage_index: PassageIndex | None = None,
 ) -> VerificationReport:
+    """Verify the English draft against passages, evidence, and thresholds.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    draft_text : str or None, optional
+        Preloaded draft text. When omitted, the stage loads the draft from
+        disk.
+    evidence_records : list of EvidenceRecord or None, optional
+        Preloaded evidence ledger. When omitted, the stage loads the ledger
+        from disk.
+    passage_index : PassageIndex or None, optional
+        Preloaded passage index. When omitted, the stage loads the index from
+        disk.
+
+    Returns
+    -------
+    VerificationReport
+        Structured verification report written to disk.
+
+    Raises
+    ------
+    ValueError
+        If verification fails and the configuration requires quote or citation
+        failures to halt promotion.
+    """
+
     loaded_text = draft_text or load_english_draft(config)
     loaded_records = evidence_records or load_evidence_records(config)
     loaded_index = passage_index or load_passage_index(config)

@@ -1,5 +1,9 @@
-"""
-Editorial refinement for the verified English draft.
+"""Editorial refinement and final English report assembly.
+
+This module performs the bounded editorial pass on the verified English draft,
+optionally applies a style-simplification rewrite to prose-only blocks,
+rechecks quote alignment, and renders the final numbered-citation report plus
+the companion citation-text document used for auditability.
 """
 
 from __future__ import annotations
@@ -39,10 +43,37 @@ SINGLE_QUOTE_RE = re.compile(r"(?<!\w)['‘]([^'\n]{2,}?)['’](?!\w)")
 
 
 def load_critic_prompt(config: AppConfig) -> str:
+    """Load the editorial system prompt.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    str
+        Editorial critic prompt text.
+    """
+
     return config.resolve_prompt_path("critic_prompt_path").read_text(encoding="utf-8")
 
 
 def load_style_simplifier_prompt(config: AppConfig) -> str | None:
+    """Load the optional style-simplifier prompt asset.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    str or None
+        Style-simplifier prompt text, or ``None`` when the feature is not
+        configured.
+    """
+
     prompt_path = str(config.prompts.get("style_simplifier_prompt_path", "")).strip()
     if not prompt_path:
         return None
@@ -50,16 +81,55 @@ def load_style_simplifier_prompt(config: AppConfig) -> str | None:
 
 
 def extract_heading_inventory(text: str) -> list[str]:
+    """Extract markdown headings in encounter order.
+
+    Parameters
+    ----------
+    text : str
+        Markdown document text.
+
+    Returns
+    -------
+    list of str
+        Heading lines captured in source order.
+    """
+
     return [match.group(0).strip() for match in HEADING_RE.finditer(text)]
 
 
 def build_editorial_response_validator(original_text: str):
+    """Build a validator that protects editorially sensitive structure.
+
+    Parameters
+    ----------
+    original_text : str
+        Verified draft text used as the protected baseline.
+
+    Returns
+    -------
+    callable
+        Validator that raises when headings, quote inventory, citation
+        inventory, or metaphor-text block count drift.
+    """
+
     original_citations = Counter(extract_citation_markers(original_text))
     original_quotes = Counter(extract_quoted_strings(original_text))
     original_headings = extract_heading_inventory(original_text)
     original_metaphor_block_count = len(METAPHOR_TEXT_RE.findall(original_text))
 
     def validator(response_text: str) -> None:
+        """Validate one editorial rewrite against protected structural invariants.
+
+        Parameters
+        ----------
+        response_text : str
+            Candidate editorial rewrite.
+
+        Returns
+        -------
+        None
+        """
+
         revised_text = response_text.strip()
         if not revised_text:
             raise ValueError("Editorial revision is empty")
@@ -84,6 +154,20 @@ def build_editorial_response_validator(original_text: str):
 
 
 def build_editorial_user_prompt(draft_text: str) -> str:
+    """Build the user prompt for the bounded editorial pass.
+
+    Parameters
+    ----------
+    draft_text : str
+        Verified English draft.
+
+    Returns
+    -------
+    str
+        User prompt instructing the model to revise prose without altering
+        protected structure.
+    """
+
     instructions = [
         "Revise the verified markdown draft below for clarity, cohesion, and stronger analytical flow.",
         "Preserve every markdown heading line exactly as written.",
@@ -103,6 +187,20 @@ def build_editorial_user_prompt(draft_text: str) -> str:
 
 
 def is_style_rewrite_eligible_block(block_text: str) -> bool:
+    """Return whether a paragraph block can be safely style-rewritten.
+
+    Parameters
+    ----------
+    block_text : str
+        Candidate paragraph block.
+
+    Returns
+    -------
+    bool
+        ``True`` when the block is prose-only and does not include headings,
+        block quotes, or protected metaphor-text sections.
+    """
+
     stripped = block_text.strip()
     if not stripped:
         return False
@@ -127,10 +225,42 @@ def protect_pattern(
     token_prefix: str,
     start_index: int,
 ) -> tuple[str, dict[str, str], int]:
+    """Replace regex matches with stable protection tokens.
+
+    Parameters
+    ----------
+    text : str
+        Source text to tokenize.
+    pattern : re.Pattern
+        Pattern describing spans to protect.
+    token_prefix : str
+        Prefix used to construct replacement tokens.
+    start_index : int
+        Starting token index.
+
+    Returns
+    -------
+    tuple of (str, dict of str to str, int)
+        Tokenized text, token-to-original lookup, and final token counter.
+    """
+
     token_counter = start_index
     token_lookup: dict[str, str] = {}
 
     def replace(match: re.Match[str]) -> str:
+        """Replace one protected span with a deterministic placeholder token.
+
+        Parameters
+        ----------
+        match : re.Match[str]
+            Regex match for the span being protected.
+
+        Returns
+        -------
+        str
+            Placeholder token recorded in the lookup table.
+        """
+
         nonlocal token_counter
         token_counter += 1
         token = f"{token_prefix}{token_counter:04d}TOKEN"
@@ -141,6 +271,19 @@ def protect_pattern(
 
 
 def protect_style_tokens(block_text: str) -> tuple[str, dict[str, str]]:
+    """Protect quotes and citations before a prose-only style rewrite.
+
+    Parameters
+    ----------
+    block_text : str
+        Paragraph block to protect.
+
+    Returns
+    -------
+    tuple of (str, dict of str to str)
+        Protected block text and the token lookup required for restoration.
+    """
+
     protected_text, quote_tokens, _ = protect_pattern(
         block_text,
         DOUBLE_QUOTE_RE,
@@ -175,6 +318,21 @@ def protect_style_tokens(block_text: str) -> tuple[str, dict[str, str]]:
 
 
 def restore_style_tokens(block_text: str, token_lookup: dict[str, str]) -> str:
+    """Restore previously protected tokens to their original content.
+
+    Parameters
+    ----------
+    block_text : str
+        Tokenized block text.
+    token_lookup : dict of str to str
+        Mapping from protection token to original text.
+
+    Returns
+    -------
+    str
+        Restored block text.
+    """
+
     restored = block_text
     for token, original in token_lookup.items():
         restored = restored.replace(token, original)
@@ -182,6 +340,19 @@ def restore_style_tokens(block_text: str, token_lookup: dict[str, str]) -> str:
 
 
 def build_style_simplifier_user_prompt(block_text: str) -> str:
+    """Build the user prompt for the prose-only style simplifier.
+
+    Parameters
+    ----------
+    block_text : str
+        Protected paragraph text.
+
+    Returns
+    -------
+    str
+        User prompt for the style-simplification rewrite.
+    """
+
     instructions = [
         "Rewrite the prose paragraph below in plainspoken modern prose.",
         "Write for a high-agency reader who wants fast signal and no fluff.",
@@ -203,6 +374,22 @@ def build_style_simplifier_user_prompt(block_text: str) -> str:
 
 
 def build_style_simplifier_response_validator(original_text: str, *, minimum_word_ratio: float):
+    """Build a validator for protected prose-only rewrites.
+
+    Parameters
+    ----------
+    original_text : str
+        Protected block text used as the baseline.
+    minimum_word_ratio : float
+        Minimum allowed output-to-input word ratio.
+
+    Returns
+    -------
+    callable
+        Validator that enforces token, quote, citation, and compression
+        constraints.
+    """
+
     original_quote_tokens = Counter(PROTECTED_QUOTE_TOKEN_RE.findall(original_text))
     original_citation_tokens = Counter(PROTECTED_CITATION_TOKEN_RE.findall(original_text))
     original_quotes = Counter(extract_quoted_strings(original_text))
@@ -210,6 +397,18 @@ def build_style_simplifier_response_validator(original_text: str, *, minimum_wor
     original_word_count = len(original_text.split())
 
     def validator(response_text: str) -> None:
+        """Validate one prose-simplification response.
+
+        Parameters
+        ----------
+        response_text : str
+            Candidate simplified prose.
+
+        Returns
+        -------
+        None
+        """
+
         revised_text = response_text.strip()
         if not revised_text:
             raise ValueError("Style simplifier returned empty content")
@@ -247,6 +446,23 @@ def simplify_style_block(
     block_text: str,
     system_prompt: str,
 ) -> str:
+    """Run the style-simplification rewrite for one prose block.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    block_text : str
+        Prose block to rewrite.
+    system_prompt : str
+        Style-simplifier system prompt.
+
+    Returns
+    -------
+    str
+        Rewritten block, or the original block when validation fails.
+    """
+
     protected_text, token_lookup = protect_style_tokens(block_text.strip())
     minimum_word_ratio = float(config.editorial.get("style_simplifier_min_word_ratio", 0.88))
     transport_override = (
@@ -278,6 +494,22 @@ def simplify_style_block(
 
 
 def apply_style_simplifier(config: AppConfig, draft_text: str) -> str:
+    """Apply the optional style-simplifier pass to eligible prose blocks.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    draft_text : str
+        Draft text to simplify.
+
+    Returns
+    -------
+    str
+        Draft text with eligible prose blocks simplified when the feature is
+        enabled.
+    """
+
     if not bool(config.editorial.get("style_simplifier_enabled", False)):
         return draft_text
 
@@ -306,6 +538,21 @@ def apply_style_simplifier(config: AppConfig, draft_text: str) -> str:
 
 
 def write_final_english_draft(config: AppConfig, draft_text: str) -> None:
+    """Write the final English report markdown to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    draft_text : str
+        Final rendered report markdown.
+
+    Returns
+    -------
+    None
+        The final English report is written to the configured output path.
+    """
+
     output_path = config.final_draft_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(draft_text.strip() + "\n", encoding="utf-8")
@@ -317,6 +564,27 @@ def critique_and_edit(
     *,
     draft_text: str | None = None,
 ) -> str:
+    """Refine the verified draft and assemble final English report artifacts.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    draft_text : str or None, optional
+        Preloaded verified draft. When omitted, the stage loads the draft from
+        disk.
+
+    Returns
+    -------
+    str
+        Final reader-facing English report with numbered citations.
+
+    Notes
+    -----
+    If the editorial LLM response breaks protected quote, citation, or heading
+    invariants, the stage falls back to the verified draft unchanged.
+    """
+
     loaded_draft = draft_text or load_english_draft(config)
     loaded_index = load_passage_index(config)
     transport_override = (

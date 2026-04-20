@@ -1,5 +1,9 @@
-"""
-Deterministic structural QA for translated reports.
+"""Deterministic structural QA for translated reports.
+
+This module checks whether Spanish and Mandarin translations preserve the
+structure, citations, quotation units, and localization expectations of the
+frozen English master. Its reports are used as hard gating signals before PDF
+rendering and artifact promotion.
 """
 
 from __future__ import annotations
@@ -182,12 +186,43 @@ SPANISH_HINT_WORDS = {
 
 
 def load_translation_text(path: Path) -> str:
+    """Load a translated markdown artifact from disk.
+
+    Parameters
+    ----------
+    path : Path
+        Translation artifact path.
+
+    Returns
+    -------
+    str
+        Translation markdown text.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the translation artifact does not exist.
+    """
+
     if not path.exists():
         raise FileNotFoundError(f"Translated report not found: {path}")
     return path.read_text(encoding="utf-8")
 
 
 def span_looks_untranslated_english(span: str) -> bool:
+    """Heuristically detect untranslated English text inside a translation.
+
+    Parameters
+    ----------
+    span : str
+        Candidate text span.
+
+    Returns
+    -------
+    bool
+        ``True`` when the span resembles untranslated English prose.
+    """
+
     if not ENGLISH_MULTIWORD_RE.search(span):
         return False
     tokens = [token.lower() for token in LATIN_WORD_RE.findall(span)]
@@ -202,10 +237,36 @@ def span_looks_untranslated_english(span: str) -> bool:
 
 
 def find_untranslated_body_quotes(text: str) -> list[str]:
+    """Find quoted spans in the body that still look like English.
+
+    Parameters
+    ----------
+    text : str
+        Translated body text.
+
+    Returns
+    -------
+    list of str
+        Untranslated English-looking quoted spans.
+    """
+
     return [span for span in extract_quote_spans(text) if span_looks_untranslated_english(span)]
 
 
 def count_protected_quote_units(text: str) -> int:
+    """Count quote-bearing units in block quotes and numbered lists.
+
+    Parameters
+    ----------
+    text : str
+        Markdown document text.
+
+    Returns
+    -------
+    int
+        Number of quote-bearing protected units.
+    """
+
     total = 0
     for line in text.splitlines():
         stripped = line.lstrip()
@@ -217,30 +278,121 @@ def count_protected_quote_units(text: str) -> int:
 
 
 def find_citation_glue_issues(text: str) -> list[str]:
+    """Find citations glued directly to adjacent prose.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Problematic glued citation spans.
+    """
+
     return [match.group(0) for match in CITATION_GLUE_RE.finditer(text)]
 
 
 def find_mixed_script_issues(text: str) -> list[str]:
+    """Find mixed Latin/CJK spans that suggest rendering or cleanup drift.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Mixed-script spans.
+    """
+
     return [match.group(0) for match in MIXED_CJK_LATIN_RE.finditer(text)]
 
 
 def find_forbidden_mandarin_variants(text: str) -> list[str]:
+    """Find forbidden Mandarin proper-noun variants.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Forbidden variants present in the text.
+    """
+
     return [variant for variant in FORBIDDEN_MANDARIN_VARIANTS if variant in text]
 
 
 def find_internal_token_issues(text: str) -> list[str]:
+    """Find leaked internal placeholder tokens.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Internal placeholder tokens found in the text.
+    """
+
     return [match.group(0) for match in INTERNAL_TOKEN_RE.finditer(text)]
 
 
 def find_escape_sequence_issues(text: str) -> list[str]:
+    """Find leaked escape-sequence artifacts.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Escape-sequence artifacts found in the text.
+    """
+
     return [match.group(0) for match in ESCAPE_SEQUENCE_RE.finditer(text)]
 
 
 def find_zero_width_issues(text: str) -> list[str]:
+    """Find zero-width Unicode characters in text.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Zero-width characters found in the text.
+    """
+
     return [match.group(0) for match in ZERO_WIDTH_RE.finditer(text)]
 
 
 def find_spanish_foreign_script_issues(text: str) -> list[str]:
+    """Find unexpected non-Latin script intrusions in Spanish text.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Foreign-script spans found in the text.
+    """
+
     issues: list[str] = []
     issues.extend(match.group(0) for match in CYRILLIC_RE.finditer(text))
     issues.extend(match.group(0) for match in HAN_RE.finditer(text))
@@ -248,10 +400,38 @@ def find_spanish_foreign_script_issues(text: str) -> list[str]:
 
 
 def find_repeated_ellipsis_before_citations(text: str) -> list[str]:
+    """Find repeated ellipsis patterns immediately before citations.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Repeated ellipsis spans found near citations.
+    """
+
     return [match.group(0) for match in REPEATED_ELLIPSIS_BEFORE_CITATION_RE.finditer(text)]
 
 
 def find_known_bad_tokens(text: str, tokens: tuple[str, ...]) -> list[str]:
+    """Find explicitly banned regression tokens in text.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+    tokens : tuple of str
+        Tokens that should not appear.
+
+    Returns
+    -------
+    list of str
+        Matching bad tokens, repeated according to occurrence count.
+    """
+
     issues: list[str] = []
     for token in tokens:
         issues.extend(token for _ in range(text.count(token)))
@@ -259,14 +439,53 @@ def find_known_bad_tokens(text: str, tokens: tuple[str, ...]) -> list[str]:
 
 
 def find_markdown_heading_leaks(text: str) -> list[str]:
+    """Find leaked markdown heading markers in visible text.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Leaked heading spans.
+    """
+
     return [match.group(0) for match in LEAKED_MARKDOWN_HEADING_RE.finditer(text)]
 
 
 def find_bibliography_localization_issues(text: str) -> list[str]:
+    """Find unlocalized bibliography metadata in translated citations.
+
+    Parameters
+    ----------
+    text : str
+        Localized citations section text.
+
+    Returns
+    -------
+    list of str
+        Unlocalized bibliography fragments.
+    """
+
     return [match.group(0) for match in UNLOCALIZED_BIBLIOGRAPHY_RE.finditer(text)]
 
 
 def find_assistant_prompt_leaks(text: str) -> list[str]:
+    """Find leaked assistant or revision-prompt text in translations.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Prompt-leak spans found in the text.
+    """
+
     return [match.group(0) for match in ASSISTANT_PROMPT_LEAK_RE.finditer(text)]
 
 
@@ -276,6 +495,23 @@ def find_citation_neighborhood_issues(
     language: str,
     known_bad_tokens: tuple[str, ...] = (),
 ) -> list[str]:
+    """Inspect windows around visible citations for malformed local context.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+    language : str
+        Target language name.
+    known_bad_tokens : tuple of str, default=()
+        Additional known-bad tokens to flag when they appear near citations.
+
+    Returns
+    -------
+    list of str
+        Citation-neighborhood windows containing structural problems.
+    """
+
     issues: list[str] = []
     normalized_language = language.lower()
     for match in VISIBLE_CITATION_RE.finditer(text):
@@ -307,6 +543,23 @@ def build_translation_qa_report(
     english_master: str,
     translated_text: str,
 ) -> dict[str, object]:
+    """Build a deterministic QA report for a translated document.
+
+    Parameters
+    ----------
+    language : str
+        Target language name.
+    english_master : str
+        Frozen English master document.
+    translated_text : str
+        Localized document to evaluate.
+
+    Returns
+    -------
+    dict of str to object
+        Structured translation QA report.
+    """
+
     english_body, english_citations_section = split_body_and_citations(english_master)
     translated_body, translated_citations_section = split_translated_output_and_citations(translated_text)
     english_headings = extract_heading_levels(english_master)
@@ -436,6 +689,21 @@ def build_translation_qa_report(
 
 
 def write_translation_qa_report(output_path: Path, report: dict[str, object]) -> None:
+    """Write a translation QA report to disk.
+
+    Parameters
+    ----------
+    output_path : Path
+        Target report path.
+    report : dict of str to object
+        Report payload to serialize.
+
+    Returns
+    -------
+    None
+        The report is written to disk.
+    """
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     LOGGER.info("Wrote translation QA report to %s", output_path)
@@ -447,6 +715,24 @@ def qa_spanish(
     english_master_text: str | None = None,
     translated_text: str | None = None,
 ) -> dict[str, object]:
+    """Run structural QA for the Spanish translation package.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    english_master_text : str or None, optional
+        Preloaded English master. When omitted, the stage loads it from disk.
+    translated_text : str or None, optional
+        Preloaded Spanish translation. When omitted, the stage loads it from
+        disk.
+
+    Returns
+    -------
+    dict of str to object
+        Spanish QA report.
+    """
+
     master_text = english_master_text or load_english_master(config)
     current_translation = translated_text or load_translation_text(config.spanish_translation_output_path)
     report = build_translation_qa_report(
@@ -464,6 +750,24 @@ def qa_mandarin(
     english_master_text: str | None = None,
     translated_text: str | None = None,
 ) -> dict[str, object]:
+    """Run structural QA for the Mandarin translation package.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    english_master_text : str or None, optional
+        Preloaded English master. When omitted, the stage loads it from disk.
+    translated_text : str or None, optional
+        Preloaded Mandarin translation. When omitted, the stage loads it from
+        disk.
+
+    Returns
+    -------
+    dict of str to object
+        Mandarin QA report.
+    """
+
     master_text = english_master_text or load_english_master(config)
     current_translation = translated_text or load_translation_text(config.mandarin_translation_output_path)
     report = build_translation_qa_report(
@@ -476,6 +780,20 @@ def qa_mandarin(
 
 
 def translation_report_is_renderable(report: dict[str, object]) -> bool:
+    """Return whether a translation QA report is eligible for rendering.
+
+    Parameters
+    ----------
+    report : dict of str to object
+        Translation QA report.
+
+    Returns
+    -------
+    bool
+        ``True`` when all required parity checks pass and all hard issue counts
+        are zero.
+    """
+
     required_true_fields = (
         "non_empty_translation",
         "heading_count_match",

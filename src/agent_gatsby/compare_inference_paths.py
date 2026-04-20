@@ -1,5 +1,9 @@
-"""
-Compare one real drafting prompt across multiple local inference interfaces.
+"""Compare one drafting prompt across multiple local inference interfaces.
+
+This utility is a diagnostic helper used during local development. It sends the
+same real drafting prompt through the OpenAI-compatible endpoint, native Ollama
+chat API, and optionally the ``ollama`` CLI so transport-level differences can
+be inspected with saved artifacts.
 """
 
 from __future__ import annotations
@@ -30,6 +34,14 @@ from agent_gatsby.schemas import EvidenceRecord, OutlinePlan, OutlineSection
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for interface comparison.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed command-line arguments.
+    """
+
     parser = argparse.ArgumentParser(
         description="Compare one drafting prompt across the OpenAI-compatible, native Ollama, and CLI interfaces."
     )
@@ -57,6 +69,26 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_section_context(config: AppConfig, section_id: str | None) -> tuple[OutlinePlan, OutlineSection, list[EvidenceRecord], PassageIndex]:
+    """Load the outline section and context used for comparison.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    section_id : str or None
+        Optional explicit section identifier.
+
+    Returns
+    -------
+    tuple
+        Outline, selected section, section evidence records, and passage index.
+
+    Raises
+    ------
+    ValueError
+        If no sections exist or the requested section identifier is unknown.
+    """
+
     outline = load_outline(config)
     evidence_records = load_evidence_records(config)
     passage_index = load_passage_index(config)
@@ -85,6 +117,27 @@ def build_prompt_bundle(
     evidence_records: list[EvidenceRecord],
     passage_index: PassageIndex,
 ) -> tuple[str, str]:
+    """Build the real drafting prompt pair for one body section.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Loaded outline.
+    section : OutlineSection
+        Section selected for comparison.
+    evidence_records : list of EvidenceRecord
+        Evidence records assigned to the section.
+    passage_index : PassageIndex
+        Passage index used to render source context.
+
+    Returns
+    -------
+    tuple of (str, str)
+        System prompt and user prompt.
+    """
+
     system_prompt = load_draft_prompt(config)
     user_prompt = build_draft_user_prompt(
         config,
@@ -99,6 +152,21 @@ def build_prompt_bundle(
 
 
 def resolve_output_dir(config: AppConfig, custom_output_dir: str | None) -> Path:
+    """Resolve the output directory for comparison artifacts.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    custom_output_dir : str or None
+        Optional explicit output directory.
+
+    Returns
+    -------
+    Path
+        Resolved artifact directory, created if necessary.
+    """
+
     if custom_output_dir:
         output_dir = config.resolve_repo_path(custom_output_dir)
     else:
@@ -108,6 +176,19 @@ def resolve_output_dir(config: AppConfig, custom_output_dir: str | None) -> Path
 
 
 def derive_native_ollama_endpoint(config: AppConfig) -> str:
+    """Derive the native Ollama base URL from the configured endpoint.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    str
+        Base URL for native Ollama requests.
+    """
+
     parsed = urlparse(str(config.require_mapping_value("models", "endpoint")))
     path = parsed.path or ""
     if path.endswith("/v1"):
@@ -117,10 +198,42 @@ def derive_native_ollama_endpoint(config: AppConfig) -> str:
 
 
 def write_text(path: Path, value: str) -> None:
+    """Write a UTF-8 text artifact to disk.
+
+    Parameters
+    ----------
+    path : Path
+        Output path.
+    value : str
+        Text to write.
+
+    Returns
+    -------
+    None
+        The text is written to disk.
+    """
+
     path.write_text(value, encoding="utf-8")
 
 
 def call_openai_compatible(config: AppConfig, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+    """Call the OpenAI-compatible interface for the comparison prompt.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    system_prompt : str
+        System prompt text.
+    user_prompt : str
+        User prompt text.
+
+    Returns
+    -------
+    dict of str to Any
+        Metadata and response payload for the OpenAI-compatible path.
+    """
+
     client = build_client(config)
     start = time.perf_counter()
     response = client.chat.completions.create(
@@ -151,6 +264,23 @@ def call_openai_compatible(config: AppConfig, *, system_prompt: str, user_prompt
 
 
 def call_native_ollama_chat(config: AppConfig, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+    """Call the native Ollama chat API for the comparison prompt.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    system_prompt : str
+        System prompt text.
+    user_prompt : str
+        User prompt text.
+
+    Returns
+    -------
+    dict of str to Any
+        Metadata and response payload for the native Ollama path.
+    """
+
     endpoint = derive_native_ollama_endpoint(config) + "/api/chat"
     payload = {
         "model": config.model_name_for("primary_reasoner"),
@@ -193,6 +323,21 @@ def call_native_ollama_chat(config: AppConfig, *, system_prompt: str, user_promp
 
 
 def build_cli_prompt(system_prompt: str, user_prompt: str) -> str:
+    """Build the combined prompt string passed to the ``ollama`` CLI.
+
+    Parameters
+    ----------
+    system_prompt : str
+        System prompt text.
+    user_prompt : str
+        User prompt text.
+
+    Returns
+    -------
+    str
+        Combined prompt text for standard input.
+    """
+
     return (
         "System instructions:\n"
         + system_prompt.strip()
@@ -203,6 +348,28 @@ def build_cli_prompt(system_prompt: str, user_prompt: str) -> str:
 
 
 def call_ollama_cli(config: AppConfig, *, system_prompt: str, user_prompt: str) -> dict[str, Any]:
+    """Call the local ``ollama`` CLI for the comparison prompt.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    system_prompt : str
+        System prompt text.
+    user_prompt : str
+        User prompt text.
+
+    Returns
+    -------
+    dict of str to Any
+        Metadata and response payload for the CLI path.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the ``ollama`` binary is not available on ``PATH``.
+    """
+
     ollama_binary = shutil.which("ollama")
     if not ollama_binary:
         raise FileNotFoundError("Could not find 'ollama' on PATH")
@@ -230,6 +397,21 @@ def call_ollama_cli(config: AppConfig, *, system_prompt: str, user_prompt: str) 
 
 
 def capture_call(name: str, func: Any) -> dict[str, Any]:
+    """Execute one comparison call and normalize failures into a payload.
+
+    Parameters
+    ----------
+    name : str
+        Comparison path label.
+    func : Any
+        Callable that executes the underlying request.
+
+    Returns
+    -------
+    dict of str to Any
+        Success or failure payload for the comparison path.
+    """
+
     try:
         return func()
     except (HTTPError, URLError, subprocess.SubprocessError, TimeoutError, OSError, ValueError) as exc:
@@ -254,6 +436,27 @@ def write_artifacts(
     summary: dict[str, Any],
     results: list[dict[str, Any]],
 ) -> None:
+    """Write prompt and response artifacts for an interface-comparison run.
+
+    Parameters
+    ----------
+    output_dir : Path
+        Target directory for comparison artifacts.
+    system_prompt : str
+        System prompt text.
+    user_prompt : str
+        User prompt text.
+    summary : dict of str to Any
+        Run-summary payload.
+    results : list of dict of str to Any
+        Per-interface result payloads.
+
+    Returns
+    -------
+    None
+        Artifacts are written into the output directory.
+    """
+
     write_text(output_dir / "system_prompt.md", system_prompt)
     write_text(output_dir / "user_prompt.md", user_prompt)
     write_text(output_dir / "summary.json", json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
@@ -270,6 +473,19 @@ def write_artifacts(
 
 
 def print_summary(summary: dict[str, Any]) -> None:
+    """Print a compact human-readable comparison summary.
+
+    Parameters
+    ----------
+    summary : dict of str to Any
+        Comparison summary payload.
+
+    Returns
+    -------
+    None
+        Summary lines are printed to standard output.
+    """
+
     print(f"Section: {summary['section_id']} — {summary['section_heading']}")
     print(f"Prompt chars: system={summary['system_prompt_chars']} user={summary['user_prompt_chars']}")
     print(f"Artifacts: {summary['output_dir']}")
@@ -293,6 +509,14 @@ def print_summary(summary: dict[str, Any]) -> None:
 
 
 def main() -> int:
+    """Run the local interface-comparison utility.
+
+    Returns
+    -------
+    int
+        Process exit code. Returns ``0`` when at least one path succeeds.
+    """
+
     args = parse_args()
     config = load_config(args.config)
     outline, section, evidence_records, passage_index = load_section_context(config, args.section_id)

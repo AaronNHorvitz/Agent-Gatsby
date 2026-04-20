@@ -1,5 +1,9 @@
-"""
-Evidence-led outline planning for Agent Gatsby.
+"""Outline planning from the verified evidence ledger.
+
+This module prompts the local model for a structured English report outline
+using only promoted evidence records. It validates that the returned outline is
+schema-correct, section-complete, and consistent with the verified evidence
+inventory before the drafting stage begins.
 """
 
 from __future__ import annotations
@@ -20,6 +24,19 @@ JSON_OBJECT_RE = re.compile(r"{.*}", re.DOTALL)
 
 
 def find_json_object(text: str) -> str:
+    """Extract the most likely JSON object from a response string.
+
+    Parameters
+    ----------
+    text : str
+        Raw model response text.
+
+    Returns
+    -------
+    str
+        String segment most likely containing the JSON object payload.
+    """
+
     stripped = text.strip()
     if stripped.startswith("{"):
         return stripped
@@ -32,6 +49,19 @@ def find_json_object(text: str) -> str:
 
 
 def extract_json_payload(response_text: str) -> str:
+    """Normalize an outline response down to its JSON payload.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw outline response text.
+
+    Returns
+    -------
+    str
+        JSON object string with code fences removed when necessary.
+    """
+
     text = response_text.strip()
     if text.startswith("```"):
         text = JSON_FENCE_RE.sub("", text).strip()
@@ -39,6 +69,24 @@ def extract_json_payload(response_text: str) -> str:
 
 
 def parse_outline_response(response_text: str) -> OutlinePlan:
+    """Parse a model response into an outline plan.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw outline response text.
+
+    Returns
+    -------
+    OutlinePlan
+        Parsed outline plan.
+
+    Raises
+    ------
+    ValueError
+        If the parsed payload is not a JSON object.
+    """
+
     payload = json.loads(extract_json_payload(response_text))
     if not isinstance(payload, dict):
         raise ValueError("Expected outline response to be a JSON object")
@@ -46,14 +94,58 @@ def parse_outline_response(response_text: str) -> OutlinePlan:
 
 
 def validate_outline_response(response_text: str) -> None:
+    """Validate the structural format of an outline response.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw outline response text.
+
+    Returns
+    -------
+    None
+        Validation succeeds by parsing without error.
+    """
+
     parse_outline_response(response_text)
 
 
 def load_outline_prompt(config: AppConfig) -> str:
+    """Load the configured outline-planning prompt asset.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    str
+        Outline system prompt text.
+    """
+
     return config.resolve_prompt_path("outline_prompt_path").read_text(encoding="utf-8")
 
 
 def load_evidence_records(source: AppConfig | str | Path) -> list[EvidenceRecord]:
+    """Load the evidence ledger from disk.
+
+    Parameters
+    ----------
+    source : AppConfig or str or Path
+        Configuration object or direct path to the evidence-ledger artifact.
+
+    Returns
+    -------
+    list of EvidenceRecord
+        Parsed evidence records.
+
+    Raises
+    ------
+    ValueError
+        If the ledger artifact does not contain a JSON array.
+    """
+
     if isinstance(source, AppConfig):
         path = source.evidence_ledger_path
     else:
@@ -66,6 +158,24 @@ def load_evidence_records(source: AppConfig | str | Path) -> list[EvidenceRecord
 
 
 def load_outline(source: AppConfig | str | Path) -> OutlinePlan:
+    """Load a serialized outline from disk.
+
+    Parameters
+    ----------
+    source : AppConfig or str or Path
+        Configuration object or direct path to the outline artifact.
+
+    Returns
+    -------
+    OutlinePlan
+        Parsed outline model.
+
+    Raises
+    ------
+    ValueError
+        If the outline artifact does not contain a JSON object.
+    """
+
     if isinstance(source, AppConfig):
         path = source.outline_output_path
     else:
@@ -78,6 +188,19 @@ def load_outline(source: AppConfig | str | Path) -> OutlinePlan:
 
 
 def round_robin_records_by_chapter(records: list[EvidenceRecord]) -> list[EvidenceRecord]:
+    """Interleave evidence records by chapter.
+
+    Parameters
+    ----------
+    records : list of EvidenceRecord
+        Evidence records to reorder.
+
+    Returns
+    -------
+    list of EvidenceRecord
+        Records interleaved by chapter to improve prompt coverage.
+    """
+
     chapter_buckets: dict[int, list[EvidenceRecord]] = {}
     for record in records:
         chapter_buckets.setdefault(record.chapter, []).append(record)
@@ -93,6 +216,21 @@ def round_robin_records_by_chapter(records: list[EvidenceRecord]) -> list[Eviden
 
 
 def select_outline_evidence_records(config: AppConfig, evidence_records: list[EvidenceRecord]) -> list[EvidenceRecord]:
+    """Select a prompt-sized evidence subset for outline planning.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    evidence_records : list of EvidenceRecord
+        Full verified evidence ledger.
+
+    Returns
+    -------
+    list of EvidenceRecord
+        Evidence records chosen for the outline prompt.
+    """
+
     max_records = int(config.outline.get("max_prompt_evidence_records", 0))
     if max_records <= 0 or len(evidence_records) <= max_records:
         return evidence_records
@@ -123,6 +261,21 @@ def select_outline_evidence_records(config: AppConfig, evidence_records: list[Ev
 
 
 def build_outline_user_prompt(config: AppConfig, evidence_records: list[EvidenceRecord]) -> str:
+    """Build the outline-planning user prompt.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    evidence_records : list of EvidenceRecord
+        Evidence records included in the prompt payload.
+
+    Returns
+    -------
+    str
+        User prompt describing the outline contract and evidence payload.
+    """
+
     minimum_sections = int(config.outline.get("minimum_section_count", 0))
     maximum_sections = int(config.outline.get("maximum_section_count", 0))
     fixed_title = str(config.outline.get("fixed_title", "")).strip()
@@ -173,6 +326,29 @@ def validate_outline_against_evidence(
     evidence_records: list[EvidenceRecord],
     config: AppConfig,
 ) -> None:
+    """Validate an outline against configuration and evidence constraints.
+
+    Parameters
+    ----------
+    outline : OutlinePlan
+        Parsed outline to validate.
+    evidence_records : list of EvidenceRecord
+        Evidence records that define the allowable evidence IDs.
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    None
+        Validation succeeds by completing without error.
+
+    Raises
+    ------
+    ValueError
+        If the outline violates title, thesis, section-count, heading, or
+        evidence-assignment constraints.
+    """
+
     if not outline.title.strip():
         raise ValueError("Outline title must be non-empty")
 
@@ -217,6 +393,21 @@ def validate_outline_against_evidence(
 
 
 def write_outline(config: AppConfig, outline: OutlinePlan) -> None:
+    """Write the outline artifact to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Outline to serialize.
+
+    Returns
+    -------
+    None
+        The outline is written to the configured output path.
+    """
+
     output_path = config.outline_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
@@ -230,6 +421,21 @@ def plan_outline(
     config: AppConfig,
     evidence_records: list[EvidenceRecord] | None = None,
 ) -> OutlinePlan:
+    """Plan, validate, and persist the English report outline.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    evidence_records : list of EvidenceRecord or None, optional
+        Preloaded evidence ledger. When omitted, the ledger is loaded from disk.
+
+    Returns
+    -------
+    OutlinePlan
+        Validated outline plan written to disk.
+    """
+
     loaded_records = evidence_records or load_evidence_records(config)
     prompt_records = select_outline_evidence_records(config, loaded_records)
     response_text = invoke_text_completion(

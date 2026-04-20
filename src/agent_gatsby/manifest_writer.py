@@ -1,5 +1,8 @@
-"""
-Final manifest writer for Agent Gatsby.
+"""Final manifest construction for promoted pipeline artifacts.
+
+This module gathers the final promoted outputs and QA reports for a completed
+run, then writes a compact manifest JSON that records the run timestamp, source
+hash, model names, and the paths of the artifacts that survived promotion.
 """
 
 from __future__ import annotations
@@ -18,10 +21,36 @@ LOGGER = logging.getLogger(__name__)
 
 
 def existing_paths(paths: list[Path]) -> list[str]:
+    """Return stringified paths that currently exist on disk.
+
+    Parameters
+    ----------
+    paths : list of Path
+        Candidate artifact paths.
+
+    Returns
+    -------
+    list of str
+        Existing paths converted to strings.
+    """
+
     return [str(path) for path in paths if path.exists()]
 
 
 def load_source_hash(config: AppConfig) -> str | None:
+    """Load the locked-source hash from the source manifest when present.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    str or None
+        Source SHA-256 hash, or ``None`` when the source manifest is absent.
+    """
+
     path = config.source_manifest_path
     if not path.exists():
         return None
@@ -30,6 +59,19 @@ def load_source_hash(config: AppConfig) -> str | None:
 
 
 def build_final_manifest(config: AppConfig) -> FinalManifest:
+    """Build the final manifest model from promoted artifacts.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    FinalManifest
+        Manifest describing final output and QA artifacts.
+    """
+
     output_files = existing_paths(
         [
             config.english_master_output_path,
@@ -70,6 +112,19 @@ def build_final_manifest(config: AppConfig) -> FinalManifest:
 
 
 def write_manifest(config: AppConfig) -> FinalManifest:
+    """Write the final manifest artifact to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    FinalManifest
+        Manifest that was serialized to disk.
+    """
+
     manifest = build_final_manifest(config)
     output_path = config.final_manifest_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)

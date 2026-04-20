@@ -1,5 +1,9 @@
-"""
-Source normalization for Agent Gatsby.
+"""Normalization helpers for the locked Gatsby source text.
+
+This module converts the raw source text into the canonical internal text form
+used by indexing and verification. It removes Project Gutenberg framing,
+preserves chapter boundaries, collapses paragraph blocks into stable prose
+units, and writes the normalized text artifact to disk.
 """
 
 from __future__ import annotations
@@ -20,14 +24,54 @@ WHITESPACE_RE = re.compile(r"[ \t]+")
 
 
 def normalize_line_endings(text: str) -> str:
+    """Normalize newline conventions to Unix-style newlines.
+
+    Parameters
+    ----------
+    text : str
+        Raw source text.
+
+    Returns
+    -------
+    str
+        Text with ``\\n`` line endings only.
+    """
+
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def strip_utf8_bom(text: str) -> str:
+    """Remove a UTF-8 byte-order mark if present.
+
+    Parameters
+    ----------
+    text : str
+        Source text that may begin with a BOM.
+
+    Returns
+    -------
+    str
+        Text without a leading BOM character.
+    """
+
     return text.lstrip("\ufeff")
 
 
 def extract_gutenberg_body(text: str) -> str:
+    """Remove Project Gutenberg wrapper text when present.
+
+    Parameters
+    ----------
+    text : str
+        Raw source text.
+
+    Returns
+    -------
+    str
+        Body text with Gutenberg prologue and epilogue removed when markers
+        are detected.
+    """
+
     start_match = START_MARKER_RE.search(text)
     if start_match:
         text = text[start_match.end():]
@@ -40,11 +84,42 @@ def extract_gutenberg_body(text: str) -> str:
 
 
 def is_chapter_heading(line: str) -> bool:
+    """Return whether a line looks like a chapter heading.
+
+    Parameters
+    ----------
+    line : str
+        Candidate line.
+
+    Returns
+    -------
+    bool
+        ``True`` when the line matches the configured chapter-heading forms.
+    """
+
     stripped = line.strip()
     return bool(CHAPTER_LINE_RE.fullmatch(stripped) or ROMAN_NUMERAL_RE.fullmatch(stripped))
 
 
 def canonicalize_chapter_heading(line: str) -> str:
+    """Convert a recognized chapter heading to canonical form.
+
+    Parameters
+    ----------
+    line : str
+        Raw chapter heading.
+
+    Returns
+    -------
+    str
+        Canonical heading of the form ``Chapter <LABEL>``.
+
+    Raises
+    ------
+    ValueError
+        If the supplied line is not a recognized chapter heading.
+    """
+
     stripped = line.strip()
     chapter_match = CHAPTER_LINE_RE.fullmatch(stripped)
     if chapter_match:
@@ -57,6 +132,19 @@ def canonicalize_chapter_heading(line: str) -> str:
 
 
 def looks_like_prose(line: str) -> bool:
+    """Heuristically identify whether a line resembles prose.
+
+    Parameters
+    ----------
+    line : str
+        Candidate line.
+
+    Returns
+    -------
+    bool
+        ``True`` when the line appears to contain prose rather than a heading.
+    """
+
     stripped = line.strip()
     if not stripped:
         return False
@@ -66,6 +154,21 @@ def looks_like_prose(line: str) -> bool:
 
 
 def next_nonempty_block(lines: list[str], start_index: int) -> tuple[list[str], int]:
+    """Return the next contiguous non-empty line block.
+
+    Parameters
+    ----------
+    lines : list of str
+        Source lines.
+    start_index : int
+        Index from which to begin scanning.
+
+    Returns
+    -------
+    tuple of (list of str, int)
+        Extracted non-empty block and the index immediately after the block.
+    """
+
     index = start_index
     while index < len(lines) and not lines[index].strip():
         index += 1
@@ -79,6 +182,20 @@ def next_nonempty_block(lines: list[str], start_index: int) -> tuple[list[str], 
 
 
 def looks_like_opening_paragraph(block_lines: list[str]) -> bool:
+    """Heuristically identify a chapter-opening prose block.
+
+    Parameters
+    ----------
+    block_lines : list of str
+        Candidate block lines following a chapter heading.
+
+    Returns
+    -------
+    bool
+        ``True`` when the block appears to be the first prose paragraph of a
+        chapter.
+    """
+
     if not block_lines:
         return False
 
@@ -90,6 +207,24 @@ def looks_like_opening_paragraph(block_lines: list[str]) -> bool:
 
 
 def find_first_chapter_index(lines: list[str]) -> int:
+    """Find the first reliable chapter heading in the source.
+
+    Parameters
+    ----------
+    lines : list of str
+        Source lines after basic normalization.
+
+    Returns
+    -------
+    int
+        Index of the first chapter heading that is followed by prose.
+
+    Raises
+    ------
+    ValueError
+        If no valid chapter start can be identified.
+    """
+
     for index, line in enumerate(lines):
         if not is_chapter_heading(line):
             continue
@@ -102,16 +237,50 @@ def find_first_chapter_index(lines: list[str]) -> int:
 
 
 def collapse_block_lines(block_lines: list[str]) -> str:
+    """Collapse a block of lines into a single normalized paragraph.
+
+    Parameters
+    ----------
+    block_lines : list of str
+        Lines comprising a paragraph or heading block.
+
+    Returns
+    -------
+    str
+        Collapsed block text with normalized internal whitespace.
+    """
+
     joined = " ".join(line.strip() for line in block_lines if line.strip())
     return WHITESPACE_RE.sub(" ", joined).strip()
 
 
 def build_normalized_blocks(lines: list[str]) -> list[str]:
+    """Convert normalized lines into canonical paragraph and heading blocks.
+
+    Parameters
+    ----------
+    lines : list of str
+        Source lines after BOM stripping, newline normalization, and Gutenberg
+        wrapper removal.
+
+    Returns
+    -------
+    list of str
+        Ordered normalized blocks used to build the final locked text.
+    """
+
     first_chapter_index = find_first_chapter_index(lines)
     blocks: list[str] = []
     current_block: list[str] = []
 
     def flush_current_block() -> None:
+        """Flush the in-progress paragraph or chapter block into ``blocks``.
+
+        Returns
+        -------
+        None
+        """
+
         if not current_block:
             return
 
@@ -148,6 +317,31 @@ def normalize_source_text(
     collapse_excessive_blank_lines: bool = True,
     strip_leading_trailing_whitespace: bool = True,
 ) -> str:
+    """Normalize the raw source text into the pipeline's canonical form.
+
+    Parameters
+    ----------
+    raw_text : str
+        Raw source text.
+    preserve_chapter_markers : bool, default=True
+        Whether chapter markers must be retained.
+    collapse_excessive_blank_lines : bool, default=True
+        Whether repeated blank lines should be reduced to double newlines.
+    strip_leading_trailing_whitespace : bool, default=True
+        Whether final output should be trimmed.
+
+    Returns
+    -------
+    str
+        Canonical normalized source text.
+
+    Raises
+    ------
+    ValueError
+        If chapter markers are disabled or the resulting normalized text is
+        empty.
+    """
+
     if not preserve_chapter_markers:
         raise ValueError("Agent Gatsby normalization requires preserved chapter markers")
 
@@ -172,6 +366,21 @@ def normalize_source_text(
 
 
 def write_normalized_text(config: AppConfig, normalized_text: str) -> None:
+    """Write normalized source text to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    normalized_text : str
+        Canonical normalized source text.
+
+    Returns
+    -------
+    None
+        The normalized text is written to the configured output path.
+    """
+
     output_path = config.normalized_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(normalized_text, encoding="utf-8")
@@ -179,6 +388,21 @@ def write_normalized_text(config: AppConfig, normalized_text: str) -> None:
 
 
 def normalize_source(config: AppConfig, raw_text: str) -> str:
+    """Normalize and persist the locked source text.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    raw_text : str
+        Raw source text.
+
+    Returns
+    -------
+    str
+        Canonical normalized source text.
+    """
+
     normalized = normalize_source_text(
         raw_text,
         preserve_chapter_markers=config.source.preserve_chapter_markers,

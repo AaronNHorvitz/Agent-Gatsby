@@ -1,5 +1,10 @@
-"""
-Post-render PDF extraction audit for final submission artifacts.
+"""Post-render audits for the final PDF submission artifacts.
+
+This module performs the last deterministic and model-assisted QA pass on the
+rendered English, Spanish, and Mandarin PDFs. It extracts text from the final
+artifacts, checks them for known regressions and structural problems, optionally
+runs a forensic LLM audit, and produces machine-readable reports that gate final
+artifact promotion.
 """
 
 from __future__ import annotations
@@ -144,6 +149,21 @@ DEFAULT_LLM_FORENSIC_BLOCKLIST_PATTERNS = (
 
 
 def pdf_audit_report_path(config: AppConfig, language: str) -> Path:
+    """Resolve the deterministic PDF audit report path for one language.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    language : str
+        Language key being audited.
+
+    Returns
+    -------
+    Path
+        Output path for the language-specific PDF audit report.
+    """
+
     default_name = f"{language}_pdf_audit_report.json"
     return config.resolve_repo_path(
         str(
@@ -156,10 +176,38 @@ def pdf_audit_report_path(config: AppConfig, language: str) -> Path:
 
 
 def pdf_audit_report_paths(config: AppConfig) -> list[Path]:
+    """Return deterministic PDF audit report paths for all final languages.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    list of Path
+        Report paths for English, Spanish, and Mandarin PDF audits.
+    """
+
     return [pdf_audit_report_path(config, language) for language in AUDIT_LANGUAGE_NAMES]
 
 
 def llm_forensic_audit_report_path(config: AppConfig, language: str) -> Path:
+    """Resolve the advisory LLM forensic audit report path for one language.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    language : str
+        Language key being audited.
+
+    Returns
+    -------
+    Path
+        Output path for the LLM forensic audit report.
+    """
+
     default_name = f"{language}_llm_forensic_audit_report.json"
     return config.resolve_repo_path(
         str(
@@ -172,14 +220,54 @@ def llm_forensic_audit_report_path(config: AppConfig, language: str) -> Path:
 
 
 def llm_forensic_audit_report_paths(config: AppConfig) -> list[Path]:
+    """Return LLM forensic audit report paths for all final languages.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    list of Path
+        Report paths for English, Spanish, and Mandarin LLM forensic audits.
+    """
+
     return [llm_forensic_audit_report_path(config, language) for language in AUDIT_LANGUAGE_NAMES]
 
 
 def llm_forensic_audit_enabled(config: AppConfig) -> bool:
+    """Check whether the advisory LLM forensic PDF audit is enabled.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    bool
+        ``True`` when the LLM forensic audit should run.
+    """
+
     return bool(config.verification.get("llm_forensic_audit_enabled", False))
 
 
 def llm_forensic_blocklist_categories(config: AppConfig) -> set[str]:
+    """Load blocklisted forensic defect categories from configuration.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    set of str
+        Normalized category names that should upgrade LLM findings into hard
+        failures.
+    """
+
     configured = config.verification.get(
         "llm_forensic_blocklist_categories",
         list(DEFAULT_LLM_FORENSIC_BLOCKLIST_CATEGORIES),
@@ -190,6 +278,20 @@ def llm_forensic_blocklist_categories(config: AppConfig) -> set[str]:
 
 
 def llm_forensic_blocklist_patterns(config: AppConfig) -> list[str]:
+    """Load blocklisted forensic text patterns from configuration.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    list of str
+        Lowercased substrings that should upgrade LLM findings into hard
+        failures.
+    """
+
     configured = config.verification.get(
         "llm_forensic_blocklist_patterns",
         list(DEFAULT_LLM_FORENSIC_BLOCKLIST_PATTERNS),
@@ -200,10 +302,36 @@ def llm_forensic_blocklist_patterns(config: AppConfig) -> list[str]:
 
 
 def load_forensic_audit_prompt(config: AppConfig) -> str:
+    """Load the system prompt used for LLM forensic PDF auditing.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    str
+        Prompt text for the forensic audit critic.
+    """
+
     return config.resolve_prompt_path("final_forensic_audit_prompt_path").read_text(encoding="utf-8")
 
 
 def extract_json_payload(response_text: str) -> str:
+    """Extract a JSON object from a possibly fenced model response.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw model response text.
+
+    Returns
+    -------
+    str
+        JSON payload candidate suitable for ``json.loads``.
+    """
+
     text = response_text.strip()
     if text.startswith("```"):
         text = JSON_FENCE_RE.sub("", text).strip()
@@ -216,6 +344,27 @@ def extract_json_payload(response_text: str) -> str:
 
 
 def parse_forensic_audit_response(response_text: str, *, language: str) -> dict[str, object]:
+    """Parse and normalize an LLM forensic audit response.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw response from the forensic audit model.
+    language : str
+        Expected document language for the report.
+
+    Returns
+    -------
+    dict of str to object
+        Normalized report payload containing defects and free-form notes.
+
+    Raises
+    ------
+    ValueError
+        If the response is not valid JSON or does not follow the expected
+        forensic defect schema.
+    """
+
     payload = json.loads(extract_json_payload(response_text))
     if not isinstance(payload, dict):
         raise ValueError("Expected forensic audit response to be a JSON object")
@@ -258,6 +407,25 @@ def parse_forensic_audit_response(response_text: str, *, language: str) -> dict[
 
 
 def validate_forensic_audit_response(response_text: str, *, language: str) -> None:
+    """Validate that an LLM forensic response is parseable and well shaped.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw response from the forensic audit model.
+    language : str
+        Expected document language for the report.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the response cannot be parsed into the expected schema.
+    """
+
     parse_forensic_audit_response(response_text, language=language)
 
 
@@ -265,6 +433,22 @@ def find_blocking_forensic_defects(
     config: AppConfig,
     defects: list[dict[str, str]],
 ) -> list[dict[str, str]]:
+    """Filter forensic findings down to defects that should block promotion.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    defects : list of dict of str to str
+        Parsed forensic defects from the LLM audit.
+
+    Returns
+    -------
+    list of dict of str to str
+        Subset of defects that match configured blocklist categories or text
+        patterns.
+    """
+
     blocked_categories = llm_forensic_blocklist_categories(config)
     blocked_patterns = llm_forensic_blocklist_patterns(config)
     blocking_defects: list[dict[str, str]] = []
@@ -286,6 +470,25 @@ def build_forensic_audit_user_prompt(
     extracted_text: str,
     page_count: int | None,
 ) -> str:
+    """Build the user prompt for the forensic PDF audit critic.
+
+    Parameters
+    ----------
+    language : str
+        Document language being audited.
+    pdf_path : Path
+        Path to the rendered PDF.
+    extracted_text : str
+        Text extracted from the rendered PDF.
+    page_count : int or None
+        Observed PDF page count when available.
+
+    Returns
+    -------
+    str
+        User prompt instructing the critic to audit the extracted PDF text.
+    """
+
     page_count_text = "unknown" if page_count is None else str(page_count)
     return "\n".join(
         [
@@ -307,6 +510,20 @@ def build_forensic_audit_user_prompt(
 
 
 def write_llm_forensic_audit_report(output_path: Path, report: dict[str, object]) -> None:
+    """Persist an LLM forensic audit report to disk.
+
+    Parameters
+    ----------
+    output_path : Path
+        Destination JSON report path.
+    report : dict of str to object
+        Report payload to serialize.
+
+    Returns
+    -------
+    None
+    """
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     LOGGER.info("Wrote %s LLM forensic audit report to %s", report["language"], output_path)
@@ -320,6 +537,32 @@ def run_llm_forensic_audit(
     extracted_text: str,
     page_count: int | None,
 ) -> dict[str, object]:
+    """Run the advisory LLM forensic audit for one rendered PDF.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    language : str
+        Document language being audited.
+    pdf_path : Path
+        Path to the rendered PDF.
+    extracted_text : str
+        Text extracted from the PDF.
+    page_count : int or None
+        Observed page count when available.
+
+    Returns
+    -------
+    dict of str to object
+        Serialized audit report, including skipped and error cases.
+
+    Notes
+    -----
+    This audit is advisory by default, but configured blocklist categories and
+    patterns can upgrade selected findings into hard failures.
+    """
+
     output_path = llm_forensic_audit_report_path(config, language)
     if not llm_forensic_audit_enabled(config):
         report = {
@@ -392,6 +635,26 @@ def run_llm_forensic_audit(
 
 
 def extract_pdf_text(pdf_path: Path) -> str:
+    """Extract visible text from a rendered PDF using ``pdftotext``.
+
+    Parameters
+    ----------
+    pdf_path : Path
+        PDF artifact to inspect.
+
+    Returns
+    -------
+    str
+        Extracted text content.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``pdftotext`` is unavailable.
+    ValueError
+        If text extraction fails.
+    """
+
     if shutil.which("pdftotext") is None:
         raise FileNotFoundError("pdftotext is required for final PDF audits")
     result = subprocess.run(
@@ -407,6 +670,19 @@ def extract_pdf_text(pdf_path: Path) -> str:
 
 
 def extract_pdf_page_count(pdf_path: Path) -> int | None:
+    """Extract a rendered PDF's page count using ``pdfinfo`` when available.
+
+    Parameters
+    ----------
+    pdf_path : Path
+        PDF artifact to inspect.
+
+    Returns
+    -------
+    int or None
+        Observed page count, or ``None`` when it cannot be determined.
+    """
+
     if shutil.which("pdfinfo") is None:
         LOGGER.warning("pdfinfo is unavailable; skipping page-count audit for %s", pdf_path)
         return None
@@ -440,6 +716,29 @@ def build_pdf_audit_report(
     min_page_count: int | None = None,
     max_page_count: int | None = None,
 ) -> dict[str, object]:
+    """Build the deterministic audit report for one rendered PDF.
+
+    Parameters
+    ----------
+    language : str
+        Document language being audited.
+    pdf_path : Path
+        Path to the rendered PDF.
+    extracted_text : str
+        Text extracted from the PDF.
+    page_count : int or None, optional
+        Observed page count.
+    min_page_count : int or None, optional
+        Minimum acceptable page count.
+    max_page_count : int or None, optional
+        Maximum acceptable page count.
+
+    Returns
+    -------
+    dict of str to object
+        Machine-readable deterministic audit report.
+    """
+
     internal_token_issues = find_internal_token_issues(extracted_text)
     escape_sequence_issues = find_escape_sequence_issues(extracted_text)
     zero_width_issues = find_zero_width_issues(extracted_text)
@@ -534,6 +833,20 @@ def build_pdf_audit_report(
 
 
 def write_pdf_audit_report(output_path: Path, report: dict[str, object]) -> None:
+    """Persist a deterministic PDF audit report to disk.
+
+    Parameters
+    ----------
+    output_path : Path
+        Destination JSON report path.
+    report : dict of str to object
+        Report payload to serialize.
+
+    Returns
+    -------
+    None
+    """
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     LOGGER.info("Wrote %s PDF audit report to %s", report["language"], output_path)
@@ -543,6 +856,21 @@ def merge_llm_forensic_audit_result(
     pdf_report: dict[str, object],
     llm_report: dict[str, object],
 ) -> dict[str, object]:
+    """Merge deterministic and forensic PDF audit results.
+
+    Parameters
+    ----------
+    pdf_report : dict of str to object
+        Deterministic PDF audit report.
+    llm_report : dict of str to object
+        Advisory LLM forensic audit report.
+
+    Returns
+    -------
+    dict of str to object
+        Combined report with forensic status fields added.
+    """
+
     merged = dict(pdf_report)
     merged["llm_forensic_status"] = llm_report.get("status", "unknown")
     merged["llm_forensic_defect_count"] = int(llm_report.get("defect_count", 0) or 0)
@@ -556,6 +884,19 @@ def merge_llm_forensic_audit_result(
 
 
 def audit_rendered_pdfs(config: AppConfig) -> dict[str, dict[str, object]]:
+    """Audit all rendered final PDFs and merge deterministic plus forensic results.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    dict of str to dict of str to object
+        Per-language audit reports keyed by language name.
+    """
+
     reports: dict[str, dict[str, object]] = {}
     pdf_paths = {
         "english": config.english_pdf_output_path,
@@ -593,4 +934,17 @@ def audit_rendered_pdfs(config: AppConfig) -> dict[str, dict[str, object]]:
 
 
 def pdf_audit_reports_are_renderable(reports: dict[str, dict[str, object]]) -> bool:
+    """Check whether every per-language PDF audit passed.
+
+    Parameters
+    ----------
+    reports : dict of str to dict of str to object
+        Per-language audit reports.
+
+    Returns
+    -------
+    bool
+        ``True`` when all reports have ``"passed"`` status.
+    """
+
     return all(report.get("status") == "passed" for report in reports.values())
