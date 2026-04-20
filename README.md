@@ -187,21 +187,24 @@ flowchart TD
     H --> I[Critic and Edit Pass]
     I --> J[Dynamic Validation on English Master]
     J --> K[Freeze Canonical English Draft]
-    K --> O[Render English PDF]
     K --> L[Translate to Spanish in Chunks]
     K --> M[Translate to Mandarin in Chunks]
-    L --> N[Spanish Critic Audit plus Surgical Replace]
-    M --> P[Mandarin Critic Audit plus Surgical Replace]
-    N --> Q[Spanish QA Pass]
-    P --> R[Mandarin QA Pass]
-    Q --> S[Render Spanish PDF]
-    R --> T[Render Mandarin PDF]
-    O --> U[Write Final Manifest]
-    S --> U
-    T --> U
+    L --> N[Spanish Cleanup plus Dynamic Validation]
+    M --> P[Mandarin Cleanup plus Dynamic Validation]
+    N --> Q[Spanish Structural QA]
+    P --> R[Mandarin Structural QA]
+    K --> S[Assemble Render Inputs]
+    Q --> S
+    R --> S
+    S --> T[Render English Spanish and Mandarin PDFs]
+    T --> U[Deterministic PDF Audit]
+    U --> V[LLM Forensic PDF Audit plus Blocklist]
+    V --> W[Write Final Manifest]
 ```
 
-At a high level, the system is divided into seven logical layers:
+Chunk-level translation and cleanup stages use bounded retries and fragment-safe fallback paths when citation placeholders drift. Final PDF promotion is blocked unless deterministic QA and the post-PDF forensic audit both pass.
+
+At a high level, the system is divided into eight logical layers:
 
 1. **Source acquisition and locking**
 2. **Text normalization and indexing**
@@ -209,7 +212,8 @@ At a high level, the system is divided into seven logical layers:
 4. **Evidence ledger construction**
 5. **English composition and verification**
 6. **Translation and bilingual QA**
-7. **Deterministic PDF rendering**
+7. **Deterministic PDF rendering and audit**
+8. **Final artifact promotion and manifest writing**
 
 ---
 
