@@ -1,5 +1,10 @@
-"""
-Section-bounded English drafting for Agent Gatsby.
+"""Section-bounded English drafting and bounded length recovery.
+
+This module generates the English analysis from the validated outline and
+evidence ledger. It drafts sections individually under explicit citation and
+quote constraints, assembles the combined report, and applies bounded recovery
+strategies such as compact retries, section expansion, and near-threshold
+top-off passes when the draft undershoots the configured length target.
 """
 
 from __future__ import annotations
@@ -26,14 +31,60 @@ ANY_BRACKET_RE = re.compile(r"\[([^\]]+)\]")
 
 
 def load_draft_prompt(config: AppConfig) -> str:
+    """Load the drafting system prompt.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    str
+        Drafting prompt text.
+    """
+
     return config.resolve_prompt_path("draft_prompt_path").read_text(encoding="utf-8")
 
 
 def build_evidence_lookup(evidence_records: list[EvidenceRecord]) -> dict[str, EvidenceRecord]:
+    """Build an evidence lookup keyed by evidence identifier.
+
+    Parameters
+    ----------
+    evidence_records : list of EvidenceRecord
+        Verified evidence ledger.
+
+    Returns
+    -------
+    dict of str to EvidenceRecord
+        Lookup table keyed by ``evidence_id``.
+    """
+
     return {record.evidence_id: record for record in evidence_records}
 
 
 def gather_section_evidence(section: OutlineSection, evidence_lookup: dict[str, EvidenceRecord]) -> list[EvidenceRecord]:
+    """Resolve evidence records assigned to a single outline section.
+
+    Parameters
+    ----------
+    section : OutlineSection
+        Outline section whose evidence should be resolved.
+    evidence_lookup : dict of str to EvidenceRecord
+        Evidence lookup keyed by ``evidence_id``.
+
+    Returns
+    -------
+    list of EvidenceRecord
+        Ordered evidence records assigned to the section.
+
+    Raises
+    ------
+    ValueError
+        If the outline references an evidence identifier that does not exist.
+    """
+
     records: list[EvidenceRecord] = []
     for evidence_id in section.evidence_ids:
         if evidence_id not in evidence_lookup:
@@ -43,6 +94,26 @@ def gather_section_evidence(section: OutlineSection, evidence_lookup: dict[str, 
 
 
 def gather_outline_evidence(outline: OutlinePlan, evidence_lookup: dict[str, EvidenceRecord]) -> list[EvidenceRecord]:
+    """Resolve the unique evidence inventory referenced by the outline.
+
+    Parameters
+    ----------
+    outline : OutlinePlan
+        Outline plan to inspect.
+    evidence_lookup : dict of str to EvidenceRecord
+        Evidence lookup keyed by ``evidence_id``.
+
+    Returns
+    -------
+    list of EvidenceRecord
+        Unique evidence records in first-reference order.
+
+    Raises
+    ------
+    ValueError
+        If the outline references an evidence identifier that does not exist.
+    """
+
     seen_ids: set[str] = set()
     ordered_records: list[EvidenceRecord] = []
     for section in outline.sections:
@@ -63,6 +134,25 @@ def render_evidence_payload(
     context_before: int,
     context_after: int,
 ) -> str:
+    """Render evidence records and local context as JSON for prompting.
+
+    Parameters
+    ----------
+    evidence_records : list of EvidenceRecord
+        Evidence records to render.
+    passage_index : PassageIndex
+        Passage index used to resolve local context.
+    context_before : int
+        Number of same-chapter passages to include before each citation.
+    context_after : int
+        Number of same-chapter passages to include after each citation.
+
+    Returns
+    -------
+    str
+        JSON payload describing evidence and local source context.
+    """
+
     payload = [
         {
             "evidence_id": record.evidence_id,
@@ -84,21 +174,76 @@ def render_evidence_payload(
 
 
 def collapse_spaces(text: str) -> str:
+    """Collapse repeated whitespace to single spaces.
+
+    Parameters
+    ----------
+    text : str
+        Input text.
+
+    Returns
+    -------
+    str
+        Whitespace-normalized text.
+    """
+
     return " ".join(text.split())
 
 
 def count_words(text: str) -> int:
+    """Count words in markdown text using a simple heuristic.
+
+    Parameters
+    ----------
+    text : str
+        Markdown text to count.
+
+    Returns
+    -------
+    int
+        Approximate word count with citation markers removed.
+    """
+
     cleaned = re.sub(r"\[[^\]]+\]", "", text.replace("#", " ").replace("_", " "))
     return len(re.findall(r"\b[\w'-]+\b", cleaned, flags=re.UNICODE))
 
 
 def estimate_page_count(word_count: int, words_per_page: int) -> float:
+    """Estimate page count from the configured words-per-page heuristic.
+
+    Parameters
+    ----------
+    word_count : int
+        Total word count.
+    words_per_page : int
+        Configured words-per-page estimate.
+
+    Returns
+    -------
+    float
+        Estimated page count rounded to two decimals.
+    """
+
     if words_per_page <= 0:
         return 0.0
     return round(word_count / words_per_page, 2)
 
 
 def build_overall_word_target_guidance(config: AppConfig) -> str | None:
+    """Build the overall essay-length guidance string for prompt injection.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    str or None
+        Human-readable overall word-target guidance, or ``None`` when no target
+        is configured.
+    """
+
     minimum_words = int(config.drafting.get("target_word_count_min", 0))
     maximum_words = int(config.drafting.get("target_word_count_max", 0))
     estimated_pages = int(config.drafting.get("estimated_page_target", 0))
@@ -124,12 +269,38 @@ def build_overall_word_target_guidance(config: AppConfig) -> str | None:
 
 
 def build_selection_scope_note(section_count: int) -> str:
+    """Build the deterministic report framing note.
+
+    Parameters
+    ----------
+    section_count : int
+        Number of body sections in the outline.
+
+    Returns
+    -------
+    str
+        Short markdown note describing the selected metaphor-cluster scope.
+    """
+
     return (
         f"_This report organizes selected metaphor clusters into {section_count} thematic sections for a structured, citation-supported analysis._"
     )
 
 
 def normalize_section_claim(section_notes: str) -> str:
+    """Normalize a section-purpose note into a compact claim fragment.
+
+    Parameters
+    ----------
+    section_notes : str
+        Section-purpose text from the outline.
+
+    Returns
+    -------
+    str
+        Simplified claim fragment used to build deterministic lead sentences.
+    """
+
     normalized = collapse_spaces(section_notes).strip()
     normalized = re.sub(
         r"^(argue|show|explain|demonstrate|trace|analyze|examine|explore|establish|discuss)\s+that\s+",
@@ -162,6 +333,19 @@ def normalize_section_claim(section_notes: str) -> str:
 
 
 def promote_claim_to_clause(section_claim: str) -> str:
+    """Turn a normalized section claim into a readable clause when possible.
+
+    Parameters
+    ----------
+    section_claim : str
+        Normalized claim fragment.
+
+    Returns
+    -------
+    str
+        Clause suitable for lead-sentence generation.
+    """
+
     if not section_claim:
         return ""
     if re.match(r"^Fitzgerald\b", section_claim, flags=re.IGNORECASE):
@@ -206,6 +390,21 @@ def promote_claim_to_clause(section_claim: str) -> str:
 
 
 def build_metaphor_focus_lead(section_notes: str, *, evidence_count: int) -> str:
+    """Build the deterministic lead sentence for a metaphor-text block.
+
+    Parameters
+    ----------
+    section_notes : str
+        Section-purpose text from the outline.
+    evidence_count : int
+        Number of evidence records in the cluster.
+
+    Returns
+    -------
+    str
+        Lead sentence introducing the shared metaphor cluster.
+    """
+
     normalized_claim = promote_claim_to_clause(normalize_section_claim(section_notes))
     if not normalized_claim:
         return "This cluster of images points to one shared idea."
@@ -230,6 +429,22 @@ def build_metaphor_focus_lead(section_notes: str, *, evidence_count: int) -> str
 
 
 def render_metaphor_focus_block(evidence_records: list[EvidenceRecord], *, section_notes: str) -> str:
+    """Render the deterministic ``Metaphor text`` block for a body section.
+
+    Parameters
+    ----------
+    evidence_records : list of EvidenceRecord
+        Evidence records assigned to the section.
+    section_notes : str
+        Section-purpose text from the outline.
+
+    Returns
+    -------
+    str
+        Markdown block containing a short deterministic lead sentence followed
+        by the exact cited quote lines.
+    """
+
     if not evidence_records:
         return ""
 
@@ -240,6 +455,19 @@ def render_metaphor_focus_block(evidence_records: list[EvidenceRecord], *, secti
 
 
 def strip_metaphor_focus_block(text: str) -> str:
+    """Strip a leading deterministic metaphor-focus block from section text.
+
+    Parameters
+    ----------
+    text : str
+        Section text that may begin with a deterministic focus block.
+
+    Returns
+    -------
+    str
+        Section text without the leading focus block.
+    """
+
     stripped = text.strip()
     while stripped:
         lines = stripped.splitlines()
@@ -264,6 +492,19 @@ def strip_metaphor_focus_block(text: str) -> str:
 
 
 def split_sentences(text: str) -> list[str]:
+    """Split a prose block into approximate sentences.
+
+    Parameters
+    ----------
+    text : str
+        Prose text to split.
+
+    Returns
+    -------
+    list of str
+        Sentence-like spans.
+    """
+
     normalized = collapse_spaces(text)
     if not normalized:
         return []
@@ -275,6 +516,21 @@ def split_sentences(text: str) -> list[str]:
 
 
 def summarize_body_section_text(text: str, *, max_sentences: int = 2) -> str:
+    """Summarize a drafted body section for intro/conclusion prompting.
+
+    Parameters
+    ----------
+    text : str
+        Full body section text.
+    max_sentences : int, default=2
+        Maximum number of sentences to retain.
+
+    Returns
+    -------
+    str
+        Short summary of the body argument.
+    """
+
     body_text = strip_metaphor_focus_block(text)
     sentences = split_sentences(body_text)
     if not sentences:
@@ -283,6 +539,19 @@ def summarize_body_section_text(text: str, *, max_sentences: int = 2) -> str:
 
 
 def render_completed_body_context(section_texts: list[tuple[str, str]]) -> str:
+    """Render drafted body-section summaries as JSON for prompt reuse.
+
+    Parameters
+    ----------
+    section_texts : list of tuple of (str, str)
+        Pairs of section heading and full section text.
+
+    Returns
+    -------
+    str
+        JSON payload summarizing completed body arguments.
+    """
+
     payload = [
         {
             "heading": heading,
@@ -298,6 +567,27 @@ def render_body_retry_evidence_summary(
     *,
     passage_index: PassageIndex,
 ) -> str:
+    """Render a compact evidence summary for body-section retry prompts.
+
+    Parameters
+    ----------
+    evidence_records : list of EvidenceRecord
+        Evidence records assigned to the section.
+    passage_index : PassageIndex
+        Passage index associated with the section evidence.
+
+    Returns
+    -------
+    str
+        Compact JSON evidence summary.
+
+    Notes
+    -----
+    The current implementation does not use ``passage_index`` directly here,
+    but keeps it in the signature for interface consistency with nearby prompt
+    helpers.
+    """
+
     payload = []
     for record in evidence_records:
         payload.append(
@@ -317,6 +607,24 @@ def build_section_word_target_guidance(
     outline: OutlinePlan,
     section_type: str,
 ) -> str | None:
+    """Build section-level word-target guidance for prompting.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Outline used to derive section-weight heuristics.
+    section_type : str
+        One of ``"introduction"``, ``"body"``, or ``"conclusion"``.
+
+    Returns
+    -------
+    str or None
+        Human-readable section target guidance, or ``None`` when no overall
+        target is configured.
+    """
+
     minimum_words, maximum_words = section_word_target_bounds(
         config,
         outline=outline,
@@ -340,6 +648,23 @@ def section_word_target_bounds(
     outline: OutlinePlan,
     section_type: str,
 ) -> tuple[int | None, int | None]:
+    """Estimate per-section word-target bounds from the global draft target.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Outline used to determine section weighting.
+    section_type : str
+        One of ``"introduction"``, ``"body"``, or ``"conclusion"``.
+
+    Returns
+    -------
+    tuple of (int or None, int or None)
+        Minimum and maximum word targets for the requested section type.
+    """
+
     minimum_total = int(config.drafting.get("target_word_count_min", 0))
     maximum_total = int(config.drafting.get("target_word_count_max", 0))
     if minimum_total <= 0 and maximum_total <= 0:
@@ -359,6 +684,19 @@ def section_word_target_bounds(
 
 
 def normalize_validator_text(text: str) -> str:
+    """Normalize text for quote-inventory comparisons.
+
+    Parameters
+    ----------
+    text : str
+        Text to normalize.
+
+    Returns
+    -------
+    str
+        Whitespace-normalized text with curly quotes canonicalized.
+    """
+
     normalized = (
         text.replace("“", '"')
         .replace("”", '"')
@@ -369,6 +707,19 @@ def normalize_validator_text(text: str) -> str:
 
 
 def extract_quoted_strings(text: str) -> list[str]:
+    """Extract quoted spans from a section draft.
+
+    Parameters
+    ----------
+    text : str
+        Section text to scan.
+
+    Returns
+    -------
+    list of str
+        Normalized quoted spans found in the text.
+    """
+
     quotes: list[str] = []
     for pattern in (DOUBLE_QUOTE_RE, SINGLE_QUOTE_RE):
         for match in pattern.finditer(text):
@@ -379,15 +730,58 @@ def extract_quoted_strings(text: str) -> list[str]:
 
 
 def strip_unauthorized_quotes(text: str, *, evidence_records: list[EvidenceRecord]) -> str:
+    """Remove quoted spans that are not authorized evidence quotes.
+
+    Parameters
+    ----------
+    text : str
+        Section text to clean.
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+
+    Returns
+    -------
+    str
+        Text with unauthorized quote wrappers removed.
+    """
+
     allowed_quotes = {normalize_validator_text(record.quote) for record in evidence_records}
 
     def replace_double(match: re.Match[str]) -> str:
+        """Remove unauthorized double-quoted spans while preserving allowed quotes.
+
+        Parameters
+        ----------
+        match : re.Match[str]
+            Regex match for a double-quoted span.
+
+        Returns
+        -------
+        str
+            Original quoted text for allowed quotes, otherwise the unwrapped
+            span.
+        """
+
         candidate = collapse_spaces(match.group(1)).strip()
         if normalize_validator_text(candidate) in allowed_quotes:
             return match.group(0)
         return candidate
 
     def replace_single(match: re.Match[str]) -> str:
+        """Remove unauthorized single-quoted spans while preserving allowed quotes.
+
+        Parameters
+        ----------
+        match : re.Match[str]
+            Regex match for a single-quoted span.
+
+        Returns
+        -------
+        str
+            Original quoted text for allowed quotes, otherwise the unwrapped
+            span.
+        """
+
         candidate = collapse_spaces(match.group(1)).strip()
         if normalize_validator_text(candidate) in allowed_quotes:
             return match.group(0)
@@ -399,13 +793,52 @@ def strip_unauthorized_quotes(text: str, *, evidence_records: list[EvidenceRecor
 
 
 def strip_all_direct_quotes(text: str) -> str:
+    """Remove all direct-quote wrappers from text.
+
+    Parameters
+    ----------
+    text : str
+        Text to clean.
+
+    Returns
+    -------
+    str
+        Text with quote characters stripped and quoted spans flattened.
+    """
+
     cleaned = DOUBLE_QUOTE_RE.sub(lambda match: collapse_spaces(match.group(1)).strip(), text)
     cleaned = SINGLE_QUOTE_RE.sub(lambda match: collapse_spaces(match.group(1)).strip(), cleaned)
     return cleaned.replace('"', "").replace("“", "").replace("”", "")
 
 
 def strip_invalid_bracket_markers(text: str) -> str:
+    """Remove bracket markers that are not valid citations.
+
+    Parameters
+    ----------
+    text : str
+        Section text to clean.
+
+    Returns
+    -------
+    str
+        Text with invalid bracket markers unwrapped.
+    """
+
     def replace(match: re.Match[str]) -> str:
+        """Unwrap non-citation bracketed text while preserving valid citations.
+
+        Parameters
+        ----------
+        match : re.Match[str]
+            Regex match for a bracketed span.
+
+        Returns
+        -------
+        str
+            Original marker for valid citations, otherwise the inner text.
+        """
+
         marker = match.group(0)
         if marker not in extract_invalid_bracket_markers(marker):
             return marker
@@ -420,6 +853,23 @@ def repair_invalid_section_artifacts(
     evidence_records: list[EvidenceRecord],
     forbid_direct_quotes: bool = False,
 ) -> str:
+    """Apply deterministic cleanup to a section draft that failed validation.
+
+    Parameters
+    ----------
+    text : str
+        Failed section response text.
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+    forbid_direct_quotes : bool, default=False
+        Whether all direct quotations should be removed during repair.
+
+    Returns
+    -------
+    str
+        Deterministically repaired section text.
+    """
+
     cleaned = strip_invalid_bracket_markers(text)
     cleaned = strip_unauthorized_quotes(cleaned, evidence_records=evidence_records)
     if forbid_direct_quotes:
@@ -433,10 +883,40 @@ def build_section_response_validator(
     require_citation: bool,
     forbid_direct_quotes: bool = False,
 ) -> callable:
+    """Build a validator for a drafted section response.
+
+    Parameters
+    ----------
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+    require_citation : bool
+        Whether the response must include at least one valid citation.
+    forbid_direct_quotes : bool, default=False
+        Whether direct quotations should be disallowed entirely.
+
+    Returns
+    -------
+    callable
+        Validator that raises when the response violates citation or quote
+        constraints.
+    """
+
     allowed_quotes = {normalize_validator_text(record.quote) for record in evidence_records}
     allowed_passage_ids = {record.passage_id for record in evidence_records}
 
     def validator(response_text: str) -> None:
+        """Validate one drafted section against citation and quote rules.
+
+        Parameters
+        ----------
+        response_text : str
+            Candidate drafted section.
+
+        Returns
+        -------
+        None
+        """
+
         stripped = response_text.strip()
         if not stripped:
             raise ValueError("Drafted section is empty")
@@ -486,6 +966,33 @@ def build_draft_user_prompt(
     passage_index: PassageIndex,
     completed_body_sections: list[tuple[str, str]] | None = None,
 ) -> str:
+    """Build the primary drafting prompt for one section.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Full outline for the report.
+    section_type : str
+        One of ``"introduction"``, ``"body"``, or ``"conclusion"``.
+    heading : str
+        Section heading.
+    section_notes : str
+        Section-purpose notes from the outline.
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+    passage_index : PassageIndex
+        Passage index used to render source context.
+    completed_body_sections : list of tuple of (str, str) or None, optional
+        Completed body sections reused for introduction or conclusion prompts.
+
+    Returns
+    -------
+    str
+        Full user prompt for the section draft call.
+    """
+
     instructions = [
         f"Section type: {section_type}",
         f"Essay title: {outline.title}",
@@ -610,6 +1117,27 @@ def build_intro_retry_user_prompt(
     section_notes: str,
     completed_body_sections: list[tuple[str, str]],
 ) -> str:
+    """Build the compact retry prompt for the introduction.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Full outline for the report.
+    heading : str
+        Section heading.
+    section_notes : str
+        Introduction notes from the outline.
+    completed_body_sections : list of tuple of (str, str)
+        Completed body sections summarized for prompt reuse.
+
+    Returns
+    -------
+    str
+        Compact retry prompt for introduction drafting.
+    """
+
     instructions = [
         "Compact retry mode: introductory summary only.",
         f"Essay title: {outline.title}",
@@ -653,6 +1181,29 @@ def build_body_retry_user_prompt(
     evidence_records: list[EvidenceRecord],
     passage_index: PassageIndex,
 ) -> str:
+    """Build the compact retry prompt for a body section.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Full outline for the report.
+    heading : str
+        Section heading.
+    section_notes : str
+        Section-purpose notes from the outline.
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+    passage_index : PassageIndex
+        Passage index associated with the evidence records.
+
+    Returns
+    -------
+    str
+        Compact retry prompt for a body section.
+    """
+
     instructions = [
         "Compact retry mode: body argument only.",
         f"Essay title: {outline.title}",
@@ -699,6 +1250,27 @@ def build_conclusion_retry_user_prompt(
     section_notes: str,
     completed_body_sections: list[tuple[str, str]],
 ) -> str:
+    """Build the compact retry prompt for the conclusion.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Full outline for the report.
+    heading : str
+        Section heading.
+    section_notes : str
+        Conclusion notes from the outline.
+    completed_body_sections : list of tuple of (str, str)
+        Completed body sections summarized for prompt reuse.
+
+    Returns
+    -------
+    str
+        Compact retry prompt for conclusion drafting.
+    """
+
     instructions = [
         "Compact retry mode: conclusion synthesis only.",
         f"Essay title: {outline.title}",
@@ -745,6 +1317,39 @@ def build_section_expansion_user_prompt(
     minimum_increase_words: int,
     completed_body_sections: list[tuple[str, str]] | None = None,
 ) -> str:
+    """Build the prompt for a bounded section-expansion pass.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Full outline for the report.
+    section_type : str
+        One of ``"introduction"``, ``"body"``, or ``"conclusion"``.
+    heading : str
+        Section heading.
+    section_notes : str
+        Section-purpose notes from the outline.
+    current_text : str
+        Current section text or prose body.
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+    passage_index : PassageIndex
+        Passage index used to render source context.
+    current_word_count : int
+        Current section word count.
+    minimum_increase_words : int
+        Minimum new words required for this pass.
+    completed_body_sections : list of tuple of (str, str) or None, optional
+        Completed body-section summaries reused for intro/conclusion expansion.
+
+    Returns
+    -------
+    str
+        Expansion prompt for the requested section.
+    """
+
     instructions = [
         "Expansion mode: revise and expand the existing section so the essay can reach its target length.",
         f"Section type: {section_type}",
@@ -820,12 +1425,45 @@ def build_section_expansion_response_validator(
     minimum_progress_word_count: int,
     forbid_direct_quotes: bool,
 ):
+    """Build a validator for expansion-pass section responses.
+
+    Parameters
+    ----------
+    original_text : str
+        Original section text before expansion.
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+    require_citation : bool
+        Whether the expanded section must include a valid citation.
+    minimum_progress_word_count : int
+        Minimum word count the expanded section must reach.
+    forbid_direct_quotes : bool
+        Whether the expansion must avoid direct quotations entirely.
+
+    Returns
+    -------
+    callable
+        Validator that enforces section invariants and measurable progress.
+    """
+
     section_validator = build_section_response_validator(
         evidence_records,
         require_citation=require_citation,
     )
 
     def validator(response_text: str) -> None:
+        """Validate one expanded section for progress and structural safety.
+
+        Parameters
+        ----------
+        response_text : str
+            Candidate expanded section text.
+
+        Returns
+        -------
+        None
+        """
+
         section_validator(response_text)
         if forbid_direct_quotes and extract_quoted_strings(response_text):
             raise ValueError("Expanded section must not contain direct quotations")
@@ -855,6 +1493,42 @@ def expand_section(
     completed_body_sections: list[tuple[str, str]] | None = None,
     minimum_increase_words: int | None = None,
 ) -> str:
+    """Expand an existing section with bounded validation and cleanup.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Full outline for the report.
+    section_type : str
+        One of ``"introduction"``, ``"body"``, or ``"conclusion"``.
+    heading : str
+        Section heading.
+    section_notes : str
+        Section-purpose notes from the outline.
+    current_text : str
+        Current section text.
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+    passage_index : PassageIndex
+        Passage index used to render evidence context.
+    output_path : str
+        Artifact path recorded with the LLM call.
+    require_citation : bool
+        Whether the expanded section must include a valid citation.
+    completed_body_sections : list of tuple of (str, str) or None, optional
+        Completed body sections summarized for intro/conclusion expansion.
+    minimum_increase_words : int or None, optional
+        Override for the minimum new words required in this pass.
+
+    Returns
+    -------
+    str
+        Expanded section text, with the deterministic metaphor-focus block
+        reattached for body sections.
+    """
+
     current_body_text = strip_metaphor_focus_block(current_text) if section_type == "body" else current_text.strip()
     current_word_count = count_words(current_body_text)
     minimum_words, _ = section_word_target_bounds(
@@ -933,6 +1607,28 @@ def expand_section(
 
 
 def validate_section_text(text: str, *, heading: str, require_citation: bool) -> str:
+    """Validate minimal non-empty and citation-presence constraints for a section.
+
+    Parameters
+    ----------
+    text : str
+        Section text to validate.
+    heading : str
+        Section heading used for error messages.
+    require_citation : bool
+        Whether the section must contain a valid citation.
+
+    Returns
+    -------
+    str
+        Stripped section text.
+
+    Raises
+    ------
+    ValueError
+        If the section is empty or lacks required citations.
+    """
+
     stripped = text.strip()
     if not stripped:
         raise ValueError(f"Drafted section '{heading}' is empty")
@@ -942,6 +1638,25 @@ def validate_section_text(text: str, *, heading: str, require_citation: bool) ->
 
 
 def write_section_file(config: AppConfig, *, filename: str, heading: str, text: str) -> Path:
+    """Write a per-section draft artifact.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    filename : str
+        Section artifact filename.
+    heading : str
+        Section heading written at the top of the file.
+    text : str
+        Section body text.
+
+    Returns
+    -------
+    Path
+        Path to the written section artifact.
+    """
+
     output_dir = config.section_drafts_dir_path
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / filename
@@ -963,6 +1678,38 @@ def draft_section(
     require_citation: bool,
     completed_body_sections: list[tuple[str, str]] | None = None,
 ) -> str:
+    """Draft one report section with bounded retry and cleanup behavior.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan
+        Full outline for the report.
+    section_type : str
+        One of ``"introduction"``, ``"body"``, or ``"conclusion"``.
+    heading : str
+        Section heading.
+    section_notes : str
+        Section-purpose notes from the outline.
+    evidence_records : list of EvidenceRecord
+        Allowed evidence records for the section.
+    passage_index : PassageIndex
+        Passage index used to render context payloads.
+    output_path : str
+        Artifact path recorded with the LLM call.
+    require_citation : bool
+        Whether the section must contain a valid citation.
+    completed_body_sections : list of tuple of (str, str) or None, optional
+        Completed body sections reused for introduction and conclusion prompts.
+
+    Returns
+    -------
+    str
+        Validated section text, with deterministic focus block reattached for
+        body sections.
+    """
+
     transport_override = str(config.drafting.get("llm_transport", "")).strip() or None
     response_validator = build_section_response_validator(
         evidence_records,
@@ -1103,6 +1850,25 @@ def compose_full_draft(
     section_texts: list[tuple[str, str]],
     conclusion_text: str,
 ) -> str:
+    """Assemble the full English report from section components.
+
+    Parameters
+    ----------
+    outline : OutlinePlan
+        Full outline for the report.
+    introduction_text : str
+        Drafted introduction text.
+    section_texts : list of tuple of (str, str)
+        Ordered body-section heading and text pairs.
+    conclusion_text : str
+        Drafted conclusion text.
+
+    Returns
+    -------
+    str
+        Complete markdown draft for the English report.
+    """
+
     parts = [
         f"# {outline.title}",
         "",
@@ -1120,6 +1886,27 @@ def compose_full_draft(
 
 
 def validate_combined_draft(draft_text: str, outline: OutlinePlan) -> None:
+    """Validate combined-draft heading presence and order.
+
+    Parameters
+    ----------
+    draft_text : str
+        Combined draft text.
+    outline : OutlinePlan
+        Outline whose headings define the expected draft structure.
+
+    Returns
+    -------
+    None
+        Validation succeeds by completing without error.
+
+    Raises
+    ------
+    ValueError
+        If the combined draft is empty, missing headings, or has headings out
+        of order.
+    """
+
     if not draft_text.strip():
         raise ValueError("English draft is empty")
 
@@ -1135,12 +1922,42 @@ def validate_combined_draft(draft_text: str, outline: OutlinePlan) -> None:
 
 
 def apply_draft_regression_fixes(text: str, *, label: str) -> str:
+    """Apply deterministic English regression fixes to draft text.
+
+    Parameters
+    ----------
+    text : str
+        Draft text to normalize.
+    label : str
+        Human-readable label used in logging.
+
+    Returns
+    -------
+    str
+        Draft text after deterministic regression normalization.
+    """
+
     normalized_text, applied_fixes = normalize_english_master_regressions(text)
     if applied_fixes:
         LOGGER.info("Applied %d deterministic regression fixes to %s", len(applied_fixes), label)
     return normalized_text
 
 def write_english_draft(config: AppConfig, draft_text: str) -> None:
+    """Write the combined English draft to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    draft_text : str
+        Combined English draft text.
+
+    Returns
+    -------
+    None
+        The draft is written to the configured output path.
+    """
+
     output_path = config.draft_output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(draft_text, encoding="utf-8")
@@ -1148,12 +1965,40 @@ def write_english_draft(config: AppConfig, draft_text: str) -> None:
 
 
 def draft_timing_output_path(config: AppConfig) -> Path:
+    """Return the path for the draft timing report.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    Path
+        Resolved timing-report output path.
+    """
+
     return config.resolve_repo_path(
         str(config.drafting.get("timing_output_path", "artifacts/qa/english_draft_timing.json"))
     )
 
 
 def write_draft_timing_report(config: AppConfig, payload: dict[str, object]) -> None:
+    """Write the English drafting timing report to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    payload : dict of str to object
+        Timing and run-summary payload to serialize.
+
+    Returns
+    -------
+    None
+        The timing report is written to the configured output path.
+    """
+
     output_path = draft_timing_output_path(config)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -1161,22 +2006,87 @@ def write_draft_timing_report(config: AppConfig, payload: dict[str, object]) -> 
 
 
 def expansion_pass_enabled(config: AppConfig) -> bool:
+    """Return whether bounded expansion is enabled for English drafting.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    bool
+        ``True`` when the expansion pass is enabled.
+    """
+
     return bool(config.drafting.get("expansion_pass_enabled", False))
 
 
 def expansion_pass_max_rounds(config: AppConfig) -> int:
+    """Return the maximum number of expansion rounds.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    int
+        Non-negative maximum number of expansion rounds.
+    """
+
     return max(0, int(config.drafting.get("expansion_pass_max_rounds", 1)))
 
 
 def near_target_top_off_enabled(config: AppConfig) -> bool:
+    """Return whether near-threshold intro/conclusion top-off is enabled.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    bool
+        ``True`` when the top-off pass is enabled.
+    """
+
     return bool(config.drafting.get("near_target_top_off_enabled", False))
 
 
 def near_target_top_off_tolerance_words(config: AppConfig) -> int:
+    """Return the word-shortfall window that qualifies for top-off.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    int
+        Non-negative shortfall tolerance in words.
+    """
+
     return max(0, int(config.drafting.get("near_target_top_off_tolerance_words", 0)))
 
 
 def near_target_top_off_min_increase_words(config: AppConfig) -> int:
+    """Return the minimum growth target for a top-off expansion pass.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    int
+        Minimum required increase in words for top-off expansion.
+    """
+
     return max(1, int(config.drafting.get("near_target_top_off_min_increase_words", 1)))
 
 
@@ -1187,6 +2097,39 @@ def draft_english(
     evidence_records: list[EvidenceRecord] | None = None,
     passage_index: PassageIndex | None = None,
 ) -> str:
+    """Draft, expand, and persist the full English report.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    outline : OutlinePlan or None, optional
+        Preloaded outline. When omitted, the stage loads the outline from disk.
+    evidence_records : list of EvidenceRecord or None, optional
+        Preloaded evidence ledger. When omitted, the stage loads the ledger
+        from disk.
+    passage_index : PassageIndex or None, optional
+        Preloaded passage index. When omitted, the stage loads the index from
+        disk.
+
+    Returns
+    -------
+    str
+        Combined English draft markdown.
+
+    Raises
+    ------
+    ValueError
+        If the final draft remains below the configured minimum word count and
+        the configuration requires that shortfall to fail closed.
+
+    Notes
+    -----
+    The function uses three bounded recovery mechanisms before failing:
+    section-level compact retries, multi-round expansion for short sections,
+    and a near-threshold introduction/conclusion top-off pass.
+    """
+
     draft_started_at = time.perf_counter()
     loaded_outline = outline or load_outline(config)
     loaded_records = evidence_records or load_evidence_records(config)

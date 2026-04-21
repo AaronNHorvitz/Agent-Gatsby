@@ -1,5 +1,9 @@
-"""
-Mandarin translation stage for Agent Gatsby.
+"""Mandarin translation stage wrapper.
+
+This module provides the Simplified Chinese stage entry point for the shared
+translation pipeline. It binds the Mandarin-specific prompts, model key, and
+output path while leaving chunking, cleanup, dynamic validation, and artifact
+writing to :mod:`agent_gatsby.translation_common`.
 """
 
 from __future__ import annotations
@@ -13,6 +17,23 @@ def translate_mandarin(
     *,
     english_master_text: str | None = None,
 ) -> str:
+    """Translate the frozen English master into Simplified Chinese.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    english_master_text : str or None, optional
+        Preloaded English master text. When omitted, the stage loads the frozen
+        English master from disk.
+
+    Returns
+    -------
+    str
+        Final Simplified Chinese markdown written to the configured
+        translation path.
+    """
+
     return translate_document(
         config,
         stage_name="translate_mandarin",

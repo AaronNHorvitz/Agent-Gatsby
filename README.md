@@ -1,5 +1,5 @@
 # Agent Gatsby
-## Local AI Pipeline for the Treasury Gatsby Screening Task
+## Local AI Pipeline for the Treasury Gatsby Challenge
 
 Agent Gatsby is a local-first AI pipeline built for Treasury's supplemental *Great Gatsby* challenge to do the following:
 

@@ -1,5 +1,10 @@
-"""
-Shared translation helpers for Agent Gatsby.
+"""Shared translation, localization, and freeze-time helpers.
+
+This module contains the common machinery used by the English master freeze
+step and the Spanish/Mandarin translation stages. It handles markdown chunking,
+citation masking and restoration, translation cleanup, dynamic validation,
+localization of citation sections, and deterministic normalization passes that
+protect structure while repairing known artifact classes.
 """
 
 from __future__ import annotations
@@ -332,10 +337,38 @@ UNQUOTED_ENGLISH_QUOTE_PATTERNS = (
 
 
 def paragraph_blocks(text: str) -> list[str]:
+    """Split markdown into non-empty paragraph-style blocks.
+
+    Parameters
+    ----------
+    text : str
+        Markdown text to segment.
+
+    Returns
+    -------
+    list of str
+        Trimmed non-empty blocks separated by blank lines.
+    """
+
     return [block.strip() for block in BLOCK_SPLIT_RE.split(text) if block.strip()]
 
 
 def split_markdown_into_chunks(text: str, *, max_chars: int) -> list[str]:
+    """Split markdown into roughly size-bounded chunks on block boundaries.
+
+    Parameters
+    ----------
+    text : str
+        Markdown document to segment.
+    max_chars : int
+        Maximum preferred chunk size in characters.
+
+    Returns
+    -------
+    list of str
+        Ordered markdown chunks suitable for model calls.
+    """
+
     if max_chars <= 0:
         return [text.strip()]
 
@@ -368,17 +401,69 @@ def split_markdown_into_chunks(text: str, *, max_chars: int) -> list[str]:
 
 
 def extract_heading_levels(text: str) -> list[int]:
+    """Extract markdown heading levels from text.
+
+    Parameters
+    ----------
+    text : str
+        Markdown text to inspect.
+
+    Returns
+    -------
+    list of int
+        Heading levels in encounter order.
+    """
+
     return [len(match.group(1)) for match in HEADING_RE.finditer(text)]
 
 
 def extract_visible_citation_markers(text: str) -> list[str]:
+    """Extract visible citation markers from markdown text.
+
+    Parameters
+    ----------
+    text : str
+        Markdown text to inspect.
+
+    Returns
+    -------
+    list of str
+        Visible citation markers in encounter order.
+    """
+
     return [match.group(0) for match in VISIBLE_CITATION_RE.finditer(text)]
 
 
 def mask_visible_citation_markers(text: str) -> tuple[str, list[str]]:
+    """Replace visible citation markers with deterministic placeholders.
+
+    Parameters
+    ----------
+    text : str
+        Markdown text containing visible citation markers.
+
+    Returns
+    -------
+    tuple of str and list of str
+        Masked text plus the original marker inventory in encounter order.
+    """
+
     original_markers: list[str] = []
 
     def replace(match: re.Match[str]) -> str:
+        """Capture one citation marker and return its placeholder token.
+
+        Parameters
+        ----------
+        match : re.Match[str]
+            Regex match for a visible citation marker.
+
+        Returns
+        -------
+        str
+            Deterministic placeholder token for the matched citation.
+        """
+
         original_markers.append(match.group(0))
         return f"AGCITTOKEN{len(original_markers):04d}XYZ"
 
@@ -386,10 +471,43 @@ def mask_visible_citation_markers(text: str) -> tuple[str, list[str]]:
 
 
 def extract_translation_placeholders(text: str) -> list[str]:
+    """Extract internal translation placeholders from text.
+
+    Parameters
+    ----------
+    text : str
+        Text containing masked citation placeholders.
+
+    Returns
+    -------
+    list of str
+        Placeholder tokens in encounter order.
+    """
+
     return [match.group(0) for match in TRANSLATION_CITATION_PLACEHOLDER_RE.finditer(text)]
 
 
 def restore_visible_citation_markers(text: str, original_markers: list[str]) -> str:
+    """Restore visible citation markers after a placeholder-safe model call.
+
+    Parameters
+    ----------
+    text : str
+        Model output containing citation placeholders.
+    original_markers : list of str
+        Original visible citation markers captured before masking.
+
+    Returns
+    -------
+    str
+        Text with placeholders restored to the original visible markers.
+
+    Raises
+    ------
+    ValueError
+        If the placeholder inventory changed during translation or cleanup.
+    """
+
     expected_placeholders = [f"AGCITTOKEN{index:04d}XYZ" for index in range(1, len(original_markers) + 1)]
     observed_placeholders = extract_translation_placeholders(text)
     if observed_placeholders != expected_placeholders:
@@ -402,6 +520,19 @@ def restore_visible_citation_markers(text: str, original_markers: list[str]) -> 
 
 
 def count_quote_spans(text: str) -> int:
+    """Count visible quote spans across supported quotation styles.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    int
+        Total number of matched quote spans.
+    """
+
     patterns = (
         STRAIGHT_QUOTE_SPAN_RE,
         CURLY_QUOTE_SPAN_RE,
@@ -414,6 +545,19 @@ def count_quote_spans(text: str) -> int:
 
 
 def extract_quote_spans(text: str) -> list[str]:
+    """Extract visible quote spans across supported quotation styles.
+
+    Parameters
+    ----------
+    text : str
+        Text to inspect.
+
+    Returns
+    -------
+    list of str
+        Quote spans in encounter order.
+    """
+
     patterns = (
         STRAIGHT_QUOTE_SPAN_RE,
         CURLY_QUOTE_SPAN_RE,
@@ -429,6 +573,19 @@ def extract_quote_spans(text: str) -> list[str]:
 
 
 def count_protected_quote_spans(text: str) -> int:
+    """Count quote spans that appear in protected blockquote or citation lines.
+
+    Parameters
+    ----------
+    text : str
+        Markdown text to inspect.
+
+    Returns
+    -------
+    int
+        Number of quote spans inside protected structural lines.
+    """
+
     total = 0
     for line in text.splitlines():
         stripped = line.lstrip()
@@ -438,6 +595,20 @@ def count_protected_quote_spans(text: str) -> int:
 
 
 def split_body_and_citations(text: str) -> tuple[str, str]:
+    """Split an English master into body text and citations section.
+
+    Parameters
+    ----------
+    text : str
+        English markdown document.
+
+    Returns
+    -------
+    tuple of str and str
+        Body text and citations section, with an empty string when the section
+        is absent.
+    """
+
     match = CITATIONS_SECTION_RE.search(text)
     if not match:
         return text.strip(), ""
@@ -445,6 +616,20 @@ def split_body_and_citations(text: str) -> tuple[str, str]:
 
 
 def split_translated_output_and_citations(text: str) -> tuple[str, str]:
+    """Split a translated document into body text and localized citations section.
+
+    Parameters
+    ----------
+    text : str
+        Translated markdown document.
+
+    Returns
+    -------
+    tuple of str and str
+        Body text and citations section, with an empty string when the section
+        is absent.
+    """
+
     match = TRANSLATED_CITATIONS_SECTION_RE.search(text)
     if not match:
         return text.strip(), ""
@@ -452,10 +637,36 @@ def split_translated_output_and_citations(text: str) -> tuple[str, str]:
 
 
 def count_numbered_citation_entries(text: str) -> int:
+    """Count numbered bibliography entries in a citations section.
+
+    Parameters
+    ----------
+    text : str
+        Citation-section text.
+
+    Returns
+    -------
+    int
+        Number of numbered entries.
+    """
+
     return len(NUMBERED_CITATION_ENTRY_RE.findall(text))
 
 
 def extract_translated_quote_lookup(text: str) -> dict[int, str]:
+    """Build a lookup of translated citation numbers to translated quote text.
+
+    Parameters
+    ----------
+    text : str
+        Translated markdown body and citations.
+
+    Returns
+    -------
+    dict of int to str
+        Mapping of citation number to translated quote text.
+    """
+
     lookup: dict[int, str] = {}
     for line in text.splitlines():
         match = CITATION_QUOTE_LINE_RE.match(line.strip())
@@ -472,6 +683,24 @@ def extract_translated_quote_lookup(text: str) -> dict[int, str]:
 
 
 def render_translated_citations_section(citations_text: str, *, language_name: str, translated_body: str) -> str:
+    """Render a localized citations section for a translated document.
+
+    Parameters
+    ----------
+    citations_text : str
+        English citations section from the frozen master.
+    language_name : str
+        Human-readable target language name.
+    translated_body : str
+        Translated body text used to reuse translated quote strings when
+        available.
+
+    Returns
+    -------
+    str
+        Localized citations section or an empty string when no citations exist.
+    """
+
     if not citations_text.strip():
         return ""
 
@@ -503,6 +732,25 @@ def localize_citation_metadata_line(
     language_name: str,
     translated_quote_lookup: dict[int, str] | None = None,
 ) -> str:
+    """Localize one English citation metadata line.
+
+    Parameters
+    ----------
+    line : str
+        English citation metadata line.
+    language_name : str
+        Human-readable target language name.
+    translated_quote_lookup : dict of int to str, optional
+        Mapping of citation numbers to translated quote strings found in the
+        translated body.
+
+    Returns
+    -------
+    str
+        Localized citation metadata line, or the original line when it does not
+        match the expected English citation pattern.
+    """
+
     stripped = line.strip()
     match = ENGLISH_CITATION_ENTRY_RE.match(stripped)
     if not match:
@@ -531,6 +779,26 @@ def localize_citation_metadata_line(
 
 
 def validate_citations_section_parity(english_master: str, translated_text: str) -> None:
+    """Ensure a translated output preserves citation-section presence and count.
+
+    Parameters
+    ----------
+    english_master : str
+        Frozen English master text.
+    translated_text : str
+        Candidate translated output.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the translated output drops the citations section or changes the
+        entry count.
+    """
+
     _, english_citations_section = split_body_and_citations(english_master)
     _, translated_citations_section = split_translated_output_and_citations(translated_text)
 
@@ -546,6 +814,19 @@ def validate_citations_section_parity(english_master: str, translated_text: str)
 
 
 def english_master_regression_report_path(config: AppConfig):
+    """Resolve the English master regression report path.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    Path
+        Output path for the regression report.
+    """
+
     return config.resolve_repo_path(
         str(
             config.verification.get(
@@ -557,6 +838,19 @@ def english_master_regression_report_path(config: AppConfig):
 
 
 def normalize_english_master_regressions(text: str) -> tuple[str, list[dict[str, str]]]:
+    """Apply deterministic English master regression fixes.
+
+    Parameters
+    ----------
+    text : str
+        Candidate English master text.
+
+    Returns
+    -------
+    tuple of str and list of dict of str to str
+        Normalized text plus a record of applied replacements.
+    """
+
     normalized = text
     applied_fixes: list[dict[str, str]] = []
     for source, target in ENGLISH_MASTER_REGRESSION_FIXES.items():
@@ -581,6 +875,23 @@ def normalize_english_master_regressions(text: str) -> tuple[str, list[dict[str,
 
 
 def build_english_master_regression_report(config: AppConfig, text: str, *, applied_fixes: list[dict[str, str]] | None = None):
+    """Build a regression report for the frozen English master candidate.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    text : str
+        Candidate English master text.
+    applied_fixes : list of dict of str to str, optional
+        Deterministic replacements applied before report generation.
+
+    Returns
+    -------
+    dict of str to object
+        Regression report describing missing required terms and forbidden text.
+    """
+
     required_terms = tuple(
         str(term)
         for term in config.verification.get("english_master_required_terms", DEFAULT_REQUIRED_ENGLISH_MASTER_TERMS)
@@ -620,6 +931,20 @@ def build_english_master_regression_report(config: AppConfig, text: str, *, appl
 
 
 def write_english_master_regression_report(config: AppConfig, report: dict[str, object]) -> None:
+    """Persist the English master regression report to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    report : dict of str to object
+        Report payload to serialize.
+
+    Returns
+    -------
+    None
+    """
+
     output_path = english_master_regression_report_path(config)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -627,6 +952,27 @@ def write_english_master_regression_report(config: AppConfig, report: dict[str, 
 
 
 def validate_english_master_regressions(config: AppConfig, text: str) -> str:
+    """Normalize and validate the English master before promotion.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    text : str
+        Candidate English master text.
+
+    Returns
+    -------
+    str
+        Validated English master text after deterministic cleanup and dynamic
+        validation.
+
+    Raises
+    ------
+    ValueError
+        If required terms, forbidden phrases, or unquoted source reuse remain.
+    """
+
     normalized_text, applied_fixes = normalize_english_master_regressions(text)
     normalized_text, _ = dynamic_validation_loop(
         config,
@@ -642,10 +988,43 @@ def validate_english_master_regressions(config: AppConfig, text: str) -> str:
 
 
 def find_unquoted_english_quote_reuse(text: str) -> list[str]:
+    """Find exact-source English quote reuse that lacks quotation marks.
+
+    Parameters
+    ----------
+    text : str
+        Candidate English prose.
+
+    Returns
+    -------
+    list of str
+        Regex patterns that matched unquoted source reuse.
+    """
+
     return [pattern.pattern for pattern in UNQUOTED_ENGLISH_QUOTE_PATTERNS if pattern.search(text)]
 
 
 def freeze_english_master(config: AppConfig) -> str:
+    """Promote the final English draft into the frozen master artifact.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    str
+        Frozen English master text.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the final English draft does not exist.
+    ValueError
+        If the final English draft fails regression validation.
+    """
+
     source_path = config.final_draft_output_path
     if not source_path.exists():
         raise FileNotFoundError(f"Final English report not found: {source_path}")
@@ -663,6 +1042,27 @@ def freeze_english_master(config: AppConfig) -> str:
 
 
 def load_english_master(config: AppConfig, *, freeze_if_missing: bool = True) -> str:
+    """Load the frozen English master, freezing it on demand if allowed.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    freeze_if_missing : bool, default=True
+        Whether to create the frozen master from the final draft when it is
+        missing.
+
+    Returns
+    -------
+    str
+        Frozen English master text.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the frozen master is missing and ``freeze_if_missing`` is ``False``.
+    """
+
     output_path = config.english_master_output_path
     if output_path.exists():
         return output_path.read_text(encoding="utf-8")
@@ -672,18 +1072,72 @@ def load_english_master(config: AppConfig, *, freeze_if_missing: bool = True) ->
 
 
 def load_translation_prompt(config: AppConfig, prompt_key: str) -> str:
+    """Load a translation-stage prompt asset from disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    prompt_key : str
+        Prompt path key or prompt asset identifier.
+
+    Returns
+    -------
+    str
+        Prompt text.
+    """
+
     return config.resolve_prompt_path(prompt_key).read_text(encoding="utf-8")
 
 
 def dynamic_validation_enabled(config: AppConfig) -> bool:
+    """Check whether critic-guided dynamic validation is enabled.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    bool
+        ``True`` when dynamic validation should run.
+    """
+
     return bool(config.verification.get("dynamic_validation_enabled", False))
 
 
 def dynamic_validation_max_defects(config: AppConfig) -> int:
+    """Return the maximum number of critic-reported defects to apply.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    int
+        Maximum defect count accepted from the critic response.
+    """
+
     return int(config.verification.get("dynamic_validation_max_defects", 20))
 
 
 def dynamic_validation_transport(config: AppConfig) -> str | None:
+    """Resolve the transport override for dynamic validation calls.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    str or None
+        Transport name to pass to the LLM client, or ``None`` to use defaults.
+    """
+
     transport = (
         str(config.verification.get("dynamic_validation_transport", "")).strip()
         or str(config.translation.get("llm_transport", "")).strip()
@@ -693,6 +1147,19 @@ def dynamic_validation_transport(config: AppConfig) -> str | None:
 
 
 def dynamic_validation_language_key(language_name: str) -> str:
+    """Map a human-readable language name to a stable config/report key.
+
+    Parameters
+    ----------
+    language_name : str
+        Human-readable language name.
+
+    Returns
+    -------
+    str
+        Stable normalized key for report filenames and config lookups.
+    """
+
     if language_name == "English":
         return "english"
     if language_name == "Spanish":
@@ -703,6 +1170,21 @@ def dynamic_validation_language_key(language_name: str) -> str:
 
 
 def dynamic_validation_report_path(config: AppConfig, language_name: str):
+    """Resolve the output path for a dynamic validation report.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    language_name : str
+        Human-readable language name.
+
+    Returns
+    -------
+    Path
+        Output path for the dynamic validation report.
+    """
+
     language_key = dynamic_validation_language_key(language_name)
     configured = str(
         config.verification.get(
@@ -714,10 +1196,38 @@ def dynamic_validation_report_path(config: AppConfig, language_name: str):
 
 
 def load_dynamic_validation_prompt(config: AppConfig) -> str:
+    """Load the critic prompt used for dynamic validation.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+
+    Returns
+    -------
+    str
+        Dynamic validation system prompt.
+    """
+
     return config.resolve_prompt_path("dynamic_validation_prompt_path").read_text(encoding="utf-8")
 
 
 def build_dynamic_validation_user_prompt(text: str, *, language_name: str) -> str:
+    """Build the user prompt for a dynamic validation critic pass.
+
+    Parameters
+    ----------
+    text : str
+        Document text to audit.
+    language_name : str
+        Human-readable document language.
+
+    Returns
+    -------
+    str
+        User prompt requesting JSON-only defect output.
+    """
+
     return "\n".join(
         [
             f"Document language: {language_name}",
@@ -732,6 +1242,19 @@ def build_dynamic_validation_user_prompt(text: str, *, language_name: str) -> st
 
 
 def normalize_dynamic_validation_json(response_text: str) -> str:
+    """Strip fences and extract the JSON object from a critic response.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw model response text.
+
+    Returns
+    -------
+    str
+        JSON payload candidate.
+    """
+
     text = DYNAMIC_VALIDATION_JSON_FENCE_RE.sub("", response_text).strip()
     match = DYNAMIC_VALIDATION_JSON_OBJECT_RE.search(text)
     if match:
@@ -740,6 +1263,27 @@ def normalize_dynamic_validation_json(response_text: str) -> str:
 
 
 def parse_dynamic_validation_response(response_text: str, *, language_name: str) -> dict[str, object]:
+    """Parse and normalize a dynamic validation response.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw critic response text.
+    language_name : str
+        Human-readable document language.
+
+    Returns
+    -------
+    dict of str to object
+        Parsed defects list and optional notes.
+
+    Raises
+    ------
+    ValueError
+        If the response is not valid JSON or does not match the expected defect
+        schema.
+    """
+
     try:
         payload = json.loads(normalize_dynamic_validation_json(response_text))
     except json.JSONDecodeError as exc:
@@ -774,10 +1318,44 @@ def parse_dynamic_validation_response(response_text: str, *, language_name: str)
 
 
 def validate_dynamic_validation_response(response_text: str, *, language_name: str) -> None:
+    """Validate that a dynamic validation response is parseable.
+
+    Parameters
+    ----------
+    response_text : str
+        Raw critic response text.
+    language_name : str
+        Human-readable document language.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the response cannot be parsed into the expected schema.
+    """
+
     parse_dynamic_validation_response(response_text, language_name=language_name)
 
 
 def apply_dynamic_validation_replacements(text: str, defects: list[dict[str, str]]) -> tuple[str, list[dict[str, object]]]:
+    """Apply exact critic-provided replacements to a document.
+
+    Parameters
+    ----------
+    text : str
+        Original document text.
+    defects : list of dict of str to str
+        Critic defects containing ``hallucination`` and ``correction`` fields.
+
+    Returns
+    -------
+    tuple of str and list of dict of str to object
+        Revised text plus a log of replacements that were actually applied.
+    """
+
     sanitized = text
     applied: list[dict[str, object]] = []
     for defect in defects:
@@ -798,6 +1376,21 @@ def apply_dynamic_validation_replacements(text: str, defects: list[dict[str, str
 
 
 def apply_dynamic_validation_regex_fallbacks(text: str, *, language_name: str) -> str:
+    """Apply deterministic cleanup rules after or instead of critic fixes.
+
+    Parameters
+    ----------
+    text : str
+        Document text to sanitize.
+    language_name : str
+        Human-readable document language.
+
+    Returns
+    -------
+    str
+        Deterministically cleaned text.
+    """
+
     sanitized = STANDALONE_ZERO_LINE_RE.sub("", text)
     if language_name == "Simplified Chinese":
         sanitized = ASCII_COMMA_AFTER_CITATION_RE.sub(r"\1，", sanitized)
@@ -808,6 +1401,25 @@ def apply_dynamic_validation_regex_fallbacks(text: str, *, language_name: str) -
 
 
 def validate_dynamic_validation_structure(original_text: str, revised_text: str) -> None:
+    """Ensure dynamic validation preserved document structure and citations.
+
+    Parameters
+    ----------
+    original_text : str
+        Text before dynamic validation.
+    revised_text : str
+        Text after dynamic validation.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If headings, visible citation markers, or citation entry counts changed.
+    """
+
     if extract_heading_levels(revised_text) != extract_heading_levels(original_text):
         raise ValueError("Dynamic validation changed the markdown heading structure")
     if extract_visible_citation_markers(revised_text) != extract_visible_citation_markers(original_text):
@@ -819,6 +1431,20 @@ def validate_dynamic_validation_structure(original_text: str, revised_text: str)
 
 
 def write_dynamic_validation_report(output_path, report: dict[str, object]) -> None:
+    """Persist a dynamic validation report to disk.
+
+    Parameters
+    ----------
+    output_path : Path
+        Destination report path.
+    report : dict of str to object
+        Report payload to serialize.
+
+    Returns
+    -------
+    None
+    """
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     LOGGER.info("Wrote %s dynamic validation report to %s", report["language"], output_path)
@@ -831,6 +1457,31 @@ def dynamic_validation_loop(
     language_name: str,
     stage_name: str,
 ) -> tuple[str, dict[str, object]]:
+    """Run bounded critic-guided validation and fallback cleanup on a document.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    text : str
+        Document text to validate and sanitize.
+    language_name : str
+        Human-readable document language.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+
+    Returns
+    -------
+    tuple of str and dict of str to object
+        Sanitized text plus the structured dynamic validation report.
+
+    Notes
+    -----
+    The loop is intentionally bounded: it performs one critic pass, applies
+    exact replacements, falls back to deterministic regex cleanup on failure,
+    and revalidates structure before accepting the result.
+    """
+
     report_path = dynamic_validation_report_path(config, language_name)
     original_text = text.strip()
     if not dynamic_validation_enabled(config):
@@ -903,6 +1554,25 @@ def dynamic_validation_loop(
 
 
 def build_translation_user_prompt(chunk_text: str, *, chunk_index: int, total_chunks: int, language_name: str) -> str:
+    """Build the main translation prompt for one masked markdown chunk.
+
+    Parameters
+    ----------
+    chunk_text : str
+        Masked English markdown chunk.
+    chunk_index : int
+        One-based chunk index.
+    total_chunks : int
+        Total number of chunks in the document.
+    language_name : str
+        Human-readable target language name.
+
+    Returns
+    -------
+    str
+        User prompt for the translation model.
+    """
+
     instructions = [
         f"Chunk {chunk_index} of {total_chunks}.",
         f"Translate this markdown chunk into {language_name}.",
@@ -915,6 +1585,21 @@ def build_translation_user_prompt(chunk_text: str, *, chunk_index: int, total_ch
 
 
 def build_fragment_user_prompt(fragment_text: str, *, language_name: str) -> str:
+    """Build a fragment-level translation prompt used in stitching fallbacks.
+
+    Parameters
+    ----------
+    fragment_text : str
+        Citation-safe fragment to translate.
+    language_name : str
+        Human-readable target language name.
+
+    Returns
+    -------
+    str
+        User prompt for fragment translation.
+    """
+
     instructions = [
         f"Translate this markdown fragment into {language_name}.",
         "Do not add commentary or extra lines.",
@@ -925,6 +1610,25 @@ def build_fragment_user_prompt(fragment_text: str, *, language_name: str) -> str
 
 
 def build_translation_cleanup_user_prompt(chunk_text: str, *, chunk_index: int, total_chunks: int, language_name: str) -> str:
+    """Build the post-edit cleanup prompt for one translated chunk.
+
+    Parameters
+    ----------
+    chunk_text : str
+        Existing translated markdown chunk.
+    chunk_index : int
+        One-based chunk index.
+    total_chunks : int
+        Total number of chunks in the document.
+    language_name : str
+        Human-readable target language name.
+
+    Returns
+    -------
+    str
+        User prompt for cleanup or copyediting of the translated chunk.
+    """
+
     instructions = [
         f"Chunk {chunk_index} of {total_chunks}.",
         f"Revise this existing {language_name} markdown chunk into polished academic {language_name}.",
@@ -939,6 +1643,21 @@ def build_translation_cleanup_user_prompt(chunk_text: str, *, chunk_index: int, 
 
 
 def build_cleanup_fragment_user_prompt(fragment_text: str, *, language_name: str) -> str:
+    """Build a fragment-level cleanup prompt used in stitching fallbacks.
+
+    Parameters
+    ----------
+    fragment_text : str
+        Citation-safe translated fragment.
+    language_name : str
+        Human-readable target language name.
+
+    Returns
+    -------
+    str
+        User prompt for fragment cleanup.
+    """
+
     instructions = [
         f"Revise this existing {language_name} markdown fragment into polished academic {language_name}.",
         "Do not add commentary or extra lines.",
@@ -950,6 +1669,26 @@ def build_cleanup_fragment_user_prompt(fragment_text: str, *, language_name: str
 
 
 def validate_translation_chunk(source_chunk: str, translated_chunk: str) -> None:
+    """Validate headings and visible citation markers for a translated chunk.
+
+    Parameters
+    ----------
+    source_chunk : str
+        Source markdown chunk.
+    translated_chunk : str
+        Candidate translated chunk.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the translated chunk is empty or changes headings or visible
+        citations.
+    """
+
     stripped = translated_chunk.strip()
     if not stripped:
         raise ValueError("Translated chunk is empty")
@@ -962,6 +1701,26 @@ def validate_translation_chunk(source_chunk: str, translated_chunk: str) -> None
 
 
 def validate_placeholder_chunk(source_chunk: str, translated_chunk: str) -> None:
+    """Validate placeholder preservation for masked translation chunks.
+
+    Parameters
+    ----------
+    source_chunk : str
+        Masked source chunk containing internal placeholders.
+    translated_chunk : str
+        Candidate translated chunk.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the translated chunk is empty or changes headings or placeholder
+        inventory.
+    """
+
     stripped = translated_chunk.strip()
     if not stripped:
         raise ValueError("Translated chunk is empty")
@@ -974,6 +1733,24 @@ def validate_placeholder_chunk(source_chunk: str, translated_chunk: str) -> None
 
 
 def validate_translated_fragment(translated_text: str) -> None:
+    """Validate a fragment-level translation or cleanup response.
+
+    Parameters
+    ----------
+    translated_text : str
+        Candidate translated fragment.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If the fragment is empty or unexpectedly introduces citations or
+        internal placeholders.
+    """
+
     if not translated_text.strip():
         raise ValueError("Translated fragment is empty")
 
@@ -985,6 +1762,21 @@ def validate_translated_fragment(translated_text: str) -> None:
 
 
 def normalize_translated_body(text: str, *, language_name: str) -> str:
+    """Apply deterministic language-specific normalization to translated text.
+
+    Parameters
+    ----------
+    text : str
+        Translated markdown text.
+    language_name : str
+        Human-readable target language name.
+
+    Returns
+    -------
+    str
+        Normalized text with known artifacts repaired.
+    """
+
     normalized = CITATION_GLUE_RE.sub(r"\1 ", text)
     normalized = ZERO_WIDTH_RE.sub("", normalized)
     normalized = ASSISTANT_PROMPT_LEAK_RE.sub("", normalized)
@@ -1012,6 +1804,22 @@ def normalize_translated_body(text: str, *, language_name: str) -> str:
 
 
 def write_translation_output(output_path, text: str, *, language_name: str) -> None:
+    """Persist a translated markdown artifact to disk.
+
+    Parameters
+    ----------
+    output_path : Path
+        Destination markdown path.
+    text : str
+        Translated text to write.
+    language_name : str
+        Human-readable target language name for logging.
+
+    Returns
+    -------
+    None
+    """
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(text.strip() + "\n", encoding="utf-8")
     LOGGER.info("Wrote %s translation to %s", language_name, output_path)
@@ -1028,6 +1836,38 @@ def post_edit_translated_body(
     translated_body: str,
     transport_override: str | None,
 ) -> str:
+    """Run the post-edit cleanup pass on a translated document body.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+    system_prompt : str
+        Cleanup system prompt.
+    output_path : Path
+        Artifact path used for model-call logging.
+    model_name : str
+        Cleanup model name.
+    language_name : str
+        Human-readable target language name.
+    translated_body : str
+        Initial translated body text.
+    transport_override : str or None
+        Optional transport override for model calls.
+
+    Returns
+    -------
+    str
+        Cleaned and normalized translated body text.
+
+    Notes
+    -----
+    If chunk-level cleanup breaks placeholder preservation, the function falls
+    back to fragment-safe cleanup for the affected chunk only.
+    """
+
     chunks = split_markdown_into_chunks(
         translated_body,
         max_chars=int(config.translation.get("max_chunk_chars", 5000)),
@@ -1088,6 +1928,33 @@ def translate_fragment(
     fragment_text: str,
     transport_override: str | None,
 ) -> str:
+    """Translate one citation-safe fragment.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+    system_prompt : str
+        Translation system prompt.
+    output_path : Path
+        Artifact path used for model-call logging.
+    model_name : str
+        Translation model name.
+    language_name : str
+        Human-readable target language name.
+    fragment_text : str
+        Source fragment to translate.
+    transport_override : str or None
+        Optional transport override for model calls.
+
+    Returns
+    -------
+    str
+        Translated fragment with leading and trailing whitespace preserved.
+    """
+
     if not fragment_text.strip():
         return fragment_text
 
@@ -1121,6 +1988,33 @@ def cleanup_fragment(
     fragment_text: str,
     transport_override: str | None,
 ) -> str:
+    """Clean up one citation-safe translated fragment.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+    system_prompt : str
+        Cleanup system prompt.
+    output_path : Path
+        Artifact path used for model-call logging.
+    model_name : str
+        Cleanup model name.
+    language_name : str
+        Human-readable target language name.
+    fragment_text : str
+        Existing translated fragment to revise.
+    transport_override : str or None
+        Optional transport override for model calls.
+
+    Returns
+    -------
+    str
+        Cleaned fragment with leading and trailing whitespace preserved.
+    """
+
     if not fragment_text.strip():
         return fragment_text
 
@@ -1154,6 +2048,33 @@ def translate_text_preserving_citations(
     text: str,
     transport_override: str | None,
 ) -> str:
+    """Translate prose while preserving visible citation markers verbatim.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+    system_prompt : str
+        Translation system prompt.
+    output_path : Path
+        Artifact path used for model-call logging.
+    model_name : str
+        Translation model name.
+    language_name : str
+        Human-readable target language name.
+    text : str
+        Text that may contain visible citation markers.
+    transport_override : str or None
+        Optional transport override for model calls.
+
+    Returns
+    -------
+    str
+        Translated text with visible citations preserved exactly.
+    """
+
     if not text:
         return text
 
@@ -1191,6 +2112,33 @@ def cleanup_text_preserving_citations(
     text: str,
     transport_override: str | None,
 ) -> str:
+    """Clean translated prose while preserving visible citation markers.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+    system_prompt : str
+        Cleanup system prompt.
+    output_path : Path
+        Artifact path used for model-call logging.
+    model_name : str
+        Cleanup model name.
+    language_name : str
+        Human-readable target language name.
+    text : str
+        Existing translated text that may contain visible citation markers.
+    transport_override : str or None
+        Optional transport override for model calls.
+
+    Returns
+    -------
+    str
+        Cleaned text with visible citations preserved exactly.
+    """
+
     if not text:
         return text
 
@@ -1228,6 +2176,33 @@ def translate_chunk_with_marker_stitching(
     chunk_text: str,
     transport_override: str | None,
 ) -> str:
+    """Translate a chunk line-by-line when placeholder preservation fails.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+    system_prompt : str
+        Translation system prompt.
+    output_path : Path
+        Artifact path used for model-call logging.
+    model_name : str
+        Translation model name.
+    language_name : str
+        Human-readable target language name.
+    chunk_text : str
+        Source chunk to translate.
+    transport_override : str or None
+        Optional transport override for model calls.
+
+    Returns
+    -------
+    str
+        Chunk translated through citation-safe fragment stitching.
+    """
+
     translated_blocks: list[str] = []
     for block in paragraph_blocks(chunk_text):
         translated_lines: list[str] = []
@@ -1276,6 +2251,33 @@ def cleanup_chunk_with_marker_stitching(
     chunk_text: str,
     transport_override: str | None,
 ) -> str:
+    """Clean a chunk line-by-line when placeholder preservation fails.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+    system_prompt : str
+        Cleanup system prompt.
+    output_path : Path
+        Artifact path used for model-call logging.
+    model_name : str
+        Cleanup model name.
+    language_name : str
+        Human-readable target language name.
+    chunk_text : str
+        Existing translated chunk to clean.
+    transport_override : str or None
+        Optional transport override for model calls.
+
+    Returns
+    -------
+    str
+        Cleaned chunk produced through citation-safe fragment stitching.
+    """
+
     cleaned_blocks: list[str] = []
     for block in paragraph_blocks(chunk_text):
         cleaned_lines: list[str] = []
@@ -1324,6 +2326,40 @@ def translate_document(
     language_name: str,
     source_text: str | None = None,
 ) -> str:
+    """Translate the frozen English master into one target language.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Loaded application configuration.
+    stage_name : str
+        Stage label used for logging and artifact naming.
+    prompt_key : str
+        Translation prompt asset key.
+    cleanup_prompt_key : str or None
+        Optional cleanup prompt asset key.
+    model_key : str
+        Configuration key used to resolve the translation model.
+    output_path : Path
+        Destination markdown path.
+    language_name : str
+        Human-readable target language name.
+    source_text : str or None, optional
+        Override English source text. When omitted, the frozen English master is
+        loaded from disk.
+
+    Returns
+    -------
+    str
+        Final translated markdown, including the localized citations section.
+
+    Notes
+    -----
+    The workflow is intentionally layered: chunk translation, optional
+    post-edit cleanup, localized citation rendering, bounded dynamic
+    validation, structural revalidation, and final artifact write-out.
+    """
+
     master_text = source_text or load_english_master(config)
     body_text, citations_text = split_body_and_citations(master_text)
     max_chunk_chars = int(config.translation.get("max_chunk_chars", 5000))

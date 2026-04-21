@@ -1,5 +1,9 @@
-"""
-Minimal CLI orchestrator for the early Agent Gatsby pipeline stages.
+"""CLI orchestration for the full Agent Gatsby pipeline.
+
+This module wires the stage-level pipeline functions into a minimal command-line
+interface. It preserves explicit stage ordering, supports partial reruns from a
+requested stage, and enforces the promotion gates that stop translation, PDF
+rendering, and manifest writing when upstream validation fails.
 """
 
 from __future__ import annotations
@@ -58,12 +62,42 @@ IMPLEMENTED_STAGE_ORDER = (
 
 
 def stage_ingest(config: AppConfig, context: StageContext) -> None:
+    """Run source ingestion and cache the results in stage context.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with source text and manifest objects.
+    """
+
     source_text, source_manifest = ingest_source(config)
     context["source_text"] = source_text
     context["source_manifest"] = source_manifest
 
 
 def stage_normalize(config: AppConfig, context: StageContext) -> None:
+    """Normalize the locked source text and cache the result.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with normalized text.
+    """
+
     if "source_text" not in context:
         stage_ingest(config, context)
 
@@ -71,6 +105,21 @@ def stage_normalize(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_index(config: AppConfig, context: StageContext) -> None:
+    """Build the deterministic passage index for the normalized text.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the passage index.
+    """
+
     if "normalized_text" not in context:
         stage_normalize(config, context)
 
@@ -78,6 +127,21 @@ def stage_index(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_extract_metaphors(config: AppConfig, context: StageContext) -> None:
+    """Extract candidate metaphor records from the passage index.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with extracted candidates.
+    """
+
     if "passage_index" not in context:
         stage_index(config, context)
 
@@ -85,6 +149,21 @@ def stage_extract_metaphors(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_build_evidence_ledger(config: AppConfig, context: StageContext) -> None:
+    """Promote verified evidence records from extracted candidates.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with evidence and rejection artifacts.
+    """
+
     if "candidates" not in context:
         stage_extract_metaphors(config, context)
     if "passage_index" not in context:
@@ -100,6 +179,21 @@ def stage_build_evidence_ledger(config: AppConfig, context: StageContext) -> Non
 
 
 def stage_plan_outline(config: AppConfig, context: StageContext) -> None:
+    """Generate the structured English outline from verified evidence.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the outline plan.
+    """
+
     if "evidence_records" not in context:
         stage_build_evidence_ledger(config, context)
 
@@ -107,6 +201,21 @@ def stage_plan_outline(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_draft_english(config: AppConfig, context: StageContext) -> None:
+    """Draft the English analysis from the outline and evidence ledger.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the English draft text.
+    """
+
     if "outline" not in context:
         stage_plan_outline(config, context)
     if "evidence_records" not in context:
@@ -123,6 +232,27 @@ def stage_draft_english(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_verify_english(config: AppConfig, context: StageContext) -> None:
+    """Repair cited quote drift and verify the English draft.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the English verification report.
+
+    Notes
+    -----
+    Before verification, the stage applies canonical quote-alignment repairs to
+    cited direct quotes so near-miss quote reuse is normalized to the verified
+    evidence ledger.
+    """
+
     if "english_draft" not in context:
         stage_draft_english(config, context)
     if "passage_index" not in context:
@@ -154,6 +284,22 @@ def stage_verify_english(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_critique_english(config: AppConfig, context: StageContext) -> None:
+    """Run the bounded editorial refinement pass on the English draft.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the editorially refined English
+        draft or its safe fallback.
+    """
+
     if "english_verification_report" not in context:
         stage_verify_english(config, context)
     if "english_draft" not in context:
@@ -166,12 +312,42 @@ def stage_critique_english(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_freeze_english(config: AppConfig, context: StageContext) -> None:
+    """Freeze the verified English master for downstream translation.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the frozen English master text.
+    """
+
     if "english_final" not in context and not config.final_draft_output_path.exists():
         stage_critique_english(config, context)
     context["english_master"] = freeze_english_master(config)
 
 
 def stage_translate_spanish(config: AppConfig, context: StageContext) -> None:
+    """Translate the frozen English master into Spanish.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the Spanish translation text.
+    """
+
     if "english_master" not in context and not config.english_master_output_path.exists():
         stage_freeze_english(config, context)
 
@@ -182,6 +358,21 @@ def stage_translate_spanish(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_qa_spanish(config: AppConfig, context: StageContext) -> None:
+    """Run structural QA on the Spanish translation package.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the Spanish QA report.
+    """
+
     if "spanish_translation" not in context and not config.spanish_translation_output_path.exists():
         stage_translate_spanish(config, context)
     if "english_master" not in context and not config.english_master_output_path.exists():
@@ -195,6 +386,21 @@ def stage_qa_spanish(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_translate_mandarin(config: AppConfig, context: StageContext) -> None:
+    """Translate the frozen English master into Simplified Chinese.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the Mandarin translation text.
+    """
+
     if "english_master" not in context and not config.english_master_output_path.exists():
         stage_freeze_english(config, context)
 
@@ -205,6 +411,21 @@ def stage_translate_mandarin(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_qa_mandarin(config: AppConfig, context: StageContext) -> None:
+    """Run structural QA on the Mandarin translation package.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the Mandarin QA report.
+    """
+
     if "mandarin_translation" not in context and not config.mandarin_translation_output_path.exists():
         stage_translate_mandarin(config, context)
     if "english_master" not in context and not config.english_master_output_path.exists():
@@ -218,6 +439,27 @@ def stage_qa_mandarin(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_render_pdfs(config: AppConfig, context: StageContext) -> None:
+    """Render and audit the final multilingual PDFs.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with PDF paths and audit reports.
+
+    Raises
+    ------
+    ValueError
+        If either translation package fails structural QA or the final PDF
+        audits fail renderability requirements.
+    """
+
     if "english_master" not in context and not config.english_master_output_path.exists():
         stage_freeze_english(config, context)
     if "spanish_translation" not in context and not config.spanish_translation_output_path.exists():
@@ -245,6 +487,21 @@ def stage_render_pdfs(config: AppConfig, context: StageContext) -> None:
 
 
 def stage_write_manifest(config: AppConfig, context: StageContext) -> None:
+    """Write the final run manifest after outputs have been promoted.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The context is updated in place with the final manifest model.
+    """
+
     if "spanish_qa_report" not in context and not config.spanish_qa_report_path.exists():
         stage_qa_spanish(config, context)
     if "mandarin_qa_report" not in context and not config.mandarin_qa_report_path.exists():
@@ -261,6 +518,14 @@ def stage_write_manifest(config: AppConfig, context: StageContext) -> None:
 
 
 def get_stage_registry() -> dict[str, StageHandler]:
+    """Return the mapping from stage names to stage handlers.
+
+    Returns
+    -------
+    dict of str to StageHandler
+        Registry used by the CLI to resolve stage execution.
+    """
+
     return {
         "ingest": stage_ingest,
         "normalize": stage_normalize,
@@ -282,6 +547,14 @@ def get_stage_registry() -> dict[str, StageHandler]:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser for the orchestrator.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        CLI parser supporting config-path and stage-selection arguments.
+    """
+
     parser = argparse.ArgumentParser(description="Run Agent Gatsby pipeline stages")
     parser.add_argument(
         "--config",
@@ -297,6 +570,28 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_stage_sequence(requested_stage: str, config: AppConfig) -> list[str]:
+    """Resolve the stage sequence requested by the CLI.
+
+    Parameters
+    ----------
+    requested_stage : str
+        Requested stage name or ``all``.
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    list of str
+        Ordered stage names to execute.
+
+    Raises
+    ------
+    NotImplementedError
+        If the requested stage is configured but has no implementation.
+    ValueError
+        If the requested stage is not supported by configuration.
+    """
+
     registry = get_stage_registry()
     configured_stages = set(config.orchestration.get("supported_stages", []))
 
@@ -317,6 +612,23 @@ def resolve_stage_sequence(requested_stage: str, config: AppConfig) -> list[str]
 
 
 def run_stage(stage_name: str, config: AppConfig, context: StageContext) -> None:
+    """Execute a single pipeline stage with timing and logging.
+
+    Parameters
+    ----------
+    stage_name : str
+        Name of the stage to execute.
+    config : AppConfig
+        Validated application configuration.
+    context : dict of str to Any
+        Mutable stage context shared across the current CLI invocation.
+
+    Returns
+    -------
+    None
+        The target stage mutates the context in place.
+    """
+
     registry = get_stage_registry()
     LOGGER.info("Starting stage: %s", stage_name)
     started_at = time.perf_counter()
@@ -326,6 +638,25 @@ def run_stage(stage_name: str, config: AppConfig, context: StageContext) -> None
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the CLI orchestrator entry point.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Optional argument vector. When ``None``, arguments are read from the
+        process command line.
+
+    Returns
+    -------
+    int
+        Process exit code.
+
+    Notes
+    -----
+    The function logs failures through the configured logger when logging has
+    already been initialized, otherwise it emits a parser error message.
+    """
+
     parser = build_parser()
     args = parser.parse_args(argv)
 

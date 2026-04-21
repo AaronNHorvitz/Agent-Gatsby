@@ -46,6 +46,10 @@ artifacts/**
 outputs/**
 !outputs/
 !outputs/.gitkeep
+!outputs/Gatsby_Analysis_English.pdf
+!outputs/Gatsby_Analysis_Spanish.pdf
+!outputs/Gatsby_Analysis_Mandarin.pdf
+!outputs/final_manifest.json
 
 data/normalized/**
 !data/normalized/

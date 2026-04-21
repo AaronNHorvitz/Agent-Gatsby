@@ -1,5 +1,9 @@
-"""
-Minimal local LLM client wrapper for Agent Gatsby.
+"""Local LLM invocation helpers for Agent Gatsby.
+
+This module abstracts the small set of model transports used by the pipeline.
+It supports both OpenAI-compatible and native Ollama chat calls, applies shared
+retry and validation behavior, and raises a structured validation error when a
+model response is syntactically present but contract-invalid.
 """
 
 from __future__ import annotations
@@ -25,12 +29,47 @@ NATIVE_OLLAMA_CHAT_TRANSPORT = "ollama_native_chat"
 
 
 class LLMResponseValidationError(ValueError):
+    """Raised when a model response fails stage-specific validation.
+
+    Attributes
+    ----------
+    response_text : str
+        Raw model response text that failed validation.
+    """
+
     def __init__(self, message: str, response_text: str) -> None:
+        """Initialize the validation error with the raw invalid response.
+
+        Parameters
+        ----------
+        message : str
+            Human-readable validation failure message.
+        response_text : str
+            Raw model response text that failed validation.
+
+        Returns
+        -------
+        None
+        """
+
         super().__init__(message)
         self.response_text = response_text
 
 
 def build_client(config: AppConfig) -> OpenAI:
+    """Build the OpenAI-compatible client from configuration.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    OpenAI
+        Client configured for the repository's local endpoint.
+    """
+
     return OpenAI(
         base_url=str(config.require_mapping_value("models", "endpoint")),
         api_key=str(config.require_mapping_value("models", "api_key")),
@@ -38,6 +77,19 @@ def build_client(config: AppConfig) -> OpenAI:
 
 
 def extract_message_text(response: Any) -> str:
+    """Extract message text from an OpenAI-compatible response object.
+
+    Parameters
+    ----------
+    response : Any
+        Chat completion response object.
+
+    Returns
+    -------
+    str
+        Concatenated response text.
+    """
+
     content = response.choices[0].message.content
     if isinstance(content, str):
         return content
@@ -53,6 +105,19 @@ def extract_message_text(response: Any) -> str:
 
 
 def extract_reasoning_text(response: Any) -> str:
+    """Extract reasoning text when a response transport exposes it.
+
+    Parameters
+    ----------
+    response : Any
+        Chat completion response object.
+
+    Returns
+    -------
+    str
+        Concatenated reasoning text, or an empty string when unavailable.
+    """
+
     reasoning = getattr(response.choices[0].message, "reasoning", None)
     if isinstance(reasoning, str):
         return reasoning
@@ -68,12 +133,38 @@ def extract_reasoning_text(response: Any) -> str:
 
 
 def describe_response(response: Any) -> str:
+    """Build a compact log description for a completion response.
+
+    Parameters
+    ----------
+    response : Any
+        Chat completion response object.
+
+    Returns
+    -------
+    str
+        Short summary including finish reason and reasoning-text length.
+    """
+
     finish_reason = getattr(response.choices[0], "finish_reason", None) or "unknown"
     reasoning_text = extract_reasoning_text(response)
     return f"finish_reason={finish_reason}, reasoning_len={len(reasoning_text)}"
 
 
 def derive_native_ollama_endpoint(config: AppConfig) -> str:
+    """Derive the native Ollama base URL from the configured endpoint.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    str
+        Base URL suitable for native Ollama chat requests.
+    """
+
     parsed = urlparse(str(config.require_mapping_value("models", "endpoint")))
     path = parsed.path or ""
     if path.endswith("/v1"):
@@ -83,6 +174,21 @@ def derive_native_ollama_endpoint(config: AppConfig) -> str:
 
 
 def resolve_transport(config: AppConfig, transport_override: str | None) -> str:
+    """Resolve the transport name for a model invocation.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    transport_override : str or None
+        Optional transport override for the current call.
+
+    Returns
+    -------
+    str
+        Resolved transport identifier.
+    """
+
     if transport_override:
         return transport_override
 
@@ -102,6 +208,27 @@ def invoke_openai_compatible_completion(
     user_prompt: str,
     timeout_seconds: int,
 ) -> tuple[str, str]:
+    """Invoke the configured OpenAI-compatible chat endpoint.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    target_model : str
+        Model name for the request.
+    system_prompt : str
+        System prompt text.
+    user_prompt : str
+        User prompt text.
+    timeout_seconds : int
+        Request timeout in seconds.
+
+    Returns
+    -------
+    tuple of (str, str)
+        Response text and a compact response description for logging.
+    """
+
     client = build_client(config)
     response = client.chat.completions.create(
         model=target_model,
@@ -125,6 +252,27 @@ def invoke_native_ollama_chat_completion(
     user_prompt: str,
     timeout_seconds: int,
 ) -> tuple[str, str]:
+    """Invoke the native Ollama chat API directly.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    target_model : str
+        Model name for the request.
+    system_prompt : str
+        System prompt text.
+    user_prompt : str
+        User prompt text.
+    timeout_seconds : int
+        Request timeout in seconds.
+
+    Returns
+    -------
+    tuple of (str, str)
+        Response text and a compact response description for logging.
+    """
+
     endpoint = derive_native_ollama_endpoint(config) + "/api/chat"
     payload = {
         "model": target_model,
@@ -166,6 +314,52 @@ def invoke_text_completion(
     response_validator: ResponseValidator | None = None,
     transport_override: str | None = None,
 ) -> str:
+    """Invoke a model completion with retries and optional response validation.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    stage_name : str
+        Pipeline stage label used for logging.
+    system_prompt : str
+        System prompt text.
+    user_prompt : str
+        User prompt text.
+    output_path : str or None, optional
+        Artifact path associated with the call for logging purposes.
+    model_name : str or None, optional
+        Explicit model name override.
+    response_validator : callable or None, optional
+        Validator applied to the returned text before it is accepted.
+    transport_override : str or None, optional
+        Explicit transport override for the current call.
+
+    Returns
+    -------
+    str
+        Accepted response text.
+
+    Raises
+    ------
+    APIConnectionError
+        If the OpenAI-compatible client cannot connect.
+    APIError
+        If the OpenAI-compatible transport returns an API error.
+    APITimeoutError
+        If the OpenAI-compatible transport times out.
+    HTTPError
+        If the native Ollama request returns an HTTP error.
+    LLMResponseValidationError
+        If the response is empty or fails the supplied validator.
+    RuntimeError
+        If the retry loop exits without capturing a concrete exception.
+    URLError
+        If the native Ollama request fails at the URL layer.
+    ValueError
+        If an unsupported transport is requested.
+    """
+
     target_model = model_name or config.model_name_for("primary_reasoner")
     timeout_seconds = int(config.models.get("timeout_seconds", 180))
     max_retries = int(config.models.get("max_retries", 0))
