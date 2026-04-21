@@ -1573,6 +1573,7 @@ def expand_section(
                 completed_body_sections=completed_body_sections,
             ),
             output_path=output_path,
+            task_name="english_expand",
             response_validator=response_validator,
             transport_override=transport_override,
         )
@@ -1732,6 +1733,7 @@ def draft_section(
                 completed_body_sections=completed_body_sections,
             ),
             output_path=output_path,
+            task_name="english_draft",
             response_validator=response_validator,
             transport_override=transport_override,
         )
@@ -1786,6 +1788,7 @@ def draft_section(
                     completed_body_sections=completed_body_sections or [],
                 ),
                 output_path=output_path,
+                task_name="english_draft",
                 response_validator=response_validator,
                 transport_override=transport_override,
             )
@@ -1807,6 +1810,7 @@ def draft_section(
                     passage_index=passage_index,
                 ),
                 output_path=output_path,
+                task_name="english_draft",
                 response_validator=response_validator,
                 transport_override=transport_override,
             )
@@ -1829,6 +1833,7 @@ def draft_section(
                     completed_body_sections=completed_body_sections or [],
                 ),
                 output_path=output_path,
+                task_name="english_draft",
                 response_validator=response_validator,
                 transport_override=transport_override,
             )

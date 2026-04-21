@@ -591,6 +591,7 @@ def extract_batch_candidates(
             system_prompt=system_prompt,
             user_prompt=initial_prompt,
             output_path=output_path,
+            task_name="metaphor_extraction",
             response_validator=validate_candidate_response,
             transport_override=transport_override,
         )
@@ -610,6 +611,7 @@ def extract_batch_candidates(
                 system_prompt=system_prompt,
                 user_prompt=stricter_prompt,
                 output_path=output_path,
+                task_name="metaphor_extraction",
                 response_validator=validate_candidate_response,
                 transport_override=transport_override,
             )

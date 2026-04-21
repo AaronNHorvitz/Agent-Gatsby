@@ -31,6 +31,160 @@ Build, test, debug, and package a working local AI pipeline that:
 - deterministic PDF rendering with Unicode-safe font configuration
 - unit tests, smoke checks, logs, and explicit run artifacts on disk
 
+## Post-Sprint Iteration 1: Multi-Model Routing and Benchmarking
+This is the next planned iteration after the shipped weekend sprint. It is intentionally separated from the historical weekend log below so the repo preserves both the shipped execution record and the next engineering target.
+
+**Iteration Objective:** make model choice task-based instead of module-based across the major LLM workloads in the pipeline, then benchmark a disciplined mixed-model route against the current baseline.
+
+**Architecture target for this iteration**
+- the codebase should support task-level model injection for the major LLM workloads, not just the first English draft and the two translation paths
+- the first benchmark should stay narrow even though the routing layer is broader
+
+**Proposed first mixed-model benchmark profile**
+- English outline, draft, expansion, and critique: `Gemma 4`
+- Spanish translation and cleanup: `Qwen 32B`
+- Mandarin translation and cleanup: `Qwen 32B`
+- dynamic validation and final forensic audit: keep the current critic path first unless the benchmark later justifies switching it
+
+### Post-Sprint Definition of Done
+- [ ] P1.1 A routing table exists in config for LLM task names.
+- [ ] P1.2 The current baseline single-model route still works without behavior regressions.
+- [ ] P1.3 English generation tasks resolve their model through the routing layer.
+- [ ] P1.4 Spanish translation tasks resolve their model through the routing layer.
+- [ ] P1.5 Mandarin translation tasks resolve their model through the routing layer.
+- [ ] P1.6 Critic and audit tasks have an explicit routing policy, even if they stay on the baseline critic initially.
+- [ ] P1.7 Extraction and other non-translation generation tasks can also be routed without code edits if we choose to benchmark them later.
+- [ ] P1.8 LLM call metrics are written to disk in a comparable format.
+- [ ] P1.9 A baseline run and one mixed-model run can be compared side by side.
+- [ ] P1.10 README documents the routing and benchmark workflow.
+- [ ] P1.11 The first mixed-model route completes a full local run or fails with stage-local diagnostics that identify the blocker clearly.
+
+### Post-Sprint Guardrails
+- [ ] P2.1 Do not remove the current baseline route.
+- [ ] P2.2 Do not hardcode model names deep inside individual stage modules.
+- [ ] P2.3 Keep model resolution centralized in config and shared client logic.
+- [ ] P2.4 Preserve citation, placeholder, and artifact contracts.
+- [ ] P2.5 Keep benchmarking additive; do not rewrite the shipped pipeline to serve the benchmark harness.
+- [ ] P2.6 Build broader routing support than the first benchmark actually uses, but keep the first benchmark matrix intentionally small.
+
+### Post-Sprint Task Inventory
+#### P3. Routing Design
+- [ ] P3.1 Define the canonical LLM task names used by the repo.
+- [ ] P3.2 Decide which tasks map to shared profiles and which need dedicated task keys.
+- [ ] P3.3 Keep one explicit fallback model key for unmapped tasks.
+- [ ] P3.4 Decide whether critic tasks remain unified in v1 or split into dynamic-validation and forensic-audit routes.
+- [ ] P3.5 Decide whether extraction gets its own routed task in v1 or remains on the baseline route until Iteration 2.
+- [ ] P3.6 Document which task keys are supported by the architecture versus which ones are exercised in the first benchmark.
+
+#### P4. Config Surface
+- [ ] P4.1 Add a `model_routing` section to `config/config.yaml`.
+- [ ] P4.2 Add a baseline routing profile that mirrors the current shipped behavior.
+- [ ] P4.3 Add the first mixed-model routing profile.
+- [ ] P4.4 Add clear task keys for:
+  - [ ] P4.4.1 `metaphor_extraction`
+  - [ ] P4.4.2 `english_outline`
+  - [ ] P4.4.3 `english_draft`
+  - [ ] P4.4.4 `english_expand`
+  - [ ] P4.4.5 `english_critique`
+  - [ ] P4.4.6 `spanish_translation`
+  - [ ] P4.4.7 `spanish_cleanup`
+  - [ ] P4.4.8 `mandarin_translation`
+  - [ ] P4.4.9 `mandarin_cleanup`
+  - [ ] P4.4.10 `dynamic_validation`
+  - [ ] P4.4.11 `final_forensic_audit`
+- [ ] P4.5 Add comments or docs that explain how to swap models without editing code.
+- [ ] P4.6 Keep config readable enough that a user can understand the routing table without reading code first.
+
+#### P5. Config Resolution Helpers
+- [ ] P5.1 Add a helper in `config.py` to resolve a model by task name.
+- [ ] P5.2 Add a helper to resolve a routing profile name.
+- [ ] P5.3 Keep compatibility with the existing `model_name_for(...)` path.
+- [ ] P5.4 Add clean errors for unknown routing profiles or missing task mappings.
+- [ ] P5.5 Add a clear fallback order so unmapped tasks do not fail silently.
+
+#### P6. Shared LLM Client
+- [ ] P6.1 Update `llm_client.py` so calls can provide `task_name`.
+- [ ] P6.2 Resolve the final model in one shared place.
+- [ ] P6.3 Log the resolved model name and task name on every call.
+- [ ] P6.4 Keep transport override behavior intact.
+- [ ] P6.5 Preserve validator and retry behavior.
+- [ ] P6.6 Keep explicit per-call model overrides available for debugging and emergency fallback.
+
+#### P7. Extraction and Early Generation Integration
+- [ ] P7.1 Decide whether `extract_metaphors.py` routes through `metaphor_extraction` in v1.
+- [ ] P7.2 If routed, update extraction calls to resolve through the shared task-based path.
+- [ ] P7.3 If not routed yet, document that extraction remains on the baseline route for the first benchmark.
+- [ ] P7.4 Confirm the baseline extraction behavior remains reproducible.
+
+#### P8. English Path Integration
+- [ ] P8.1 Route `plan_outline.py` through `english_outline`.
+- [ ] P8.2 Route section drafting in `draft_english.py` through `english_draft`.
+- [ ] P8.3 Route bounded expansion in `draft_english.py` through `english_expand`.
+- [ ] P8.4 Route critique/simplification in `critique_and_edit.py` through `english_critique`.
+- [ ] P8.5 Verify the baseline profile still reproduces current behavior.
+
+#### P9. Translation Path Integration
+- [ ] P9.1 Route Spanish translation calls in `translation_common.py` through `spanish_translation`.
+- [ ] P9.2 Route Spanish cleanup calls through `spanish_cleanup`.
+- [ ] P9.3 Route Mandarin translation calls through `mandarin_translation`.
+- [ ] P9.4 Route Mandarin cleanup calls through `mandarin_cleanup`.
+- [ ] P9.5 Confirm placeholder and citation protection still holds under mixed-model routing.
+
+#### P10. Critic and Audit Routing
+- [ ] P10.1 Decide whether `dynamic_validation` stays on the current critic or gets its own routed model.
+- [ ] P10.2 Decide whether `final_forensic_audit` stays on the current critic or gets its own routed model.
+- [ ] P10.3 Route those tasks explicitly once the policy is chosen.
+- [ ] P10.4 Confirm the small forensic blocklist still works regardless of resolved model.
+- [ ] P10.5 Confirm critic routing does not weaken any existing hard failure gates.
+
+#### P11. Metrics Capture
+- [ ] P11.1 Record resolved model name per LLM call.
+- [ ] P11.2 Record task name per LLM call.
+- [ ] P11.3 Record transport per LLM call.
+- [ ] P11.4 Record latency per LLM call.
+- [ ] P11.5 Record retry count per LLM call.
+- [ ] P11.6 Record output length per LLM call.
+- [ ] P11.7 Write comparable stage-level metrics to disk.
+- [ ] P11.8 Preserve enough context to compare later task-level experiments beyond the first benchmark matrix.
+
+#### P12. Benchmark Harness
+- [ ] P12.1 Add a benchmark mode or helper script that can run a named routing profile.
+- [ ] P12.2 Add a baseline-vs-profile comparison output.
+- [ ] P12.3 Compare at minimum:
+  - [ ] P12.3.1 English word count
+  - [ ] P12.3.2 English verification pass/fail
+  - [ ] P12.3.3 Spanish structural QA pass/fail
+  - [ ] P12.3.4 Mandarin structural QA pass/fail
+  - [ ] P12.3.5 final PDF audit pass/fail
+  - [ ] P12.3.6 total runtime
+  - [ ] P12.3.7 retries or failure hotspots
+- [ ] P12.4 Write the comparison artifact to disk in a reviewable format.
+- [ ] P12.5 Leave room for later comparisons on extraction, critics, and other task families without redesigning the harness.
+
+#### P13. First Benchmark Execution
+- [ ] P13.1 Run the baseline profile and save metrics.
+- [ ] P13.2 Run the first mixed-model profile:
+  - [ ] P13.2.1 English: `Gemma 4`
+  - [ ] P13.2.2 Spanish: `Qwen 32B`
+  - [ ] P13.2.3 Mandarin: `Qwen 32B`
+- [ ] P13.3 Keep critic and audit routing fixed on the baseline critic for the first comparison unless a blocker forces a change.
+- [ ] P13.4 Compare quality gates and runtime.
+- [ ] P13.5 Record what improved, what regressed, and what still needs hardening.
+
+#### P14. Documentation
+- [ ] P14.1 Update README model-strategy language to describe task-based routing.
+- [ ] P14.2 Document how to select a routing profile locally.
+- [ ] P14.3 Document how to run a benchmark comparison.
+- [ ] P14.4 Document which routed task types are supported even if the first benchmark does not vary all of them.
+- [ ] P14.5 Update SPRINTBOARD and TASKS with the iteration status after the first benchmark run.
+
+#### P15. Validation
+- [ ] P15.1 Add tests for config routing resolution.
+- [ ] P15.2 Add tests for shared client task-to-model resolution.
+- [ ] P15.3 Add tests that existing baseline routes still resolve correctly.
+- [ ] P15.4 Add at least one smoke validation that a mixed-model config can execute without breaking stage contracts.
+- [ ] P15.5 Add at least one validation path that confirms unsupported task keys fail cleanly instead of silently falling back in the wrong place.
+
 ## Historical Work Log
 The detailed checklist below is the actual weekend execution log retained for reviewability.
 

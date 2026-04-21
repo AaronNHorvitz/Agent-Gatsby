@@ -484,7 +484,10 @@ def test_normalize_translated_body_removes_prompt_leaks_and_current_spanish_mand
         "Esto ocurre durante el apogeencia de la fiesta, y el narración describe la cesta de un servicio de catering [10]. "
         "Please provide the Spanish markdown fragment you would like me to revise. "
         "I am ready to apply the professional academic copyediting standards described in your instructions. "
-        "Los personajes pierta la capacidad de seguir adelante, y El emocionante murmullo de su voz era un tónico salvaje bajo la lluvia."
+        "Los personajes pierta la capacidad de seguir adelante, y El emocionante murmullo de su voz era un tónico salvaje bajo la lluvia. "
+        "Gatsby intenta superar sus orígenes al marcar su reinventación como un evento espiritual o cósmico. "
+        "La transición dla roca dura de un potencial carácter [2] a las *\"espirales y remolinos de personas\"* [11] indica una fractura. "
+        "La transición dla dura roca del potencial carácter [2] a las *\"espirales y remolinos de personas\"* [11] intensifica la imagen."
     )
     mandarin = (
         "菲茨杰是否存在利用地质和空间隐喻，建立了一个人物与景观都不具备固定、可靠中心的的世界。 "
@@ -495,7 +498,8 @@ def test_normalize_translated_body_removes_prompt_leaks_and_current_spanish_mand
         "《了_不起的盖茨比》里的尼克·是否·卡拉威听着黄色鸡模音乐，闻到香骗的气味。 "
         "在 [12] 在文中，菲茨杰拉德将汤向描述为一个能产生巨大杠杆作用的躯体。 "
         "灰烬最终在物理层面上吞噬着生活其中的人们。 "
-        "这种不稳定性从生物层面延伸到了物理层面。"
+        "这种不稳定性从生物层面延伸到了物理层面。 "
+        "这种不稳定性从生物层面延伸到物理层面。"
     )
 
     normalized_spanish = normalize_translated_body(spanish, language_name="Spanish")
@@ -509,12 +513,19 @@ def test_normalize_translated_body_removes_prompt_leaks_and_current_spanish_mand
     assert "professional academic copyediting standards" not in normalized_spanish
     assert "pierta" not in normalized_spanish
     assert "emocionante murmullo de su voz" not in normalized_spanish
+    assert "reinventación" not in normalized_spanish
+    assert "La transición dla roca dura" not in normalized_spanish
+    assert "La transición dla dura roca del potencial carácter" not in normalized_spanish
+    assert " dla " not in normalized_spanish
     assert "metáforas" in normalized_spanish
     assert "ilustrar" in normalized_spanish
     assert "apogeo" in normalized_spanish
     assert "servicio de banquetes" in normalized_spanish
     assert "pierden" in normalized_spanish
     assert "El excitante ondular de su voz" in normalized_spanish
+    assert "reinvención" in normalized_spanish
+    assert "La transición de la roca dura" in normalized_spanish
+    assert "La transición desde la roca dura del carácter potencial" in normalized_spanish
 
     assert "菲茨杰是否存在" not in normalized_mandarin
     assert "长显长岛海峡" not in normalized_mandarin
@@ -546,3 +557,4 @@ def test_normalize_translated_body_removes_prompt_leaks_and_current_spanish_mand
     assert "菲茨杰拉德将汤姆描述为" in normalized_mandarin
     assert "逐渐吞噬着生活其中的人们" in normalized_mandarin
     assert "这种不稳定性从生物意象延伸到了流体意象" in normalized_mandarin
+    assert "这种不稳定性从生物意象延伸到流体意象" in normalized_mandarin

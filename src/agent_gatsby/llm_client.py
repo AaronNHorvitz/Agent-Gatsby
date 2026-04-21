@@ -12,6 +12,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
+from datetime import datetime, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
@@ -200,6 +201,59 @@ def resolve_transport(config: AppConfig, transport_override: str | None) -> str:
     return OPENAI_COMPATIBLE_TRANSPORT
 
 
+def utc_now_iso() -> str:
+    """Return the current UTC time in ISO-8601 format.
+
+    Returns
+    -------
+    str
+        Timestamp suffixed with ``Z``.
+    """
+
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def llm_metrics_enabled(config: AppConfig) -> bool:
+    """Check whether per-call LLM metrics should be written to disk.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+
+    Returns
+    -------
+    bool
+        ``True`` when LLM call metrics are enabled.
+    """
+
+    return bool(config.llm_metrics.get("enabled", False))
+
+
+def write_llm_call_metric(config: AppConfig, metric: dict[str, Any]) -> None:
+    """Append one LLM call metric record to the configured JSONL file.
+
+    Parameters
+    ----------
+    config : AppConfig
+        Validated application configuration.
+    metric : dict of str to Any
+        Metric payload to append.
+
+    Returns
+    -------
+    None
+    """
+
+    if not llm_metrics_enabled(config):
+        return
+
+    output_path = config.llm_metrics_output_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(metric, ensure_ascii=False) + "\n")
+
+
 def invoke_openai_compatible_completion(
     config: AppConfig,
     *,
@@ -311,6 +365,8 @@ def invoke_text_completion(
     user_prompt: str,
     output_path: str | None = None,
     model_name: str | None = None,
+    task_name: str | None = None,
+    fallback_model_key: str = "primary_reasoner",
     response_validator: ResponseValidator | None = None,
     transport_override: str | None = None,
 ) -> str:
@@ -330,6 +386,10 @@ def invoke_text_completion(
         Artifact path associated with the call for logging purposes.
     model_name : str or None, optional
         Explicit model name override.
+    task_name : str or None, optional
+        Canonical task name used for model routing and metrics.
+    fallback_model_key : str, default="primary_reasoner"
+        Baseline model key used when the task is not explicitly routed.
     response_validator : callable or None, optional
         Validator applied to the returned text before it is accepted.
     transport_override : str or None, optional
@@ -360,20 +420,36 @@ def invoke_text_completion(
         If an unsupported transport is requested.
     """
 
-    target_model = model_name or config.model_name_for("primary_reasoner")
+    routing_profile = config.active_model_routing_profile()
+    resolved_model_key: str | None = None
+    if model_name is not None:
+        target_model = model_name
+    elif task_name is not None:
+        resolved_model_key = config.model_key_for_task(
+            task_name,
+            fallback_model_key=fallback_model_key,
+        )
+        target_model = config.model_name_for(resolved_model_key)
+    else:
+        resolved_model_key = fallback_model_key
+        target_model = config.model_name_for(fallback_model_key)
+
     timeout_seconds = int(config.models.get("timeout_seconds", 180))
     max_retries = int(config.models.get("max_retries", 0))
     retry_backoff_seconds = int(config.models.get("retry_backoff_seconds", 1))
     transport = resolve_transport(config, transport_override)
+    call_started_at = time.monotonic()
 
     last_exception: Exception | None = None
     for attempt in range(1, max_retries + 2):
         try:
             LOGGER.info(
-                "LLM call stage=%s attempt=%d model=%s transport=%s output=%s",
+                "LLM call stage=%s task=%s attempt=%d model=%s model_key=%s transport=%s output=%s",
                 stage_name,
+                task_name or "(default)",
                 attempt,
                 target_model,
+                resolved_model_key or "(explicit)",
                 transport,
                 output_path or "(none)",
             )
@@ -408,6 +484,29 @@ def invoke_text_completion(
                 except ValueError as exc:
                     raise LLMResponseValidationError(str(exc), response_text) from exc
 
+            try:
+                write_llm_call_metric(
+                    config,
+                    {
+                        "generated_at": utc_now_iso(),
+                        "stage_name": stage_name,
+                        "task_name": task_name or "",
+                        "routing_profile": routing_profile,
+                        "model_key": resolved_model_key or "",
+                        "model_name": target_model,
+                        "transport": transport,
+                        "output_path": output_path or "",
+                        "attempt_count": attempt,
+                        "retry_count": attempt - 1,
+                        "status": "passed",
+                        "validator_enabled": response_validator is not None,
+                        "output_length": len(response_text),
+                        "duration_ms": round((time.monotonic() - call_started_at) * 1000, 3),
+                    },
+                )
+            except Exception as metrics_exc:  # pragma: no cover - metrics should never break the call path
+                LOGGER.warning("Failed to write LLM metrics for stage=%s: %s", stage_name, metrics_exc)
+
             return response_text
         except (
             APIConnectionError,
@@ -423,6 +522,31 @@ def invoke_text_completion(
                 break
             LOGGER.warning("LLM call failed at stage=%s attempt=%d: %s", stage_name, attempt, exc)
             time.sleep(retry_backoff_seconds)
+
+    try:
+        write_llm_call_metric(
+            config,
+            {
+                "generated_at": utc_now_iso(),
+                "stage_name": stage_name,
+                "task_name": task_name or "",
+                "routing_profile": routing_profile,
+                "model_key": resolved_model_key or "",
+                "model_name": target_model,
+                "transport": transport,
+                "output_path": output_path or "",
+                "attempt_count": max_retries + 1,
+                "retry_count": max_retries,
+                "status": "failed",
+                "validator_enabled": response_validator is not None,
+                "output_length": 0,
+                "duration_ms": round((time.monotonic() - call_started_at) * 1000, 3),
+                "error_type": type(last_exception).__name__ if last_exception is not None else "",
+                "error_message": str(last_exception) if last_exception is not None else "",
+            },
+        )
+    except Exception as metrics_exc:  # pragma: no cover - metrics should never break the call path
+        LOGGER.warning("Failed to write LLM metrics for stage=%s: %s", stage_name, metrics_exc)
 
     if last_exception is not None:
         raise last_exception
