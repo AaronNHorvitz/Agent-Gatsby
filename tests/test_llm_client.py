@@ -41,6 +41,8 @@ models:
   endpoint: "http://localhost:11434/v1"
   api_key: "ollama"
   primary_reasoner: "gemma4:26b"
+  final_critic: "gemma4:26b"
+  qwen32_multilingual: "qwen2.5:32b"
   timeout_seconds: 1
   max_retries: 1
   retry_backoff_seconds: 0
@@ -48,6 +50,22 @@ llm_defaults:
   temperature: 0.2
   top_p: 0.9
   max_tokens: 256
+model_routing:
+  active_profile: "gemma4_qwen32_translations"
+  profiles:
+    baseline:
+      default_model_key: "primary_reasoner"
+      tasks:
+        english_draft: "primary_reasoner"
+    gemma4_qwen32_translations:
+      default_model_key: "primary_reasoner"
+      tasks:
+        english_draft: "primary_reasoner"
+        spanish_translation: "qwen32_multilingual"
+        dynamic_validation: "final_critic"
+llm_metrics:
+  enabled: true
+  output_path: "artifacts/qa/llm_call_metrics.jsonl"
 """
     config_path = repo_root / "config/config.yaml"
     config_path.write_text(config_text.strip() + "\n", encoding="utf-8")
@@ -207,3 +225,30 @@ def test_invoke_text_completion_uses_native_ollama_chat_with_thinking_disabled(m
     assert captured["timeout"] == 1
     assert captured["payload"]["think"] is False
     assert captured["payload"]["model"] == "gemma4:26b"
+
+
+def test_invoke_text_completion_uses_task_routed_model_and_writes_metrics(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_llm_config(repo_root))
+    fake_client = FakeClient([fake_response("Translated response")])
+
+    monkeypatch.setattr("agent_gatsby.llm_client.build_client", lambda config: fake_client)
+
+    response_text = invoke_text_completion(
+        config,
+        stage_name="translate_spanish",
+        system_prompt="system",
+        user_prompt="user",
+        task_name="spanish_translation",
+        response_validator=lambda text: None,
+    )
+
+    assert response_text == "Translated response"
+    assert fake_client.chat.completions.calls[0]["model"] == "qwen2.5:32b"
+    metrics_path = repo_root / "artifacts/qa/llm_call_metrics.jsonl"
+    metrics_lines = metrics_path.read_text(encoding="utf-8").strip().splitlines()
+    metric = json.loads(metrics_lines[-1])
+    assert metric["task_name"] == "spanish_translation"
+    assert metric["model_name"] == "qwen2.5:32b"
+    assert metric["routing_profile"] == "gemma4_qwen32_translations"
+    assert metric["status"] == "passed"

@@ -444,6 +444,7 @@ def plan_outline(
         system_prompt=load_outline_prompt(config),
         user_prompt=build_outline_user_prompt(config, prompt_records),
         output_path=str(config.outline_output_path),
+        task_name="english_outline",
         response_validator=validate_outline_response,
         transport_override=str(config.outline.get("llm_transport", "")).strip() or None,
     )

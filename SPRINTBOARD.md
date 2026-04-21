@@ -63,3 +63,70 @@
 - generalized multi-book support
 
 For the full implementation checklist and historical work log, see `TASKS.md`.
+
+---
+
+## Post-Sprint Iteration 1
+### Multi-Model Routing and Benchmarking
+
+**Objective:** add task-based model routing, capture comparable per-task metrics, and benchmark a mixed-model configuration without destabilizing the shipped reference pipeline.
+
+**Status:** planned
+
+**Why this iteration exists**
+- the shipped reference path assumes one primary reasoning model for most generation tasks
+- translation and critique are different workloads from English literary analysis
+- the next iteration should make model choice explicit per task, not implicit per module
+- the repo needs a safe way to compare mixed-model runs against the current baseline
+
+**Proposed first benchmark profile**
+- English outline, draft, expansion, and critique: `Gemma 4`
+- Spanish translation and cleanup: `Qwen 32B`
+- Mandarin translation and cleanup: `Qwen 32B`
+- dynamic validation and final forensic audit: keep the current critic path first, then compare later if useful
+
+**Planned scope**
+- add task-based model routing in config and config resolution helpers
+- update core LLM call sites to resolve by task name instead of ad hoc model keys
+- record comparable metrics for LLM calls and stage results
+- add a benchmarking path for mixed-model runs versus baseline runs
+- document how to switch routing profiles locally
+
+**Granular milestone board**
+- `Milestone 1:` routing design locked
+  - define task names for English, Spanish, Mandarin, and critic workloads
+  - preserve the current single-model path as the fallback baseline
+- `Milestone 2:` config and client routing implemented
+  - add model-routing config surface
+  - resolve models by task in one shared path
+- `Milestone 3:` stage integration completed
+  - English path routed
+  - Spanish path routed
+  - Mandarin path routed
+  - critic and audit paths reviewed
+- `Milestone 4:` metrics and benchmark harness implemented
+  - capture per-call latency, retries, output length, and resolved model
+  - compare baseline versus mixed-model outputs
+- `Milestone 5:` first benchmark run completed
+  - baseline run captured
+  - mixed-model run captured
+  - QA and artifact comparison summarized
+
+**Definition of done for the iteration**
+- a routing table can switch models by task without code edits
+- the baseline route still works unchanged
+- the first mixed-model route runs locally
+- metrics are written to disk for comparison
+- README and task docs explain the routing and benchmark workflow
+
+**Primary risks**
+- routing logic spreads across too many modules instead of staying centralized
+- different models may preserve citations and placeholders differently
+- benchmark data may be noisy if stage outputs are not normalized enough to compare
+- local runtime or VRAM pressure may make some model combinations impractical
+
+**Out of scope for this iteration**
+- automated model search across every available local model
+- cloud-hosted benchmark infrastructure
+- generalized hyperparameter tuning
+- large-scale UI or dashboard work

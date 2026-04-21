@@ -149,6 +149,8 @@ MANDARIN_NORMALIZATION_MAP = {
     "它们在物理层面上吞噬着生活其中的人们": "它们逐渐吞噬着生活其中的人们",
     "在物理层面上吞噬着生活其中的人们": "逐渐吞噬着生活其中的人们",
     "这种不稳定性从生物层面延伸到了物理层面": "这种不稳定性从生物意象延伸到了流体意象",
+    "这种不稳定性从生物层面延伸到物理层面": "这种不稳定性从生物意象延伸到流体意象",
+    "物理层面": "具象层面",
 }
 SPANISH_NORMALIZATION_MAP = {
     "# Un análisis de las metáforas en *The Great Gatsby*": "# Un análisis de las metáforas en *El gran Gatsby*",
@@ -158,6 +160,10 @@ SPANISH_NORMALIZATION_MAP = {
     "desibuja": "desdibuja",
     "ilustcionar": "ilustrar",
     "metáfor yas": "metáforas",
+    "reinventación": "reinvención",
+    "La transición dla dura roca del potencial carácter": "La transición desde la roca dura del carácter potencial",
+    "La transición dla roca dura": "La transición de la roca dura",
+    "La transición de la dura roca del potencial carácter": "La transición desde la roca dura del carácter potencial",
     "música de cóctel amarillo": "música amarilla de cóctel",
     "cesta de un catering": "cesta de un banquetero",
     "La casa no simplemente existe": "La casa no existe simplemente",
@@ -1169,6 +1175,30 @@ def dynamic_validation_language_key(language_name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", language_name.lower()).strip("_") or "document"
 
 
+def translation_task_name(language_name: str, *, cleanup: bool = False) -> str:
+    """Map a human-readable language name to a translation routing task name.
+
+    Parameters
+    ----------
+    language_name : str
+        Human-readable target language name.
+    cleanup : bool, default=False
+        Whether to resolve the cleanup task instead of the initial translation
+        task.
+
+    Returns
+    -------
+    str
+        Canonical task name for model routing and metrics.
+    """
+
+    if language_name == "Spanish":
+        return "spanish_cleanup" if cleanup else "spanish_translation"
+    if language_name == "Simplified Chinese":
+        return "mandarin_cleanup" if cleanup else "mandarin_translation"
+    return "translation_cleanup" if cleanup else "translation"
+
+
 def dynamic_validation_report_path(config: AppConfig, language_name: str):
     """Resolve the output path for a dynamic validation report.
 
@@ -1511,7 +1541,8 @@ def dynamic_validation_loop(
             system_prompt=load_dynamic_validation_prompt(config),
             user_prompt=build_dynamic_validation_user_prompt(original_text, language_name=language_name),
             output_path=str(report_path),
-            model_name=str(config.models.get("final_critic", config.models.get("primary_reasoner", ""))),
+            task_name="dynamic_validation",
+            fallback_model_key="final_critic",
             response_validator=lambda value: validate_dynamic_validation_response(value, language_name=language_name),
             transport_override=dynamic_validation_transport(config),
         )
@@ -1785,6 +1816,7 @@ def normalize_translated_body(text: str, *, language_name: str) -> str:
         normalized = SPANISH_INTERNAL_TOKEN_RE.sub("", normalized)
         normalized = SPANISH_ESCAPE_SEQUENCE_RE.sub(" ", normalized)
         normalized = normalized.replace("esporádíamos", "esporádicos")
+        normalized = re.sub(r"\bdla\b", "de la", normalized)
         normalized = re.sub(r"\s*\.\s*(\[\d+\])\s*(?=[A-ZÁÉÍÓÚÑ])", r" \1. ", normalized)
         normalized = re.sub(r'([”»"])\*\.\s*(\[\d+\])', r"\1* \2.", normalized)
         normalized = re.sub(r'([”»"])\.\*\s*(\[\d+\])', r"\1* \2.", normalized)
@@ -1832,6 +1864,7 @@ def post_edit_translated_body(
     system_prompt: str,
     output_path,
     model_name: str,
+    task_name: str,
     language_name: str,
     translated_body: str,
     transport_override: str | None,
@@ -1850,6 +1883,8 @@ def post_edit_translated_body(
         Artifact path used for model-call logging.
     model_name : str
         Cleanup model name.
+    task_name : str
+        Canonical cleanup task name for routing metrics.
     language_name : str
         Human-readable target language name.
     translated_body : str
@@ -1888,6 +1923,7 @@ def post_edit_translated_body(
                 ),
                 output_path=str(output_path),
                 model_name=model_name,
+                task_name=task_name,
                 response_validator=lambda text, source_chunk=masked_chunk: validate_placeholder_chunk(source_chunk, text),
                 transport_override=transport_override,
             ).strip()
@@ -1908,6 +1944,7 @@ def post_edit_translated_body(
                     system_prompt=system_prompt,
                     output_path=output_path,
                     model_name=model_name,
+                    task_name=task_name,
                     language_name=language_name,
                     chunk_text=chunk,
                     transport_override=transport_override,
@@ -1924,6 +1961,7 @@ def translate_fragment(
     system_prompt: str,
     output_path,
     model_name: str,
+    task_name: str,
     language_name: str,
     fragment_text: str,
     transport_override: str | None,
@@ -1942,6 +1980,8 @@ def translate_fragment(
         Artifact path used for model-call logging.
     model_name : str
         Translation model name.
+    task_name : str
+        Canonical translation task name for routing metrics.
     language_name : str
         Human-readable target language name.
     fragment_text : str
@@ -1971,6 +2011,7 @@ def translate_fragment(
         user_prompt=build_fragment_user_prompt(core, language_name=language_name),
         output_path=str(output_path),
         model_name=model_name,
+        task_name=task_name,
         response_validator=validate_translated_fragment,
         transport_override=transport_override,
     ).strip()
@@ -1984,6 +2025,7 @@ def cleanup_fragment(
     system_prompt: str,
     output_path,
     model_name: str,
+    task_name: str,
     language_name: str,
     fragment_text: str,
     transport_override: str | None,
@@ -2002,6 +2044,8 @@ def cleanup_fragment(
         Artifact path used for model-call logging.
     model_name : str
         Cleanup model name.
+    task_name : str
+        Canonical cleanup task name for routing metrics.
     language_name : str
         Human-readable target language name.
     fragment_text : str
@@ -2031,6 +2075,7 @@ def cleanup_fragment(
         user_prompt=build_cleanup_fragment_user_prompt(core, language_name=language_name),
         output_path=str(output_path),
         model_name=model_name,
+        task_name=task_name,
         response_validator=validate_translated_fragment,
         transport_override=transport_override,
     ).strip()
@@ -2044,6 +2089,7 @@ def translate_text_preserving_citations(
     system_prompt: str,
     output_path,
     model_name: str,
+    task_name: str,
     language_name: str,
     text: str,
     transport_override: str | None,
@@ -2062,6 +2108,8 @@ def translate_text_preserving_citations(
         Artifact path used for model-call logging.
     model_name : str
         Translation model name.
+    task_name : str
+        Canonical translation task name for routing metrics.
     language_name : str
         Human-readable target language name.
     text : str
@@ -2093,6 +2141,7 @@ def translate_text_preserving_citations(
                 system_prompt=system_prompt,
                 output_path=output_path,
                 model_name=model_name,
+                task_name=task_name,
                 language_name=language_name,
                 fragment_text=part,
                 transport_override=transport_override,
@@ -2108,6 +2157,7 @@ def cleanup_text_preserving_citations(
     system_prompt: str,
     output_path,
     model_name: str,
+    task_name: str,
     language_name: str,
     text: str,
     transport_override: str | None,
@@ -2126,6 +2176,8 @@ def cleanup_text_preserving_citations(
         Artifact path used for model-call logging.
     model_name : str
         Cleanup model name.
+    task_name : str
+        Canonical cleanup task name for routing metrics.
     language_name : str
         Human-readable target language name.
     text : str
@@ -2157,6 +2209,7 @@ def cleanup_text_preserving_citations(
                 system_prompt=system_prompt,
                 output_path=output_path,
                 model_name=model_name,
+                task_name=task_name,
                 language_name=language_name,
                 fragment_text=part,
                 transport_override=transport_override,
@@ -2172,6 +2225,7 @@ def translate_chunk_with_marker_stitching(
     system_prompt: str,
     output_path,
     model_name: str,
+    task_name: str,
     language_name: str,
     chunk_text: str,
     transport_override: str | None,
@@ -2190,6 +2244,8 @@ def translate_chunk_with_marker_stitching(
         Artifact path used for model-call logging.
     model_name : str
         Translation model name.
+    task_name : str
+        Canonical translation task name for routing metrics.
     language_name : str
         Human-readable target language name.
     chunk_text : str
@@ -2231,6 +2287,7 @@ def translate_chunk_with_marker_stitching(
                     system_prompt=system_prompt,
                     output_path=output_path,
                     model_name=model_name,
+                    task_name=task_name,
                     language_name=language_name,
                     text=body,
                     transport_override=transport_override,
@@ -2247,6 +2304,7 @@ def cleanup_chunk_with_marker_stitching(
     system_prompt: str,
     output_path,
     model_name: str,
+    task_name: str,
     language_name: str,
     chunk_text: str,
     transport_override: str | None,
@@ -2265,6 +2323,8 @@ def cleanup_chunk_with_marker_stitching(
         Artifact path used for model-call logging.
     model_name : str
         Cleanup model name.
+    task_name : str
+        Canonical cleanup task name for routing metrics.
     language_name : str
         Human-readable target language name.
     chunk_text : str
@@ -2306,6 +2366,7 @@ def cleanup_chunk_with_marker_stitching(
                     system_prompt=system_prompt,
                     output_path=output_path,
                     model_name=model_name,
+                    task_name=task_name,
                     language_name=language_name,
                     text=body,
                     transport_override=transport_override,
@@ -2373,7 +2434,16 @@ def translate_document(
     )
 
     translated_chunks: list[str] = []
-    target_model_name = config.model_name_for(model_key)
+    translation_task = translation_task_name(language_name)
+    cleanup_task = translation_task_name(language_name, cleanup=True)
+    target_model_name = config.model_name_for_task(
+        translation_task,
+        fallback_model_key=model_key,
+    )
+    cleanup_model_name = config.model_name_for_task(
+        cleanup_task,
+        fallback_model_key=model_key,
+    )
     for index, chunk in enumerate(chunks, start=1):
         masked_chunk, original_markers = mask_visible_citation_markers(chunk)
         try:
@@ -2389,6 +2459,7 @@ def translate_document(
                 ),
                 output_path=str(output_path),
                 model_name=target_model_name,
+                task_name=translation_task,
                 response_validator=lambda text, source_chunk=masked_chunk: validate_placeholder_chunk(source_chunk, text),
                 transport_override=transport_override,
             ).strip()
@@ -2409,6 +2480,7 @@ def translate_document(
                     system_prompt=system_prompt,
                     output_path=output_path,
                     model_name=target_model_name,
+                    task_name=translation_task,
                     language_name=language_name,
                     chunk_text=chunk,
                     transport_override=transport_override,
@@ -2422,7 +2494,8 @@ def translate_document(
             stage_name=stage_name,
             system_prompt=cleanup_prompt,
             output_path=output_path,
-            model_name=target_model_name,
+            model_name=cleanup_model_name,
+            task_name=cleanup_task,
             language_name=language_name,
             translated_body=translated_body,
             transport_override=transport_override,

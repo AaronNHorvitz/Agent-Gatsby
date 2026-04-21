@@ -152,6 +152,10 @@ class AppConfig(BaseModel):
         Default model invocation options.
     prompts : dict of str to Any
         Prompt asset locations.
+    model_routing : dict of str to Any
+        Task-based model-routing profiles.
+    llm_metrics : dict of str to Any
+        LLM call metrics configuration.
     indexing : IndexingConfig
         Passage indexing settings.
     extraction : dict of str to Any
@@ -192,6 +196,8 @@ class AppConfig(BaseModel):
     models: dict[str, Any] = Field(default_factory=dict)
     llm_defaults: dict[str, Any] = Field(default_factory=dict)
     prompts: dict[str, Any] = Field(default_factory=dict)
+    model_routing: dict[str, Any] = Field(default_factory=dict)
+    llm_metrics: dict[str, Any] = Field(default_factory=dict)
     indexing: IndexingConfig
     extraction: dict[str, Any] = Field(default_factory=dict)
     evidence_ledger: dict[str, Any] = Field(default_factory=dict)
@@ -630,6 +636,113 @@ class AppConfig(BaseModel):
 
         return self.resolve_repo_path(self.require_mapping_value("prompts", prompt_key))
 
+    def active_model_routing_profile(self) -> str:
+        """Return the active task-based model-routing profile name.
+
+        Returns
+        -------
+        str
+            Routing profile name. Defaults to ``"baseline"`` when no explicit
+            profile is configured.
+        """
+
+        run_override = str(self.run.get("model_routing_profile", "")).strip()
+        if run_override:
+            return run_override
+        configured_default = str(self.model_routing.get("active_profile", "")).strip()
+        return configured_default or "baseline"
+
+    def routing_profile(self, profile_name: str | None = None) -> dict[str, Any]:
+        """Return one configured model-routing profile.
+
+        Parameters
+        ----------
+        profile_name : str or None, optional
+            Explicit routing profile name. When omitted, the active profile is
+            used.
+
+        Returns
+        -------
+        dict of str to Any
+            Routing profile mapping.
+
+        Raises
+        ------
+        ValueError
+            If the routing profile collection or selected profile is invalid.
+        """
+
+        profiles = self.model_routing.get("profiles", {})
+        if profiles in (None, ""):
+            profiles = {}
+        if not isinstance(profiles, dict):
+            raise ValueError("Config section 'model_routing.profiles' must be a mapping")
+
+        resolved_name = (profile_name or self.active_model_routing_profile()).strip() or "baseline"
+        if not profiles and resolved_name == "baseline":
+            return {}
+
+        profile = profiles.get(resolved_name)
+        if profile is None:
+            available_profiles = ", ".join(sorted(str(name) for name in profiles)) or "(none)"
+            raise ValueError(
+                f"Unknown model routing profile '{resolved_name}'. Available profiles: {available_profiles}"
+            )
+        if not isinstance(profile, dict):
+            raise ValueError(f"Model routing profile '{resolved_name}' must be a mapping")
+        return profile
+
+    def model_key_for_task(
+        self,
+        task_name: str,
+        *,
+        profile_name: str | None = None,
+        fallback_model_key: str = "primary_reasoner",
+    ) -> str:
+        """Resolve the logical model key for an LLM task.
+
+        Parameters
+        ----------
+        task_name : str
+            Canonical task name such as ``"english_draft"``.
+        profile_name : str or None, optional
+            Explicit routing profile name. When omitted, the active profile is
+            used.
+        fallback_model_key : str, default="primary_reasoner"
+            Baseline model key used when the task is not explicitly routed.
+
+        Returns
+        -------
+        str
+            Logical model key from the ``models`` configuration section.
+
+        Raises
+        ------
+        ValueError
+            If the routing profile is invalid or the resolved model key is
+            empty.
+        """
+
+        profile = self.routing_profile(profile_name)
+        tasks = profile.get("tasks", {})
+        if tasks in (None, ""):
+            tasks = {}
+        if not isinstance(tasks, dict):
+            raise ValueError("Model routing profile tasks must be a mapping")
+
+        routed_model_key = str(tasks.get(task_name, "")).strip()
+        if routed_model_key:
+            return routed_model_key
+
+        default_model_key = str(profile.get("default_model_key", "")).strip()
+        if default_model_key:
+            return default_model_key
+
+        fallback = str(fallback_model_key).strip()
+        if fallback:
+            return fallback
+        raise ValueError(f"Could not resolve a model key for task '{task_name}'")
+
     def model_name_for(self, model_key: str) -> str:
         """Return the configured model name for a logical model key.
 
@@ -645,6 +758,52 @@ class AppConfig(BaseModel):
         """
 
         return str(self.require_mapping_value("models", model_key))
+
+    def model_name_for_task(
+        self,
+        task_name: str,
+        *,
+        profile_name: str | None = None,
+        fallback_model_key: str = "primary_reasoner",
+    ) -> str:
+        """Return the configured model name for one routed LLM task.
+
+        Parameters
+        ----------
+        task_name : str
+            Canonical task name such as ``"english_draft"``.
+        profile_name : str or None, optional
+            Explicit routing profile name. When omitted, the active profile is
+            used.
+        fallback_model_key : str, default="primary_reasoner"
+            Baseline model key used when the task is not explicitly routed.
+
+        Returns
+        -------
+        str
+            Configured model name for the routed task.
+        """
+
+        return self.model_name_for(
+            self.model_key_for_task(
+                task_name,
+                profile_name=profile_name,
+                fallback_model_key=fallback_model_key,
+            )
+        )
+
+    @property
+    def llm_metrics_output_path(self) -> Path:
+        """Return the JSONL output path for LLM call metrics.
+
+        Returns
+        -------
+        Path
+            Resolved metrics output path.
+        """
+
+        configured = str(self.llm_metrics.get("output_path", "artifacts/qa/llm_call_metrics.jsonl"))
+        return self.resolve_repo_path(configured)
 
 
 def load_config(config_path: str | Path = "config/config.yaml") -> AppConfig:

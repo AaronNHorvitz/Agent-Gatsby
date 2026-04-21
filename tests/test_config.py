@@ -68,6 +68,26 @@ verification:
   citation_registry_output_path: "artifacts/qa/citation_registry.json"
 models:
   primary_reasoner: "gemma4:26b"
+  final_critic: "gemma4:26b"
+  translator_es: "gemma4:26b"
+  translator_zh: "gemma4:26b"
+  qwen32_multilingual: "qwen2.5:32b"
+model_routing:
+  active_profile: "baseline"
+  profiles:
+    baseline:
+      default_model_key: "primary_reasoner"
+      tasks:
+        english_draft: "primary_reasoner"
+        spanish_translation: "translator_es"
+    gemma4_qwen32_translations:
+      default_model_key: "primary_reasoner"
+      tasks:
+        english_draft: "primary_reasoner"
+        spanish_translation: "qwen32_multilingual"
+llm_metrics:
+  enabled: true
+  output_path: "artifacts/qa/llm_call_metrics.jsonl"
 """
     config_path = repo_root / "config/config.yaml"
     config_path.write_text(config_text.strip() + "\n", encoding="utf-8")
@@ -96,6 +116,14 @@ def test_load_config_resolves_repo_and_output_paths(tmp_path) -> None:
     assert config.citation_registry_output_path == repo_root / "artifacts/qa/citation_registry.json"
     assert config.resolve_prompt_path("draft_prompt_path") == repo_root / "config/prompts/draft.md"
     assert config.model_name_for("primary_reasoner") == "gemma4:26b"
+    assert config.active_model_routing_profile() == "baseline"
+    assert config.model_name_for_task("english_draft") == "gemma4:26b"
+    assert config.model_name_for_task("spanish_translation") == "gemma4:26b"
+    assert config.model_name_for_task(
+        "spanish_translation",
+        profile_name="gemma4_qwen32_translations",
+    ) == "qwen2.5:32b"
+    assert config.llm_metrics_output_path == repo_root / "artifacts/qa/llm_call_metrics.jsonl"
 
 
 def test_require_mapping_value_raises_for_missing_or_blank_keys(tmp_path) -> None:
@@ -108,3 +136,19 @@ def test_require_mapping_value_raises_for_missing_or_blank_keys(tmp_path) -> Non
 
     with pytest.raises(ValueError, match="Missing required config value: prompts.missing_prompt_path"):
         config.resolve_prompt_path("missing_prompt_path")
+
+
+def test_model_key_for_task_uses_fallback_for_unmapped_tasks(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_config_repo(repo_root))
+
+    assert config.model_key_for_task("unmapped_task") == "primary_reasoner"
+    assert config.model_name_for_task("unmapped_task") == "gemma4:26b"
+
+
+def test_routing_profile_raises_for_unknown_profile(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    config = load_config(write_config_repo(repo_root))
+
+    with pytest.raises(ValueError, match="Unknown model routing profile 'missing_profile'"):
+        config.routing_profile("missing_profile")

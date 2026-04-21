@@ -595,7 +595,8 @@ def run_llm_forensic_audit(
             system_prompt=prompt,
             user_prompt=user_prompt,
             output_path=str(output_path),
-            model_name=str(config.models.get("final_critic", config.models.get("primary_reasoner", ""))),
+            task_name="final_forensic_audit",
+            fallback_model_key="final_critic",
             response_validator=lambda text: validate_forensic_audit_response(text, language=language),
             transport_override="ollama_native_chat",
         )

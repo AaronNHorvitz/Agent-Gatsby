@@ -478,6 +478,7 @@ def simplify_style_block(
             system_prompt=system_prompt,
             user_prompt=build_style_simplifier_user_prompt(protected_text),
             output_path=str(config.final_draft_output_path),
+            task_name="english_critique",
             response_validator=build_style_simplifier_response_validator(
                 protected_text,
                 minimum_word_ratio=minimum_word_ratio,
@@ -599,6 +600,7 @@ def critique_and_edit(
             system_prompt=load_critic_prompt(config),
             user_prompt=build_editorial_user_prompt(loaded_draft),
             output_path=str(config.final_draft_output_path),
+            task_name="english_critique",
             response_validator=build_editorial_response_validator(loaded_draft),
             transport_override=transport_override,
         ).strip()

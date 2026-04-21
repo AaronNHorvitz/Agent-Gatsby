@@ -9,6 +9,11 @@ Agent Gatsby is a local-first AI pipeline built for Treasury's supplemental *Gre
 
 This repository is meant to demonstrate more than prompt writing. It shows the underlying job requirement in code: implementing an AI solution in a real local test environment with explicit validation, deterministic artifacts, and failure gates.
 
+Current experimental routing profile:
+- `gemma4:26b` for English extraction, planning, drafting, critique, and audit tasks
+- `qwen2.5:32b` for Spanish translation
+- `qwen2.5:32b` for Mandarin translation
+
 What this repo proves:
 - local AI execution with no hosted inference dependency in the reference path
 - evidence-first drafting instead of one-shot generation
@@ -26,7 +31,7 @@ Current shipped outputs:
 
 For the compressed weekend execution record, see `SPRINTBOARD.md`.
 
-In its current reference configuration, the repo runs against a local Ollama-compatible endpoint at `http://localhost:11434/v1` and uses `gemma4:26b` for drafting and both translation paths. During development, that local setup ran on a single NVIDIA RTX 4090 rather than a hosted API. That keeps the novel, drafts, translations, QA artifacts, and PDFs on-device, reduces exfiltration risk, avoids API-key sprawl, and keeps the trust boundary smaller and easier to audit.
+In its current experimental configuration, the repo runs against a local Ollama-compatible endpoint at `http://localhost:11434/v1` and uses task-based local model routing: `gemma4:26b` handles English extraction, generation, and audit workloads, while `qwen2.5:32b` handles the Spanish and Mandarin translation lanes. During development, that local setup ran on a single NVIDIA RTX 4090 rather than a hosted API. That keeps the novel, drafts, translations, QA artifacts, and PDFs on-device, reduces exfiltration risk, avoids API-key sprawl, and keeps the trust boundary smaller and easier to audit.
 
 One practical adjustment was needed in the English path. When the model drafts from Fitzgerald-heavy evidence, it tends to drift toward ornate literary-analysis prose. To keep the final report readable in plain English, the system drafts a fuller first pass and then applies a bounded rewrite pass that only touches prose paragraphs while preserving verified quotes, citation markers, headings, and evidence structure.
 
@@ -203,6 +208,8 @@ flowchart TD
 ```
 
 Chunk-level translation and cleanup stages use bounded retries and fragment-safe fallback paths when citation placeholders drift. Final PDF promotion is blocked unless deterministic QA and the post-PDF forensic audit both pass.
+
+The current experimental routing profile does not change the pipeline shape shown above. It changes which local model handles each task: English planning/drafting/audit tasks route to `gemma4:26b`, while Spanish and Mandarin translation tasks route to `qwen2.5:32b`.
 
 At a high level, the system is divided into eight logical layers:
 
@@ -859,33 +866,51 @@ This is more conservative than a “fully autonomous” loop, but much closer to
 
 ## 10. Model Strategy
 
-## 10.1 Default reference model
-The default local reasoning and writing model is configured through Ollama and can be set in configuration:
+## 10.1 Task-based local model routing
+The pipeline now supports task-based routing across local models instead of requiring one model for every LLM-backed stage. The active experimental profile is configured through Ollama and selected in configuration:
 
 ```yaml
+run:
+  model_routing_profile: "gemma4_qwen32_translations"
+
 models:
   primary_reasoner: "gemma4:26b"
   final_critic: "gemma4:26b"
   translator_es: "gemma4:26b"
   translator_zh: "gemma4:26b"
+  qwen32_multilingual: "qwen2.5:32b"
+
+model_routing:
+  profiles:
+    gemma4_qwen32_translations:
+      tasks:
+        english_outline: "primary_reasoner"
+        english_draft: "primary_reasoner"
+        english_expand: "primary_reasoner"
+        english_critique: "primary_reasoner"
+        spanish_translation: "qwen32_multilingual"
+        spanish_cleanup: "qwen32_multilingual"
+        mandarin_translation: "qwen32_multilingual"
+        mandarin_cleanup: "qwen32_multilingual"
+        dynamic_validation: "final_critic"
+        final_forensic_audit: "final_critic"
 ```
 
-## 10.2 Why a single default model is used in the reference path
-- simplifies setup
+## 10.2 Current experimental profile
+- `gemma4:26b` handles English planning, drafting, bounded expansion, critique, dynamic validation, and forensic audit work
+- `qwen2.5:32b` handles Spanish translation and Spanish cleanup
+- `qwen2.5:32b` handles Mandarin translation and Mandarin cleanup
+
+This profile is intentionally narrow. It changes the English-versus-translation routing first without yet varying the critic and audit families independently.
+
+## 10.3 Why this routing split exists
 - keeps the pipeline fully local
-- reduces moving parts
-- demonstrates that the core system behavior comes from orchestration, verification, and constraints, not from external model dependence
+- preserves deterministic stage contracts while allowing targeted model comparisons
+- lets the repo benchmark language-specific translation behavior without rewriting the pipeline
+- keeps English reasoning and final audit work on the current strongest local analyst
 
-## 10.3 Optional model routing
-The architecture is designed so that translator or critic stages can be swapped later without breaking system contracts.
-
-### Example future routing
-- primary_reasoner -> planning, extraction, English drafting
-- final_critic -> final polish
-- translator_es -> Spanish translation
-- translator_zh -> Mandarin translation
-
-The system is model-routable, but the baseline implementation keeps the operational story simple.
+## 10.4 Baseline and future comparisons
+The config still supports a simpler baseline profile where `gemma4:26b` handles every task. The task-based routing layer exists so future experiments can compare other model families by task without changing stage logic, artifact contracts, or validation behavior.
 
 ---
 
@@ -1217,6 +1242,7 @@ run:
   output_dir: "outputs"
   artifacts_dir: "artifacts"
   log_level: "INFO"
+  model_routing_profile: "gemma4_qwen32_translations"
   language_targets:
     - "english"
     - "spanish"
@@ -1228,6 +1254,7 @@ models:
   final_critic: "gemma4:26b"
   translator_es: "gemma4:26b"
   translator_zh: "gemma4:26b"
+  qwen32_multilingual: "qwen2.5:32b"
   temperature: 0.2
 
 drafting:
@@ -1296,9 +1323,10 @@ Open a separate terminal and start Ollama:
 ollama serve
 ```
 
-## 19.5 Pull the reference model
+## 19.5 Pull the local models used by the current experimental profile
 ```bash
 ollama pull gemma4:26b
+ollama pull qwen2.5:32b
 ```
 
 ## 19.6 Run the full pipeline
@@ -1308,7 +1336,7 @@ From an activated virtual environment:
 python -m agent_gatsby.orchestrator --config config/config.yaml --run all
 ```
 
-That command runs the reference path end to end and produces:
+That command runs the current local routing profile end to end and produces:
 
 - `outputs/Gatsby_Analysis_English.pdf`
 - `outputs/Gatsby_Analysis_Spanish.pdf`

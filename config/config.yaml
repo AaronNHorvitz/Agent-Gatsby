@@ -10,6 +10,7 @@ run:
   fail_fast: true
   overwrite_outputs: true
   save_intermediate_artifacts: true
+  model_routing_profile: "gemma4_qwen32_translations"
 
 paths:
   repo_root: "."
@@ -52,7 +53,8 @@ models:
   final_critic: "gemma4:26b"
   translator_es: "gemma4:26b"
   translator_zh: "gemma4:26b"
-  timeout_seconds: 180
+  qwen32_multilingual: "qwen2.5:32b"
+  timeout_seconds: 600
   max_retries: 2
   retry_backoff_seconds: 3
 
@@ -76,6 +78,42 @@ prompts:
   qa_prompt_path: "config/prompts/translation_qa.md"
   final_forensic_audit_prompt_path: "config/prompts/final_forensic_audit.md"
   dynamic_validation_prompt_path: "config/prompts/dynamic_validation_critic.md"
+
+model_routing:
+  active_profile: "baseline"
+  profiles:
+    baseline:
+      default_model_key: "primary_reasoner"
+      tasks:
+        metaphor_extraction: "primary_reasoner"
+        english_outline: "primary_reasoner"
+        english_draft: "primary_reasoner"
+        english_expand: "primary_reasoner"
+        english_critique: "primary_reasoner"
+        spanish_translation: "translator_es"
+        spanish_cleanup: "translator_es"
+        mandarin_translation: "translator_zh"
+        mandarin_cleanup: "translator_zh"
+        dynamic_validation: "final_critic"
+        final_forensic_audit: "final_critic"
+    gemma4_qwen32_translations:
+      default_model_key: "primary_reasoner"
+      tasks:
+        metaphor_extraction: "primary_reasoner"
+        english_outline: "primary_reasoner"
+        english_draft: "primary_reasoner"
+        english_expand: "primary_reasoner"
+        english_critique: "primary_reasoner"
+        spanish_translation: "qwen32_multilingual"
+        spanish_cleanup: "qwen32_multilingual"
+        mandarin_translation: "qwen32_multilingual"
+        mandarin_cleanup: "qwen32_multilingual"
+        dynamic_validation: "final_critic"
+        final_forensic_audit: "final_critic"
+
+llm_metrics:
+  enabled: true
+  output_path: "artifacts/qa/llm_call_metrics.jsonl"
 
 indexing:
   output_path: "artifacts/manifests/passage_index.json"
@@ -204,7 +242,8 @@ editorial:
 translation:
   split_strategy: "heading_then_paragraph_group"
   max_chunk_chars: 5000
-  post_edit_body: true
+  llm_transport: "openai_compatible"
+  post_edit_body: false
   preserve_headings: true
   preserve_citations: true
   preserve_quote_markers: true
